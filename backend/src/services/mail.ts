@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer";
 import { prisma } from "./database";
 import {
@@ -68,12 +69,74 @@ export type MailInput = {
   text?: string;
   replyTo?: string;
   from?: string;
+  /** invites, receipts … — sent even to addresses that unsubscribed */
+  essential?: boolean;
+  /** the template key, noted when someone unsubscribes from it */
+  category?: string;
 };
 
 /**
  * Core send. NEVER throws — returns a result so fire-and-forget callers stay safe.
  * A logged no-op when email isn't configured or there's no recipient.
  */
+// ── Footer: the sender's postal address and Unsubscribe (CASL / CAN-SPAM), on every email ──
+
+/** The postal address at the foot of every email; env MAIL_POSTAL_ADDRESS overrides (lines split by "|"). */
+const MAIL_POSTAL_ADDRESS = (process.env.MAIL_POSTAL_ADDRESS || "Drift.li - Visionlight Productions Inc.|Box 549|Rosenort, MB, Canada|R0G 1W0")
+  .split("|")
+  .map((s) => s.trim())
+  .filter(Boolean);
+/** renderEmail leaves this in the footer; sendMail swaps in each recipient's own link. */
+export const UNSUBSCRIBE_PLACEHOLDER = "%%DRIFT_UNSUBSCRIBE_URL%%";
+const PUBLIC_URL = (process.env.DRIFT_APP_URL || "https://drift.li").replace(/\/+$/, "");
+const UNSUBSCRIBE_SECRET = process.env.MAIL_UNSUBSCRIBE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+if (!UNSUBSCRIBE_SECRET) console.warn(`[${NS}] MAIL_UNSUBSCRIBE_SECRET not set — unsubscribe links use a fixed key`);
+
+const unsubscribeSignature = (email: string) =>
+  crypto
+    .createHmac("sha256", UNSUBSCRIBE_SECRET || "drift-mail-unsubscribe")
+    .update(`unsubscribe:${email}`)
+    .digest("base64url")
+    .slice(0, 32);
+
+/** This address's own unsubscribe link (signed, so only its holder can use it). */
+export function unsubscribeUrl(email: string, key?: string): string {
+  const e = email.trim().toLowerCase();
+  const q = new URLSearchParams({ e: Buffer.from(e).toString("base64url"), t: unsubscribeSignature(e) });
+  if (key) q.set("k", key);
+  return `${PUBLIC_URL}/api/mail/unsubscribe?${q.toString()}`;
+}
+
+/** The address an unsubscribe link belongs to, or null when it's been tampered with. */
+export function readUnsubscribeLink(query: Record<string, unknown>): { email: string; key: string | null } | null {
+  const e = typeof query.e === "string" ? query.e : "";
+  const t = typeof query.t === "string" ? query.t : "";
+  if (!e || !t || e.length > 400) return null;
+  let email = "";
+  try {
+    email = Buffer.from(e, "base64url").toString("utf8").trim().toLowerCase();
+  } catch {
+    return null;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  const want = Buffer.from(unsubscribeSignature(email));
+  const got = Buffer.from(t);
+  if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return null;
+  const key = typeof query.k === "string" && /^[a-z0-9.]{1,60}$/.test(query.k) ? query.k : null;
+  return { email, key };
+}
+
+/** Which of these addresses unsubscribed (none when the table isn't pushed yet). */
+async function unsubscribedOf(emails: string[]): Promise<Set<string>> {
+  if (!emails.length) return new Set();
+  try {
+    const rows = await prisma.emailOptOut.findMany({ where: { email: { in: emails } }, select: { email: true } });
+    return new Set(rows.map((r) => r.email));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function sendMail(
   input: MailInput,
 ): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
@@ -86,6 +149,38 @@ export async function sendMail(
   if (!to.length) {
     console.warn(`[${NS}] no recipient for "${input.subject}" — skipped`);
     return { ok: false, skipped: true };
+  }
+  // An email with the footer goes to each person on its own, with their own Unsubscribe link —
+  // and not at all to someone who unsubscribed (unless it's essential: an invite, a receipt).
+  if (input.html && input.html.includes(UNSUBSCRIBE_PLACEHOLDER)) {
+    const bccList = (Array.isArray(input.bcc) ? input.bcc : input.bcc ? [input.bcc] : []).map((s) => (s || "").trim()).filter(Boolean);
+    const everyone = [...new Set([...to, ...bccList].map((s) => s.toLowerCase()))];
+    const gone = input.essential ? new Set<string>() : await unsubscribedOf(everyone);
+    const list = everyone.filter((e) => !gone.has(e));
+    if (gone.size) console.log(`[${NS}] "${input.subject}": ${gone.size} unsubscribed recipient(s) left out`);
+    if (!list.length) return { ok: false, skipped: true };
+    let failures = 0;
+    let lastError = "";
+    for (const rcpt of list) {
+      const url = unsubscribeUrl(rcpt, input.category);
+      try {
+        await t.sendMail({
+          from: input.from || MAIL_FROM,
+          to: rcpt,
+          subject: input.subject,
+          text: input.text,
+          html: input.html.split(UNSUBSCRIBE_PLACEHOLDER).join(url.replace(/&/g, "&amp;")),
+          replyTo: input.replyTo || MAIL_REPLY_TO || undefined,
+          headers: { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        });
+      } catch (e: any) {
+        failures++;
+        lastError = e?.message || String(e);
+        console.error(`[${NS}] send failed "${input.subject}" → ${rcpt}:`, lastError);
+      }
+    }
+    if (failures < list.length) console.log(`[${NS}] sent "${input.subject}" → ${list.filter(Boolean).join(", ")}${failures ? ` (${failures} failed)` : ""}`);
+    return failures < list.length ? { ok: true } : { ok: false, error: lastError };
   }
   try {
     const bcc = (Array.isArray(input.bcc) ? input.bcc : input.bcc ? [input.bcc] : [])
@@ -169,7 +264,8 @@ export function renderEmail(opts: {
           ${opts.footnote ? `<p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#8a93a3">${esc(opts.footnote)}</p>` : ""}
         </td></tr>
       </table>
-      <p style="margin:16px 0 0;font-size:11px;color:#98a1b0">Sent by Drift Live Interactive · drift.li</p>
+      <p style="margin:18px 0 0;font-size:10px;line-height:1.5;color:#98a1b0">${MAIL_POSTAL_ADDRESS.map(esc).join("<br>")}<br>
+        <a href="${UNSUBSCRIBE_PLACEHOLDER}" style="color:#98a1b0;text-decoration:underline">Unsubscribe</a></p>
     </td></tr>
   </table></body></html>`;
 }
@@ -289,6 +385,8 @@ export async function sendTemplated(key: string, opts: TemplatedSend): Promise<v
     subject: r.subject,
     html: r.html,
     replyTo: opts.replyTo,
+    essential: !!templateByKey(key)?.essential,
+    category: key,
   });
 }
 

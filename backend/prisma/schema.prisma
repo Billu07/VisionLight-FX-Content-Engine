@@ -925,3 +925,12 @@ model MailTemplate {
 
   @@unique([key, scope])
 }
+
+/// Addresses that used an email's Unsubscribe link (services/mail.ts). They stop getting
+/// notification emails; invites, receipts and other emails they asked for still go
+/// (MailTemplateDef.essential). Additive — needs a `prisma db push` before the restart.
+model EmailOptOut {
+  email     String   @id // lower-case
+  source    String? // the email (template key) the link came from
+  createdAt DateTime @default(now())
+}

@@ -399,6 +399,17 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   reset / preview / test). Overrides live in `MailTemplate` (scope GLOBAL; org scope reserved).
   Senders call `sendTemplated(key, { vars, defaultTo, rows?, replyTo? })`; reads fail soft when
   the table isn't pushed yet. New email = add a def to `MAIL_TEMPLATES` + a sender in mail.ts.
+- **Footer + Unsubscribe (2026-09-22, CASL / CAN-SPAM; client's wording):** every email's footer carries the postal
+  address "Drift.li - Visionlight Productions Inc. · Box 549 · Rosenort, MB, Canada · R0G 1W0" (env
+  `MAIL_POSTAL_ADDRESS`, lines split by "|") in 10px, and **Unsubscribe**. `renderEmail` leaves
+  `UNSUBSCRIBE_PLACEHOLDER` there; `sendMail` then sends **one message per recipient** (to + bcc) with their own
+  signed link (`unsubscribeUrl`, HMAC with env `MAIL_UNSUBSCRIBE_SECRET`, falling back to the service-role key) and
+  `List-Unsubscribe` + `List-Unsubscribe-Post: One-Click` headers. `routes/mailUnsubscribe.ts`:
+  `GET /api/mail/unsubscribe` = a confirm page (link scanners open links, so GET never unsubscribes), POST (the button,
+  and mail apps' one-click) records `EmailOptOut` (schema model, additive) — "Subscribe Again" deletes it. Opted-out
+  addresses are left out of every email except `essential` templates (`drift.brand.invite`, `tour.pro.invite`,
+  `tour.order.paid.creator`). Supabase's own auth emails (confirm, reset) are set in the Supabase dashboard — the
+  address goes there by hand (the project is shared with the studio).
 - **Ops owed by user**: VPS env `SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`
   (`pm2 restart --update-env`); drift.li DNS (Namecheap): MX + SPF (via Mail Settings →
   Private Email), DKIM (`default._domainkey`, value from client), DMARC (`_dmarc`).

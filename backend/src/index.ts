@@ -16,6 +16,7 @@ import driftRouter, { recoverOrphanedDriftJobs } from "./routes/drift";
 import driftFlowsRouter from "./routes/driftFlows";
 import driftCreatorRouter from "./routes/driftCreator";
 import driftMailRouter from "./routes/driftMail";
+import mailUnsubscribeRouter from "./routes/mailUnsubscribe";
 import driftTourAdminRouter from "./routes/driftTourAdmin";
 import driftShareRouter from "./routes/driftShare";
 import { mailConfigured, verifyMail } from "./services/mail";
@@ -63,6 +64,7 @@ app.use(driftRouter);
 app.use(driftFlowsRouter);
 app.use(driftCreatorRouter);
 app.use(driftMailRouter);
+app.use(mailUnsubscribeRouter);
 app.use(driftTourAdminRouter);
 // drift.li link previews: each page's head, share cards, robots.txt, sitemap (reached through nginx).
 app.use(driftShareRouter);

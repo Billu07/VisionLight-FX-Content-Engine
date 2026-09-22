@@ -481,3 +481,10 @@ Drift.li is a division of PicDrift
   only when a page has neither. Try It Free (/tour/start) got an × and lost its theme toggle (dark only, missed in
   phase 1). Fixed on the way: the enquiry/contact form rendered inside the animated page hero, so the sections below it
   painted over the form — it now renders at the page root. Verified against the mocked API (scratchpad/ui-shots.js).
+- 2026-09-22 — Email compliance (client's footer, CASL / CAN-SPAM). Every email now ends with the postal address
+  (Drift.li - Visionlight Productions Inc., Box 549, Rosenort, MB, Canada, R0G 1W0) in small print and an Unsubscribe
+  link; each recipient gets their own message and their own signed link, plus one-click unsubscribe headers for
+  Gmail / Yahoo. The link opens a confirm page (no accidental unsubscribes from link scanners); unsubscribed addresses
+  stop getting notifications but still get invites and receipts. New model `EmailOptOut` — **needs `prisma db push`
+  before the backend restart.** Verified against a fake local SMTP server (scratchpad/mail-test.ts: 24 checks — one
+  message per person, footer, own link, headers, tampered links refused, GET never unsubscribes).

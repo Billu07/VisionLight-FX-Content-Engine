@@ -1,6 +1,6 @@
 import { Router, Response } from "express";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
-import { adminEmails, mailConfigured, mailFromAddress, renderTemplated, sendTemplated } from "../services/mail";
+import { UNSUBSCRIBE_PLACEHOLDER, adminEmails, mailConfigured, mailFromAddress, renderTemplated, sendTemplated } from "../services/mail";
 import {
   MAIL_TEMPLATES,
   deleteOverride,
@@ -126,7 +126,8 @@ router.post("/api/drift/mail/templates/:key/preview", authenticateToken, require
   if (!def) return res.status(404).json({ error: "Unknown email template" });
   const draft = sanitizeOverrideInput(req.body?.draft || {});
   const r = await renderTemplated(def.key, { vars: varsFromBody(def.key, req.body), rows: sampleRows(def.key), draft });
-  res.json({ subject: r.subject, html: r.html, enabled: r.enabled });
+  // Each real email gets its reader's own Unsubscribe link; the preview shows where it goes.
+  res.json({ subject: r.subject, html: r.html.split(UNSUBSCRIBE_PLACEHOLDER).join("#unsubscribe"), enabled: r.enabled });
 });
 
 // Send the (draft) template with sample values to the caller — or to `to`.

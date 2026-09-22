@@ -34,6 +34,8 @@ export type MailTemplateDef = {
   trigger: string;
   /** who receives it when recipients are left on "default" */
   audience: string;
+  /** still sent to someone who unsubscribed (invites, receipts — emails they asked for) */
+  essential?: boolean;
   vars: MailTemplateVar[];
   defaults: MailTemplateFields;
 };
@@ -89,6 +91,7 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
   },
   {
     key: "drift.brand.invite",
+    essential: true,
     name: "Brand admin invite",
     description: "Sign-in details for a brand admin created by a superadmin. The email and temporary password are listed automatically.",
     trigger: "A superadmin creates a brand with an admin email",
@@ -243,6 +246,7 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
   },
   {
     key: "tour.order.paid.creator",
+    essential: true,
     name: "Drifts paid (to the buyer)",
     description: "Confirms a tour checkout and says the drifts are converting. Stripe sends its own receipt when receipts are on.",
     trigger: "A tour checkout is paid",
@@ -290,6 +294,7 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
   },
   {
     key: "tour.pro.invite",
+    essential: true,
     name: "Page invite (to the invitee)",
     description: "The one-time link a page admin sends so someone can join the page as an Admin, Editor or Viewer.",
     trigger: "A page admin invites someone",
