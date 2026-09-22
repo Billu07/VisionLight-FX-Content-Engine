@@ -118,7 +118,7 @@ export function PrintKit({
           ×
         </button>
         <div className="pk-head">
-          <div className="d-eyebrow">Print kit</div>
+          <div className="d-eyebrow">Print Kit</div>
           <div className="t-sheet-title">{flow.title || flow.name}</div>
         </div>
         <div className="pk-controls">
@@ -145,16 +145,16 @@ export function PrintKit({
               </select>
             </label>
             <label className="pk-opt">
-              The QR code opens
+              The QR Code Opens
               <select className="d-select" value={unbranded ? "unbranded" : "tour"} onChange={(e) => void pickLink(e.target.value)} disabled={busy}>
-                <option value="tour">The tour link</option>
-                <option value="unbranded">The unbranded link (MLS)</option>
+                <option value="tour">The Tour Link</option>
+                <option value="unbranded">The Unbranded Link (MLS)</option>
               </select>
             </label>
           </div>
           <div className="d-faint pk-hint">
             {hint}
-            {unbranded ? " The unbranded version leaves out your page name and logo." : ""}
+            {unbranded ? " The Unbranded Version Leaves Out Your Page Name and Logo." : ""}
           </div>
         </div>
         <div className="pk-preview" ref={previewRef}>
@@ -164,10 +164,10 @@ export function PrintKit({
         </div>
         <div className="t-actions pk-actions">
           <button type="button" className="d-btn primary" onClick={() => window.print()} disabled={busy}>
-            Print or save as PDF
+            Print or Save as PDF
           </button>
           <span className="d-faint" style={{ fontSize: 12 }}>
-            To download it, choose "Save as PDF" in the print dialog.
+            To Download It, Choose "Save as PDF" in the Print Dialog.
           </span>
         </div>
       </div>

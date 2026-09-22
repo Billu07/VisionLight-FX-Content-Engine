@@ -42,7 +42,7 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
       <div className="drift-ui d-page" data-theme="dark">
         <DriftThemeStyles />
         <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
-          <div className="d-faint" style={{ fontSize: 13 }}>Loading your space…</div>
+          <div className="d-faint" style={{ fontSize: 13 }}>Loading Your Space…</div>
         </div>
       </div>
     );
@@ -73,8 +73,8 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
       <DriftThemeStyles />
       <main className="d-main" style={{ maxWidth: 520 }}>
         <div className="d-card d-card-pad" style={{ display: "grid", gap: 14 }}>
-          <div className="d-eyebrow">drift.li · creator suite</div>
-          <h1 className="d-h1" style={{ fontSize: 24 }}>Set up your creator space</h1>
+          <div className="d-eyebrow">drift.li · Creator Suite</div>
+          <h1 className="d-h1" style={{ fontSize: 24 }}>Set Up Your Creator Space</h1>
           <p className="d-sub">
             You're signed in as <strong style={{ color: "var(--text)" }}>{email}</strong>. Your creator
             space is a separate, personal workspace for tours — your other workspaces stay exactly as
@@ -82,7 +82,7 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
           </p>
           {error && <div className="d-banner err">{error}</div>}
           <button className="d-btn primary" style={{ padding: "12px 16px", fontSize: 14 }} disabled={busy} onClick={create}>
-            {busy ? "Setting up…" : "Create my creator space"}
+            {busy ? "Setting Up…" : "Create My Creator Space"}
           </button>
         </div>
       </main>

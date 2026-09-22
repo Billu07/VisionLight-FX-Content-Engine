@@ -77,7 +77,7 @@ export function TourInsights({
       if (!path) return;
     }
     const ok = await copyText(publicUrl(path));
-    notify[ok ? "success" : "error"](ok ? "Owner report link copied" : "Couldn't copy the link");
+    notify[ok ? "success" : "error"](ok ? "Owner Report Link Copied" : "Couldn't Copy the Link");
   };
 
   const turnOff = async () => {
@@ -86,7 +86,7 @@ export function TourInsights({
     try {
       await apiEndpoints.driftDeleteReportLink(flow.id);
       setPath(null);
-      notify.success("Owner report link turned off");
+      notify.success("Owner Report Link Turned Off");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -115,8 +115,8 @@ export function TourInsights({
           </div>
         ) : failed ? (
           <div className="ti-empty">
-            <h3>Couldn't load the insights</h3>
-            <p>Please try again in a moment.</p>
+            <h3>Couldn't Load the Insights</h3>
+            <p>Please Try Again in a Moment.</p>
           </div>
         ) : (
           <div className="d-faint" style={{ fontSize: 13 }}>
@@ -126,29 +126,29 @@ export function TourInsights({
         <div className="t-share-more">
           <div className="t-share-row">
             <span className="grow">
-              <b>Owner report</b>
+              <b>Owner Report</b>
               <small>A live, read-only page of these numbers for the owner or your client. No login, and no names, messages or personal links on it.</small>
             </span>
             {reportPath ? (
               <>
                 <button type="button" className="d-btn sm primary" onClick={() => void copyReport()} disabled={busy}>
-                  Copy link
+                  Copy Link
                 </button>
                 <a className="d-btn sm" href={reportPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
                   Open
                 </a>
                 {canManage && (
                   <button type="button" className="d-btn sm ghost" onClick={() => void turnOff()} disabled={busy}>
-                    Turn off
+                    Turn Off
                   </button>
                 )}
               </>
             ) : canManage ? (
               <button type="button" className="d-btn sm" onClick={() => void copyReport()} disabled={busy}>
-                {busy ? "Making…" : "Get link"}
+                {busy ? "Making…" : "Get Link"}
               </button>
             ) : (
-              <small className="d-faint">An editor on this page can make one.</small>
+              <small className="d-faint">An Editor on This Page Can Make One.</small>
             )}
           </div>
         </div>

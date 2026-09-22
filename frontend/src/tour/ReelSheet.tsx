@@ -167,7 +167,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
       a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) {
-      notify.error(apiError(e, "Couldn't download the reel"));
+      notify.error(apiError(e, "Couldn't Download the Reel"));
     } finally {
       setSaving(null);
     }
@@ -178,15 +178,15 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
     try {
       const file = await getFile();
       if (!navigator.canShare?.({ files: [file] })) {
-        notify.error("This browser can't share videos — use Download instead.");
+        notify.error("This Browser Can't Share Videos — Use Download Instead.");
         return;
       }
       await navigator.share({ files: [file], title: flow.title || flow.name });
     } catch (e: any) {
       if (e?.name === "AbortError") return; // closed the share sheet
       // Some phones only allow sharing right after a tap; the video is ready now.
-      if (e?.name === "NotAllowedError") notify.info("The video is ready — tap Share again.");
-      else notify.error(apiError(e, "Couldn't share the reel"));
+      if (e?.name === "NotAllowedError") notify.info("The Video Is Ready — Tap Share Again.");
+      else notify.error(apiError(e, "Couldn't Share the Reel"));
     } finally {
       setSaving(null);
     }
@@ -228,7 +228,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
           <div className="d-faint rs-hint">{current.hint}</div>
           {suggested && (
             <div className="rs-suggest">
-              Your clips are mostly {suggested === "landscape" ? "landscape" : "portrait"} — {suggested === "landscape" ? "Landscape" : "Portrait"} suits them best.
+              Your Clips Are Mostly {suggested === "landscape" ? "Landscape" : "Portrait"} — {suggested === "landscape" ? "Landscape" : "Portrait"} Suits Them Best.
             </div>
           )}
         </div>
@@ -246,19 +246,19 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
                   ) : status === "RENDERING" ? (
                     <>
                       <Spinner />
-                      <b>Making your reel…</b>
+                      <b>Making Your Reel…</b>
                       <span>Usually about a minute. You can close this — it keeps going.</span>
                     </>
                   ) : status === "FAILED" ? (
                     <>
-                      <b>That didn't work</b>
-                      <span>{reel.error || "Please try again."}</span>
+                      <b>That Didn't Work</b>
+                      <span>{reel.error || "Please Try Again."}</span>
                     </>
                   ) : (
                     <>
-                      <b>No {current.label.toLowerCase()} reel yet</b>
+                      <b>No {current.label.toLowerCase()} Reel Yet</b>
                       <span>
-                        {reel.drifts} {reel.drifts === 1 ? "drift plays" : "drifts play"} through, one after another.
+                        {reel.drifts} {reel.drifts === 1 ? "Drift Plays" : "Drifts Play"} Through, One After Another.
                       </span>
                     </>
                   )}
@@ -270,8 +270,8 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
 
         {status === "READY" && reel && (
           <div className="rs-meta">
-            {reel.seconds ? `${Math.round(reel.seconds)} seconds · ` : ""}made {timeAgo(reel.renderedAt)}
-            {reel.stale ? " · the tour has changed since" : ""}
+            {reel.seconds ? `${Math.round(reel.seconds)} Seconds · ` : ""}made {timeAgo(reel.renderedAt)}
+            {reel.stale ? " · The Tour Has Changed Since" : ""}
           </div>
         )}
 
@@ -288,14 +288,14 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
               )}
               {reel.stale && (
                 <button type="button" className="d-btn ghost" onClick={() => void make()} disabled={starting}>
-                  {starting ? "Starting…" : "Make a new reel"}
+                  {starting ? "Starting…" : "Make a New Reel"}
                 </button>
               )}
             </>
           )}
           {(status === "NONE" || status === "FAILED") && (
             <button type="button" className="d-btn primary" onClick={() => void make()} disabled={starting}>
-              {starting ? "Starting…" : status === "FAILED" ? "Try again" : "Make the reel"}
+              {starting ? "Starting…" : status === "FAILED" ? "Try Again" : "Make the Reel"}
             </button>
           )}
         </div>

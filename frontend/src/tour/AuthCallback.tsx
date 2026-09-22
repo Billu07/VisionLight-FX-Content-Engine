@@ -100,8 +100,8 @@ export default function AuthCallback() {
       <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 20 }}>
         {confirm ? (
           <div className="d-card d-card-pad" style={{ maxWidth: 460, display: "grid", gap: 12 }}>
-            <div className="d-eyebrow">drift.li · creator suite</div>
-            <div className="d-h2" style={{ fontSize: 20 }}>Create a separate creator space?</div>
+            <div className="d-eyebrow">drift.li · Creator Suite</div>
+            <div className="d-h2" style={{ fontSize: 20 }}>Create a Separate Creator Space?</div>
             <p className="d-sub">
               <strong style={{ color: "var(--text)" }}>{confirm.email}</strong> already has a workspace on this platform.
               A creator space is a separate, personal workspace for tours — your existing workspace stays exactly as it is.
@@ -123,19 +123,19 @@ export default function AuthCallback() {
                 }
               }}
             >
-              {busy ? "Setting up…" : "Yes, create my creator space"}
+              {busy ? "Setting Up…" : "Yes, Create My Creator Space"}
             </button>
             <Link to="/" className="d-btn ghost" style={{ textDecoration: "none", justifySelf: "start" }}>
-              Not now
+              Not Now
             </Link>
           </div>
         ) : error ? (
           <div className="d-card d-card-pad" style={{ maxWidth: 420, display: "grid", gap: 12 }}>
             <div className="d-eyebrow">Sign-in</div>
-            <div className="d-h2">That didn't go through</div>
+            <div className="d-h2">That Didn't Go Through</div>
             <div className="d-banner err">{error}</div>
             <Link to={CREATOR_START} className="d-btn primary" style={{ textDecoration: "none" }}>
-              Back to sign-in
+              Back to Sign-in
             </Link>
           </div>
         ) : (
@@ -143,7 +143,7 @@ export default function AuthCallback() {
             <div className="d-wordmark" style={{ marginBottom: 10 }}>
               drift<i>.li</i>
             </div>
-            <div className="d-faint" style={{ fontSize: 13 }}>Signing you in…</div>
+            <div className="d-faint" style={{ fontSize: 13 }}>Signing You In…</div>
           </div>
         )}
       </div>

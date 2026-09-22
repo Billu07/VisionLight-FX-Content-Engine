@@ -143,8 +143,8 @@ export default function UnbrandedTour() {
       <div className="ub-state">
         <style>{UB_CSS}</style>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#eef1f6", marginBottom: 6 }}>This tour isn't available</div>
-          <div>The link may have changed, or the tour is no longer online.</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#eef1f6", marginBottom: 6 }}>This Tour Isn't Available</div>
+          <div>The Link May Have Changed, or the Tour Is No Longer Online.</div>
         </div>
       </div>
     );
@@ -164,12 +164,12 @@ export default function UnbrandedTour() {
         <style>{UB_CSS}</style>
         <main className="ub-main">
           {summary.thumb && <img className="ub-cover" src={summary.thumb} alt="" />}
-          <div className="ub-kicker">Interactive tour</div>
+          <div className="ub-kicker">Interactive Tour</div>
           <h1>{summary.title}</h1>
           {summary.description && <p className="ub-desc">{summary.description}</p>}
           {summary.steps.length > 0 && (
             <button type="button" className="ub-start" onClick={() => setSearch({ d: "0" })}>
-              ▶ Start tour
+              ▶ Start Tour
             </button>
           )}
           <ol className="ub-list">
@@ -186,7 +186,7 @@ export default function UnbrandedTour() {
               </li>
             ))}
           </ol>
-          <p className="ub-foot">Drag across each view to look around.</p>
+          <p className="ub-foot">Drag Across Each View to Look Around.</p>
         </main>
       </div>
     );

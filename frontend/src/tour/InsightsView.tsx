@@ -73,7 +73,7 @@ export function RangeTabs({ value, onChange }: { value: number; onChange: (days:
     <div className="d-tabs ti-range" role="tablist" aria-label="Period">
       {INSIGHT_RANGES.map((d) => (
         <button key={d} type="button" role="tab" aria-selected={value === d} className={`d-tab ${value === d ? "active" : ""}`} onClick={() => onChange(d)}>
-          Last {d} days
+          Last {d} Days
         </button>
       ))}
     </div>
@@ -111,7 +111,7 @@ function DriftRow({ d, n, noun }: { d: DriftInsight; n: number; noun: string }) 
         <b className="ti-name" title={d.name}>
           {d.name}
         </b>
-        <span className="ti-reach">{d.visitors ? `${d.reachedPct}% of visits` : "Not reached"}</span>
+        <span className="ti-reach">{d.visitors ? `${d.reachedPct}% of Visits` : "Not Reached"}</span>
       </div>
       {d.strip.length > 0 && (
         <div className="ti-film">
@@ -130,24 +130,24 @@ function DriftRow({ d, n, noun }: { d: DriftInsight; n: number; noun: string }) 
       {d.views > 0 ? (
         <div className="ti-stats">
           <span>
-            <b>{fmtDuration(d.avgMs)}</b> average
+            <b>{fmtDuration(d.avgMs)}</b> Average
           </span>
           <span>
-            <b>{d.explored}%</b> explored
+            <b>{d.explored}%</b> Explored
           </span>
           <span>
-            <b>{d.lookedBackPct}%</b> dragged back
+            <b>{d.lookedBackPct}%</b> Dragged Back
           </span>
           <span>
-            <b>{d.exitPct}%</b> ended their visit here
+            <b>{d.exitPct}%</b> Ended Their Visit Here
           </span>
         </div>
       ) : (
-        <div className="ti-stats">No visits reached this {noun} in this period.</div>
+        <div className="ti-stats">No Visits Reached This {noun} in This Period.</div>
       )}
       {d.pins.length > 0 && (
         <div className="ti-pins">
-          <span>Pins tapped</span>
+          <span>Pins Tapped</span>
           {d.pins.map((p, k) => (
             <span key={`${p.title}-${k}`} className="d-pill">
               {p.title} · {p.taps}
@@ -168,12 +168,12 @@ export function InsightsView({ insights: i, audience }: { insights: TourInsights
   if (!i.visits) {
     return (
       <div className="ti-empty">
-        <h3>No visits in the last {i.days} days</h3>
+        <h3>No Visits in the Last {i.days} Days</h3>
         <p>
           {audience === "owner"
-            ? "This report fills in as people walk through the tour."
+            ? "This Report Fills In as People Walk Through the Tour."
             : "Share the tour — as soon as people walk through it, you'll see where they spend their time."}
-          {since ? ` Counting since ${since}.` : ""}
+          {since ? ` Counting Since ${since}.` : ""}
         </p>
       </div>
     );
@@ -198,26 +198,26 @@ export function InsightsView({ insights: i, audience }: { insights: TourInsights
           <span>{visitsSub}</span>
         </div>
         <div className="ti-tile">
-          <small>Average visit</small>
+          <small>Average Visit</small>
           <b>{fmtDuration(i.avgVisitMs)}</b>
-          <span>{fmtDuration(i.totalMs)} in total</span>
+          <span>{fmtDuration(i.totalMs)} in Total</span>
         </div>
         <div className="ti-tile">
-          <small>Saw it all</small>
+          <small>Saw It All</small>
           <b>{i.sawAllPct}%</b>
           <span>
-            {i.avgDriftsSeen} of {i.driftCount} {noun}s on average
+            {i.avgDriftsSeen} of {i.driftCount} {noun}s on Average
           </span>
         </div>
         <div className="ti-tile">
           <small>Enquiries</small>
           <b>{i.enquiries}</b>
-          <span>from this tour</span>
+          <span>From This Tour</span>
         </div>
       </div>
 
       <div className="ti-block">
-        <div className="ti-label">Visits per day</div>
+        <div className="ti-label">Visits per Day</div>
         <div
           className="ti-chart"
           style={{ gap: i.series.length > 40 ? 1 : 3 }}
@@ -249,15 +249,15 @@ export function InsightsView({ insights: i, audience }: { insights: TourInsights
       )}
 
       <div className="ti-block">
-        <div className="ti-label">{noun === "space" ? "Space by space" : "Drift by drift"}</div>
+        <div className="ti-label">{noun === "space" ? "Space by Space" : "Drift by Drift"}</div>
         <div className="ti-legend">
-          <span>Under each {noun}: where people linger</span>
+          <span>Under Each {noun}: Where People Linger</span>
           <i aria-hidden>
             {[0.1, 0.3, 0.55, 0.8, 1].map((h) => (
               <span key={h} style={{ background: heatColor(h) }} />
             ))}
           </i>
-          <span>less → more</span>
+          <span>Less → More</span>
         </div>
         <ol className="ti-drifts">
           {i.drifts.map((d, n) => (
@@ -268,7 +268,7 @@ export function InsightsView({ insights: i, audience }: { insights: TourInsights
 
       <div className="ti-foot">
         {audience === "owner"
-          ? "Anonymous visit counts, updated live."
+          ? "Anonymous Visit Counts, Updated Live."
           : `Anonymous — no cookies or personal data. Visits by your own team count too.${since ? ` Counting since ${since}.` : ""}`}
       </div>
     </div>

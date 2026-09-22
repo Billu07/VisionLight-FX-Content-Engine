@@ -432,7 +432,7 @@ export function TourShell({ children, view }: { children: React.ReactNode; view?
           {user ? (
             <>
               {isSuperAdmin && (
-                <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
+                <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the Admin Panel">
                   Admin
                 </Link>
               )}
@@ -446,7 +446,7 @@ export function TourShell({ children, view }: { children: React.ReactNode; view?
               ) : (
                 <>
                   {canSwitch && (
-                    <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
+                    <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose Another Workspace">
                       Switch Studio
                     </button>
                   )}
@@ -457,7 +457,7 @@ export function TourShell({ children, view }: { children: React.ReactNode; view?
               )}
               {/* On a page they run, the header's view switch is their dashboard. */}
               {hasTour && !view && (
-                <Link to={CREATOR_HOME} className="d-btn primary sm" style={{ textDecoration: "none" }} title="Your page">
+                <Link to={CREATOR_HOME} className="d-btn primary sm" style={{ textDecoration: "none" }} title="Your Page">
                   Dashboard
                 </Link>
               )}
@@ -515,9 +515,9 @@ export function UpgradeCard({ title, body }: { title: string; body: string }) {
           href="mailto:web@drift.li?subject=Upgrade%20my%20drift.li%20plan"
           style={{ textDecoration: "none" }}
         >
-          Talk to us about a plan
+          Talk to Us About a Plan
         </a>
-        <span className="d-faint" style={{ fontSize: 12 }}>Paid plans are rolling out — early creators get first access.</span>
+        <span className="d-faint" style={{ fontSize: 12 }}>Paid Plans Are Rolling Out — Early Creators Get First Access.</span>
       </div>
     </div>
   );

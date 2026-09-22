@@ -38,7 +38,7 @@ type TourItem = {
   flow?: Flow;
 };
 
-const ENQUIRY_PRESETS = ["Book a viewing", "Ask a question", "Request info", "Get a quote"];
+const ENQUIRY_PRESETS = ["Book a Viewing", "Ask a Question", "Request Info", "Get a Quote"];
 
 const fromPublic = (f: PublicFlow): TourItem => ({
   id: f.id,
@@ -148,7 +148,7 @@ function PageSettings({
   const [contactUrl, setContactUrl] = useState(page.contactUrl || "");
   const [demoFlowId, setDemoFlowId] = useState(page.demoFlowId || "");
   const [enqOn, setEnqOn] = useState(!!page.enquiries?.enabled);
-  const [enqLabel, setEnqLabel] = useState(page.enquiries?.label || "Book a viewing");
+  const [enqLabel, setEnqLabel] = useState(page.enquiries?.label || "Book a Viewing");
   const [enqPhone, setEnqPhone] = useState(!!page.enquiries?.askPhone);
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -160,11 +160,11 @@ function PageSettings({
     contactUrl.trim() !== (page.contactUrl || "") ||
     demoFlowId !== (page.demoFlowId || "") ||
     enqOn !== !!page.enquiries?.enabled ||
-    (enqLabel.trim() || "Book a viewing") !== (page.enquiries?.label || "Book a viewing") ||
+    (enqLabel.trim() || "Book a Viewing") !== (page.enquiries?.label || "Book a Viewing") ||
     enqPhone !== !!page.enquiries?.askPhone;
 
   const save = async () => {
-    if (!name.trim()) return notify.error("Give your page a name");
+    if (!name.trim()) return notify.error("Give Your Page a Name");
     setSaving(true);
     try {
       const r = await apiEndpoints.driftUpdateMyPage({
@@ -172,10 +172,10 @@ function PageSettings({
         contactLabel: contactLabel.trim() || null,
         contactUrl: contactUrl.trim() || null,
         demoFlowId: demoFlowId || null,
-        enquiries: { enabled: enqOn, label: enqLabel.trim() || "Book a viewing", askPhone: enqPhone },
+        enquiries: { enabled: enqOn, label: enqLabel.trim() || "Book a Viewing", askPhone: enqPhone },
       });
       onSaved(r.data.page, r.data.demo ?? null);
-      notify.success("Page saved");
+      notify.success("Page Saved");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -184,14 +184,14 @@ function PageSettings({
   };
 
   const uploadLogo = async (file: File) => {
-    if (!file.type.startsWith("image/")) return notify.error("Please choose an image (JPG, PNG or WebP)");
+    if (!file.type.startsWith("image/")) return notify.error("Please Choose an Image (JPG, PNG or WebP)");
     const fd = new FormData();
     fd.append("image", file);
     setLogoBusy(true);
     try {
       const r = await apiEndpoints.driftUploadPageLogo(fd);
       onSaved(r.data.page);
-      notify.success("Logo uploaded");
+      notify.success("Logo Uploaded");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -214,14 +214,14 @@ function PageSettings({
   return (
     <div className="d-card d-card-pad t-rise" style={{ marginBottom: 24 }}>
       <div className="d-head" style={{ marginBottom: 12 }}>
-        <div className="d-eyebrow">Page settings</div>
+        <div className="d-eyebrow">Page Settings</div>
         <button className="d-btn ghost sm" onClick={onClose}>
           Close
         </button>
       </div>
       <div className="t-cover">
         <div className="t-cover-current" style={{ aspectRatio: "1" }}>
-          {page.logoUrl ? <img src={page.logoUrl} alt="" style={{ objectFit: "contain", padding: 10 }} /> : <span>No logo</span>}
+          {page.logoUrl ? <img src={page.logoUrl} alt="" style={{ objectFit: "contain", padding: 10 }} /> : <span>No Logo</span>}
         </div>
         <div className="t-cover-controls">
           <div className="d-label">Logo</div>
@@ -241,7 +241,7 @@ function PageSettings({
               }}
             />
             <button className="d-btn sm" onClick={() => logoRef.current?.click()} disabled={logoBusy}>
-              {logoBusy ? "Working…" : page.logoUrl ? "Replace logo" : "Upload logo"}
+              {logoBusy ? "Working…" : page.logoUrl ? "Replace Logo" : "Upload Logo"}
             </button>
             {page.logoUrl && (
               <button className="d-btn ghost sm" onClick={removeLogo} disabled={logoBusy}>
@@ -253,13 +253,13 @@ function PageSettings({
       </div>
       <div className="t-fields two">
         <div>
-          <label className="d-label">Page name</label>
-          <input className="d-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Your name or business name" />
+          <label className="d-label">Page Name</label>
+          <input className="d-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Your Name or Business Name" />
         </div>
         <div>
           <label className="d-label">View Demo</label>
           <select className="d-select" value={demoFlowId} onChange={(e) => setDemoFlowId(e.target.value)}>
-            <option value="">drift.li demo tour</option>
+            <option value="">drift.li Demo Tour</option>
             {published.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
@@ -267,15 +267,15 @@ function PageSettings({
             ))}
           </select>
           <div className="d-faint" style={{ fontSize: 11.5, marginTop: 5 }}>
-            Pick one of your published tours to show as your demo.
+            Pick One of Your Published Tours to Show as Your Demo.
           </div>
         </div>
         <div>
-          <label className="d-label">Contact button — label</label>
-          <input className="d-input" value={contactLabel} onChange={(e) => setContactLabel(e.target.value)} maxLength={40} placeholder="Contact PicDrift" />
+          <label className="d-label">Contact Button — Label</label>
+          <input className="d-input" value={contactLabel} onChange={(e) => setContactLabel(e.target.value)} maxLength={40} placeholder={`Contact ${page.name}`} />
         </div>
         <div>
-          <label className="d-label">Contact button — link</label>
+          <label className="d-label">Contact Button — Link</label>
           <input
             className="d-input"
             value={contactUrl}
@@ -290,7 +290,7 @@ function PageSettings({
         <label className="tpg-check">
           <input type="checkbox" checked={enqOn} onChange={(e) => setEnqOn(e.target.checked)} />
           <span>
-            <b>Enquiry button</b>
+            <b>Enquiry Button</b>
             <small>On your page, your tours and every drift. Visitors send their name, email and a message straight to you.</small>
           </span>
         </label>
@@ -298,39 +298,41 @@ function PageSettings({
           <div className="tpg-enq-body">
             <div className="t-inline">
               {ENQUIRY_PRESETS.map((l) => (
-                <button key={l} type="button" className={`d-btn sm ${(enqLabel.trim() || "Book a viewing") === l ? "soft" : ""}`} onClick={() => setEnqLabel(l)}>
+                <button key={l} type="button" className={`d-btn sm ${(enqLabel.trim() || "Book a Viewing") === l ? "soft" : ""}`} onClick={() => setEnqLabel(l)}>
                   {l}
                 </button>
               ))}
             </div>
-            <input className="d-input" value={enqLabel} onChange={(e) => setEnqLabel(e.target.value)} maxLength={28} placeholder="Button label" aria-label="Enquiry button label" />
+            <input className="d-input" value={enqLabel} onChange={(e) => setEnqLabel(e.target.value)} maxLength={28} placeholder="Button Label" aria-label="Enquiry button label" />
             <label className="tpg-check sm">
               <input type="checkbox" checked={enqPhone} onChange={(e) => setEnqPhone(e.target.checked)} />
-              <span>Ask for a phone number</span>
+              <span>Ask for a Phone Number</span>
             </label>
           </div>
         )}
       </div>
       <div style={{ marginTop: 14 }}>
-        <div className="d-label">Account type</div>
+        <div className="d-label">Account Type</div>
         <div className="d-actions">
           <span className={`d-pill ${page.accountType === "PRO" ? "violet" : "accent"}`}>
             {page.accountType === "PRO" ? "Pro" : "General"}
           </span>
           <span className="d-faint" style={{ fontSize: 12 }}>
-            {page.accountType === "PRO" ? "Photographers · videographers" : "Realtors · brands · venues"}
+            {page.accountType === "PRO" ? "Photographers · Videographers" : "Realtors · Brands · Venues"}
           </span>
         </div>
         <div className="d-faint" style={{ fontSize: 11.5, marginTop: 6 }}>
-          Chosen at signup — contact us if it needs to change.
+          Chosen at Signup — Contact Us If It Needs to Change.
         </div>
       </div>
       <div className="t-actions" style={{ marginTop: 14 }}>
         <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
-          {saving ? "Saving…" : "Save page"}
+          {saving ? "Saving…" : "Save Page"}
         </button>
         <span className="d-faint" style={{ fontSize: 12 }}>
-          Leave the contact fields empty to use "Contact PicDrift".
+          {enqOn
+            ? `No Link? "Contact ${page.name}" Opens Your Message Form.`
+            : `No Link? The Button Reads "Contact PicDrift" Until the Enquiry Button Is On.`}
         </span>
       </div>
       <PagePeople clientPage={clientPage} onSelfChange={onSelfChange} />
@@ -364,7 +366,7 @@ function ClientPages() {
         await checkAuth();
       }
       invalidateMyPages();
-      notify.success(`${r.data.page?.name || "The page"} is ready`);
+      notify.success(`${r.data.page?.name || "The page"} Is Ready`);
       navigate(r.data.page?.path || "/tour/dashboard");
     } catch (e) {
       notify.error(apiError(e));
@@ -377,13 +379,13 @@ function ClientPages() {
       <div className="tpg-bar">
         <h2>Client Pages</h2>
         <button className="d-btn sm" onClick={() => setOpen((v) => !v)}>
-          {open ? "Cancel" : "+ New client page"}
+          {open ? "Cancel" : "+ New Client Page"}
         </button>
       </div>
       {open && (
         <div className="d-card d-card-pad t-rise" style={{ marginBottom: 14, display: "grid", gap: 10 }}>
           <label className="d-label" htmlFor="client-page-name">
-            Client's page name
+            Client's Page Name
           </label>
           <div className="t-inline">
             <input
@@ -398,7 +400,7 @@ function ClientPages() {
               autoFocus
             />
             <button className="d-btn primary" onClick={create} disabled={busy || !name.trim()}>
-              {busy ? "Creating…" : "Create page"}
+              {busy ? "Creating…" : "Create Page"}
             </button>
           </div>
           <div className="d-faint" style={{ fontSize: 12 }}>
@@ -414,7 +416,7 @@ function ClientPages() {
       ) : pages.length === 0 ? (
         !open && (
           <div className="tpg-empty">
-            <h3>Build tours for your clients</h3>
+            <h3>Build Tours for Your Clients</h3>
             <p className="d-sub" style={{ margin: 0, maxWidth: "46ch" }}>
               Create a page for each client. Each one has its own link, and you manage them all from here.
             </p>
@@ -428,7 +430,7 @@ function ClientPages() {
               <span style={{ minWidth: 0 }}>
                 <b>{p.name}</b>
                 <small>
-                  {p.tours} tour{p.tours === 1 ? "" : "s"}
+                  {p.tours} Tour{p.tours === 1 ? "" : "s"}
                 </small>
               </span>
               <span className="tpw-go" aria-hidden>
@@ -573,7 +575,7 @@ export default function TourPage() {
     if (!ok) return;
     try {
       await apiEndpoints.driftDeleteFlow(f.id);
-      notify.success("Tour deleted");
+      notify.success("Tour Deleted");
       loadAdmin();
     } catch (e) {
       notify.error(apiError(e));
@@ -582,7 +584,7 @@ export default function TourPage() {
 
   const copy = async (path: string) => {
     const ok = await copyText(publicUrl(path));
-    notify[ok ? "success" : "error"](ok ? "Link copied" : "Couldn't copy the link");
+    notify[ok ? "success" : "error"](ok ? "Link Copied" : "Couldn't Copy the Link");
   };
 
   const leave = async () => {
@@ -591,7 +593,7 @@ export default function TourPage() {
     if (!ok) return;
     try {
       await leavePage(user.id, checkAuth, navigate);
-      notify.success("You left the page");
+      notify.success("You Left the Page");
     } catch (e) {
       notify.error(apiError(e));
     }
@@ -614,9 +616,9 @@ export default function TourPage() {
   if (missing) {
     return shell(
       <div className="d-empty">
-        There's no page at this link.{" "}
+        There's No Page at This Link.{" "}
         <Link to="/tour" style={{ color: "var(--accent)" }}>
-          drift.li tour
+          drift.li Tour
         </Link>
       </div>,
     );
@@ -645,7 +647,7 @@ export default function TourPage() {
         </Link>
         {f.status === "PUBLISHED" && (
           <button className="d-btn sm" onClick={() => copy(f.publicPath)}>
-            Copy link
+            Copy Link
           </button>
         )}
         {canEdit && (
@@ -725,7 +727,7 @@ export default function TourPage() {
             </>
           ) : (
             <>
-              <p className="tpg-sub">Interactive tours you explore with a finger — pick one to start.</p>
+              <p className="tpg-sub">Interactive Tours You Explore with a Finger — Pick One to Start.</p>
               <div className="tpg-cta">
                 {pub.demo && (
                   <Link className="d-btn" to={pub.demo.path} style={{ textDecoration: "none" }}>
@@ -801,7 +803,7 @@ export default function TourPage() {
         </div>
         {editing && !adminLoaded ? (
           <div className="d-faint" style={{ fontSize: 13 }}>
-            Loading your tours…
+            Loading Your Tours…
           </div>
         ) : featured.length === 0 ? (
           canEdit ? (
@@ -817,7 +819,7 @@ export default function TourPage() {
               )}
             </div>
           ) : (
-            <div className="tpg-empty">No tours here yet — check back soon.</div>
+            <div className="tpg-empty">No Tours Here Yet — Check Back Soon.</div>
           )
         ) : (
           <TourPathList items={featured} renderActions={editing ? adminActions : undefined} />

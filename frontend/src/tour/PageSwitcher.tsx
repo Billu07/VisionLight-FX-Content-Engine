@@ -73,7 +73,7 @@ export function PageSwitcher({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        title={onLogout ? "Your pages and account" : "Switch page"}
+        title={onLogout ? "Your Pages and Account" : "Switch Page"}
       >
         <span className="t-switch-name">{current ? current.name : pages.length ? "Your Pages" : "Account"}</span>
         <span aria-hidden>▾</span>
@@ -96,7 +96,7 @@ export function PageSwitcher({
               <span className="t-switch-text">
                 <b>{p.name}</b>
                 <small>
-                  {p.own ? "Your page" : p.managedBy ? "Client page" : "Shared with you"} · {ROLE_INFO[p.role].label}
+                  {p.own ? "Your Page" : p.managedBy ? "Client Page" : "Shared with You"} · {ROLE_INFO[p.role].label}
                 </small>
               </span>
             </button>
@@ -113,7 +113,7 @@ export function PageSwitcher({
           )}
           {onLogout && (
             <>
-              {email && <div className="t-switch-me">Signed in as {email}</div>}
+              {email && <div className="t-switch-me">Signed In as {email}</div>}
               <button type="button" role="menuitem" className="t-switch-item t-switch-out" onClick={onLogout}>
                 Log Out
               </button>

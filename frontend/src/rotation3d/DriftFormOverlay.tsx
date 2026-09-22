@@ -16,17 +16,17 @@ export type OverlayForm = { id: string; name: string; definition: FormDefinition
 /** The fixed form behind a tour page's enquiry button ("Book a viewing", "Ask a question" …). */
 export function enquiryDefinition(e: { label: string; askPhone: boolean }): FormDefinition {
   const fields: FormField[] = [
-    { key: "name", type: "text", label: "Your name", required: true },
+    { key: "name", type: "text", label: "Your Name", required: true },
     { key: "email", type: "email", label: "Email", required: true },
   ];
-  if (e.askPhone) fields.push({ key: "phone", type: "phone", label: "Phone (optional)" });
-  fields.push({ key: "message", type: "textarea", label: "Message (optional)", placeholder: "What would you like to know — or a good time to reach you" });
+  if (e.askPhone) fields.push({ key: "phone", type: "phone", label: "Phone (Optional)" });
+  fields.push({ key: "message", type: "textarea", label: "Message (Optional)", placeholder: "What would you like to know — or a good time to reach you" });
   return {
     multiStep: false,
     steps: [{ title: e.label, fields }],
     consent: { enabled: false, text: "" },
     submitLabel: "Send",
-    successMessage: "Sent — they'll get back to you by email.",
+    successMessage: "Sent — They'll Get Back to You by Email.",
   };
 }
 
@@ -150,7 +150,7 @@ export default function DriftFormOverlay({
       `}</style>
 
       <div className="fo-head">
-        <button className="fo-back" onClick={onClose}>← Back to drift</button>
+        <button className="fo-back" onClick={onClose}>← Back to Drift</button>
         <div style={{ flex: 1 }} />
         {def.multiStep && steps.length > 1 && (
           <span className="fo-steps">Step {step + 1} / {steps.length}</span>
@@ -162,7 +162,7 @@ export default function DriftFormOverlay({
           <div>
             <div style={{ fontSize: 44, marginBottom: 12 }}>✓</div>
             <p style={{ fontSize: 17, fontWeight: 600 }}>{done}</p>
-            <button className="fo-back" style={{ marginTop: 16 }} onClick={onClose}>← Back to drift</button>
+            <button className="fo-back" style={{ marginTop: 16 }} onClick={onClose}>← Back to Drift</button>
           </div>
         </div>
       ) : (
@@ -211,7 +211,7 @@ export default function DriftFormOverlay({
                 ) : f.type === "consent" ? (
                   <label className="fo-opt">
                     <input type="checkbox" checked={!!values[f.key]} onChange={(e) => set(f.key, e.target.checked)} />
-                    {f.label || "I agree"}
+                    {f.label || "I Agree"}
                   </label>
                 ) : (
                   <input
@@ -228,7 +228,7 @@ export default function DriftFormOverlay({
             {isLast && def.consent?.enabled && (
               <label className="fo-opt">
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                {def.consent.text || "I agree to be contacted."}
+                {def.consent.text || "I Agree to Be Contacted."}
               </label>
             )}
 

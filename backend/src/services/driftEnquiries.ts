@@ -77,10 +77,12 @@ export async function submitEnquiry(
   ]);
 
   const data = { name, email, ...(phone ? { phone } : {}), ...(message ? { message } : {}) };
+  // Sent from the page's contact button (no link of its own) rather than its enquiry button.
+  const button = b.via === "contact" ? `Contact ${org.name}` : settings.label;
   const tour = flow ? flow.title || flow.name : null;
   const source = {
     kind: ENQUIRY_KIND,
-    button: settings.label,
+    button,
     flowId: flow?.id ?? null,
     tour,
     drift: product?.name ?? null,
@@ -98,7 +100,7 @@ export async function submitEnquiry(
     await sendTourEnquiryEmail({
       to: await teamEmails(org.id),
       pageName: org.name,
-      button: settings.label,
+      button,
       name,
       email,
       phone: phone || null,

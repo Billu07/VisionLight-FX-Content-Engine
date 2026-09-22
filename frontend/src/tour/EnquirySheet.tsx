@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { apiEndpoints } from "../lib/api";
 import type { Page } from "./types";
 import { apiError } from "./tourUi";
@@ -23,7 +24,20 @@ export function EnquiryButton({ page, flowId, className = "d-btn primary" }: { p
   );
 }
 
-function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | null; onClose: () => void }) {
+/** The message form. `title` + `via: "contact"`: opened from the page's contact button. */
+export function EnquirySheet({
+  page,
+  flowId,
+  onClose,
+  title,
+  via,
+}: {
+  page: Page;
+  flowId: string | null;
+  onClose: () => void;
+  title?: string;
+  via?: "contact";
+}) {
   const settings = page.enquiries!;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,8 +56,8 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
 
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (!name.trim()) return setError("Please add your name");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setError("Please add a valid email address");
+    if (!name.trim()) return setError("Please Add Your Name");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setError("Please Add a Valid Email Address");
     setSending(true);
     setError("");
     try {
@@ -54,6 +68,7 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
         message: message.trim() || undefined,
         flowId: flowId || undefined,
         link: shareLinkFor(flowId) || undefined,
+        via,
         website,
       });
       setSent(true);
@@ -64,8 +79,8 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
     }
   };
 
-  return (
-    <div className="t-sheet" onClick={onClose} role="dialog" aria-modal aria-label={settings.label}>
+  const sheet = (
+    <div className="t-sheet" onClick={onClose} role="dialog" aria-modal aria-label={title || settings.label}>
       <div className="t-sheet-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="t-sheet-x" onClick={onClose} aria-label="Close">
           ×
@@ -77,7 +92,7 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
             </div>
             <div className="t-sheet-title">Sent</div>
             <p className="d-sub" style={{ margin: 0 }}>
-              {page.name} has your message and will get back to you at {email.trim()}.
+              {page.name} Has Your Message and Will Get Back to You at {email.trim()}.
             </p>
             <div className="t-actions" style={{ justifyContent: "center", marginTop: 6 }}>
               <button type="button" className="d-btn primary" onClick={onClose}>
@@ -89,14 +104,14 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
           <form className="tpg-enq-form" onSubmit={submit} noValidate>
             <div style={{ paddingRight: 34 }}>
               <div className="d-eyebrow">{page.name}</div>
-              <div className="t-sheet-title">{settings.label}</div>
+              <div className="t-sheet-title">{title || settings.label}</div>
               <p className="d-sub" style={{ margin: 0, fontSize: 13 }}>
-                Leave your details and a message — they'll reply by email.
+                Leave Your Details and a Message — They'll Reply by Email.
               </p>
             </div>
             <div>
               <label className="d-label" htmlFor="enq-name">
-                Your name
+                Your Name
               </label>
               <input id="enq-name" className="d-input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} />
             </div>
@@ -118,7 +133,7 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
             {settings.askPhone && (
               <div>
                 <label className="d-label" htmlFor="enq-phone">
-                  Phone <span className="d-faint">(optional)</span>
+                  Phone <span className="d-faint">(Optional)</span>
                 </label>
                 <input
                   id="enq-phone"
@@ -134,7 +149,7 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
             )}
             <div>
               <label className="d-label" htmlFor="enq-msg">
-                Message <span className="d-faint">(optional)</span>
+                Message <span className="d-faint">(Optional)</span>
               </label>
               <textarea
                 id="enq-msg"
@@ -164,4 +179,8 @@ function EnquirySheet({ page, flowId, onClose }: { page: Page; flowId: string | 
       </div>
     </div>
   );
+  // Rendered at the top of the drift.li page (it keeps the theme), outside any animated section
+  // — an animated hero is its own layer, and the sections after it painted over the form.
+  const host = typeof document !== "undefined" ? document.querySelector(".drift-ui.d-page") : null;
+  return host ? createPortal(sheet, host) : sheet;
 }

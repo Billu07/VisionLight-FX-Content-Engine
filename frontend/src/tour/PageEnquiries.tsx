@@ -15,7 +15,7 @@ export function PageEnquiries({ page, canDelete, onSetUp }: { page: Page; canDel
   const ref = useRef<HTMLElement>(null);
   const loaded = items !== null;
   const on = !!page.enquiries?.enabled;
-  const label = page.enquiries?.label || "Book a viewing";
+  const label = page.enquiries?.label || "Book a Viewing";
 
   useEffect(() => {
     let alive = true;
@@ -42,7 +42,7 @@ export function PageEnquiries({ page, canDelete, onSetUp }: { page: Page; canDel
     try {
       await apiEndpoints.driftDeleteEnquiry(q.id);
       setItems((cur) => (cur || []).filter((x) => x.id !== q.id));
-      notify.success("Enquiry deleted");
+      notify.success("Enquiry Deleted");
     } catch (e) {
       notify.error(apiError(e));
     }
@@ -55,7 +55,7 @@ export function PageEnquiries({ page, canDelete, onSetUp }: { page: Page; canDel
     <section className="tpg-section" ref={ref} id="enquiries">
       <div className="tpg-bar">
         <h2>Enquiries{items && items.length ? ` · ${items.length}` : ""}</h2>
-        {on && <span className="d-faint">From your "{label}" button</span>}
+        {on && <span className="d-faint">From Your "{label}" Button</span>}
       </div>
       {!loaded ? (
         <div className="d-faint" style={{ fontSize: 13 }}>
@@ -65,21 +65,21 @@ export function PageEnquiries({ page, canDelete, onSetUp }: { page: Page; canDel
         <div className="tpg-empty">
           {on ? (
             <>
-              <h3>No enquiries yet</h3>
+              <h3>No Enquiries Yet</h3>
               <p className="d-sub" style={{ margin: 0, maxWidth: "48ch" }}>
                 When someone uses your "{label}" button, their message shows up here and in your email.
               </p>
             </>
           ) : (
             <>
-              <h3>Let visitors get in touch</h3>
+              <h3>Let Visitors Get in Touch</h3>
               <p className="d-sub" style={{ margin: 0, maxWidth: "48ch" }}>
                 Add a "Book a viewing" or "Ask a question" button to your page, your tours and every drift. Messages land
                 here and in your email.
               </p>
               {onSetUp && (
                 <button className="d-btn primary" onClick={onSetUp}>
-                  Set it up
+                  Set It Up
                 </button>
               )}
             </>
@@ -102,7 +102,7 @@ export function PageEnquiries({ page, canDelete, onSetUp }: { page: Page; canDel
               {q.message && <p className="tpg-enquiry-msg">{q.message}</p>}
               <div className="tpg-enquiry-meta">
                 <span>{[q.button, q.tour, q.drift].filter(Boolean).join(" · ")}</span>
-                {q.via && <span className="d-pill accent">via {q.via}'s link</span>}
+                {q.via && <span className="d-pill accent">Via {q.via}'s Link</span>}
                 {canDelete && (
                   <button className="d-btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => void remove(q)}>
                     Delete

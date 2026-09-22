@@ -23,10 +23,10 @@ import { TOUR_PAGE_STYLES } from "./tourPageStyles";
  */
 
 const DIRECTIONS = [
-  { value: "LTR", glyph: "→", short: "L→R", title: "Left to right — the camera pans right" },
-  { value: "RTL", glyph: "←", short: "R→L", title: "Right to left" },
-  { value: "TTB", glyph: "↓", short: "T→B", title: "Top to bottom" },
-  { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
+  { value: "LTR", glyph: "→", short: "L→R", title: "Left to Right — The Camera Pans Right" },
+  { value: "RTL", glyph: "←", short: "R→L", title: "Right to Left" },
+  { value: "TTB", glyph: "↓", short: "T→B", title: "Top to Bottom" },
+  { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to Top" },
 ] as const;
 const COVER_LABELS = ["Start", "Middle", "End"];
 /** A tour drift plays on drift.li's dark ground until its creator picks a colour. */
@@ -34,9 +34,9 @@ const TOUR_DEFAULT_BG = "#0d1119";
 // The auto clean-up, in words (the step card's note under a ready drift).
 const cleanupText = (c: NonNullable<NonNullable<FlowStep["product"]>["cleanup"]>) =>
   [
-    c.trimmedS > 0 ? `trimmed ${c.trimmedS}s of still footage` : "",
-    c.steadied ? "steadied the shake" : "",
-    c.direction ? `direction set from the footage (${DIRECTIONS.find((d) => d.value === c.direction)?.glyph ?? c.direction})` : "",
+    c.trimmedS > 0 ? `Trimmed ${c.trimmedS}s of Still Footage` : "",
+    c.steadied ? "Steadied the Shake" : "",
+    c.direction ? `Direction Set from the Footage (${DIRECTIONS.find((d) => d.value === c.direction)?.glyph ?? c.direction})` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -144,7 +144,7 @@ function StepCard({
   const dirty = name !== (p?.name || "") || bg !== (p?.background || "") || direction !== (p?.driftDirection || "LTR");
 
   const save = async () => {
-    if (!name.trim()) return notify.error("Give this drift a name");
+    if (!name.trim()) return notify.error("Give This Drift a Name");
     setSaving(true);
     try {
       const r = await apiEndpoints.driftUpdateFlowStep(flow.id, step.id, {
@@ -153,7 +153,7 @@ function StepCard({
         driftDirection: direction,
       });
       onChanged(r.data.flow);
-      notify.success("Drift saved");
+      notify.success("Drift Saved");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -175,12 +175,12 @@ function StepCard({
   };
 
   const remove = async () => {
-    const ok = await confirmAction(`Remove "${driftName(step, index)}" from the tour?`);
+    const ok = await confirmAction(`Remove "${driftName(step, index)}" from the Tour?`);
     if (!ok) return;
     try {
       const r = await apiEndpoints.driftDeleteFlowStep(flow.id, step.id);
       onChanged(r.data.flow);
-      notify.success("Drift removed");
+      notify.success("Drift Removed");
     } catch (e) {
       notify.error(apiError(e));
     }
@@ -188,7 +188,7 @@ function StepCard({
 
   const replaceClip = async (file: File) => {
     const d = await readClipDuration(file);
-    if (maxClip && d && d > maxClip + 0.5) return notify.error(`Clips must be ${maxClip}s or shorter — this one is ${d.toFixed(1)}s.`);
+    if (maxClip && d && d > maxClip + 0.5) return notify.error(`Clips Must Be ${maxClip}s or Shorter — This One Is ${d.toFixed(1)}s.`);
     const fd = new FormData();
     fd.append("video", file);
     setReplacing(0);
@@ -197,7 +197,7 @@ function StepCard({
         if (e.total) setReplacing(Math.round((e.loaded / e.total) * 100));
       });
       onChanged(r.data.flow);
-      notify.success("New clip uploaded — building it now");
+      notify.success("New Clip Uploaded — Building It Now");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -222,28 +222,28 @@ function StepCard({
           ) : status === "PROCESSING" ? (
             <div className="t-building">
               <Spinner />
-              <span>Building your drift…</span>
+              <span>Building Your Drift…</span>
             </div>
           ) : status === "AWAITING_PAYMENT" ? (
-            <span>Clip saved · converts after checkout</span>
+            <span>Clip Saved · Converts After Checkout</span>
           ) : status === "FAILED" ? (
-            <span>Couldn't build this clip</span>
+            <span>Couldn't Build This Clip</span>
           ) : (
-            <span>No preview yet</span>
+            <span>No Preview Yet</span>
           )}
           {selected && isReady(status) && <span className="t-previewing">Previewing</span>}
         </div>
         <div className="t-step-meta">
           <StatusPill status={status} />
-          {p?.frameCount ? <span className="d-faint">{p.frameCount} frames</span> : null}
+          {p?.frameCount ? <span className="d-faint">{p.frameCount} Frames</span> : null}
         </div>
         {p?.cleanup && isReady(status) && (
-          <div className="d-faint t-tip" title="drift.li tidies every clip as it builds">
-            Auto clean-up: {cleanupText(p.cleanup)}
+          <div className="d-faint t-tip" title="drift.li Tidies Every Clip as It Builds">
+            Auto Clean-up: {cleanupText(p.cleanup)}
           </div>
         )}
         {p?.hostingExpiresAt && (
-          <div className="d-faint t-tip">Hosted until {new Date(p.hostingExpiresAt).toLocaleDateString()}</div>
+          <div className="d-faint t-tip">Hosted Until {new Date(p.hostingExpiresAt).toLocaleDateString()}</div>
         )}
         {!readOnly && (status === "FAILED" || status === "AWAITING_PAYMENT" || isReady(status)) && (
           <div>
@@ -264,12 +264,12 @@ function StepCard({
               </div>
             ) : (
               <button className={`d-btn sm ${status === "FAILED" ? "primary" : "ghost"}`} onClick={() => fileRef.current?.click()}>
-                {status === "FAILED" ? "Try another clip" : "Replace clip"}
+                {status === "FAILED" ? "Try Another Clip" : "Replace Clip"}
               </button>
             )}
           </div>
         )}
-        {status === "PROCESSING" && <div className="d-faint t-tip">You can keep going — this drift updates itself when it's ready.</div>}
+        {status === "PROCESSING" && <div className="d-faint t-tip">You Can Keep Going — This Drift Updates Itself When It's Ready.</div>}
       </div>
 
       <div className="t-step-body">
@@ -292,7 +292,7 @@ function StepCard({
                 <button
                   type="button"
                   className="t-pencil"
-                  title="Rename this drift"
+                  title="Rename This Drift"
                   aria-label="Rename this drift"
                   onClick={() => {
                     nameRef.current?.focus();
@@ -307,10 +307,10 @@ function StepCard({
           <div className="t-actions">
             {!readOnly && (
               <span className="t-arrows">
-                <button className="d-btn sm" onClick={() => move(-1)} disabled={index === 0} title="Move up" aria-label="Move up">
+                <button className="d-btn sm" onClick={() => move(-1)} disabled={index === 0} title="Move Up" aria-label="Move up">
                   ↑
                 </button>
-                <button className="d-btn sm" onClick={() => move(1)} disabled={index === flow.steps.length - 1} title="Move down" aria-label="Move down">
+                <button className="d-btn sm" onClick={() => move(1)} disabled={index === flow.steps.length - 1} title="Move Down" aria-label="Move down">
                   ↓
                 </button>
               </span>
@@ -348,7 +348,7 @@ function StepCard({
                 Transparent
               </button>
               {bg ? (
-                <button className="d-btn ghost sm" onClick={() => setBg("")} disabled={readOnly} title="Back to drift.li's dark background">
+                <button className="d-btn ghost sm" onClick={() => setBg("")} disabled={readOnly} title="Back to drift.li's Dark Background">
                   Default
                 </button>
               ) : (
@@ -359,7 +359,7 @@ function StepCard({
             </div>
           </div>
           <div className="t-field">
-            <label className="d-label">Drift direction</label>
+            <label className="d-label">Drift Direction</label>
             <div className="t-seg" role="radiogroup" aria-label="Drift direction">
               {DIRECTIONS.map((d) => (
                 <button
@@ -382,7 +382,7 @@ function StepCard({
 
         {!readOnly && (
           <div className="t-step-foot">
-            <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+            <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved Changes" : "All Changes Saved"}</span>
             <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
               {saving ? "Saving…" : "Save Drift"}
             </button>
@@ -451,7 +451,7 @@ function UploadSlot({
       setProgress({ n, total: n + queueRef.current.length, pct: 0 });
       const d = await readClipDuration(file);
       if (maxClip && d && d > maxClip + 0.5) {
-        notify.error(`"${file.name}" is ${d.toFixed(1)}s — clips must be ${maxClip}s or shorter.`);
+        notify.error(`"${file.name}" Is ${d.toFixed(1)}s — Clips Must Be ${maxClip}s or Shorter.`);
         continue;
       }
       const fd = new FormData();
@@ -486,20 +486,20 @@ function UploadSlot({
         `${added} clip${added === 1 ? "" : "s"} saved${building ? ` — ${building} building now` : ""}. ${waiting} ${waiting === 1 ? "is" : "are"} waiting for checkout.`,
       );
     } else {
-      notify.success(`${added} clip${added === 1 ? "" : "s"} uploaded — building your drift${added === 1 ? "" : "s"}`);
+      notify.success(`${added} Clip${added === 1 ? "" : "s"} Uploaded — Building Your Drift${added === 1 ? "" : "s"}`);
     }
   };
 
   const enqueue = (list: File[]) => {
     const files = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
     if (!files.length) {
-      notify.error("Please choose video clips (MP4 or MOV)");
+      notify.error("Please Choose Video Clips (MP4 or MOV)");
       return;
     }
     queueRef.current.push(...files);
     if (runningRef.current) {
       setProgress((p) => (p ? { ...p, total: p.n + queueRef.current.length } : p));
-      notify.success(`${files.length} more clip${files.length === 1 ? "" : "s"} added to the queue`);
+      notify.success(`${files.length} More Clip${files.length === 1 ? "" : "s"} Added to the Queue`);
       return;
     }
     void run();
@@ -544,8 +544,8 @@ function UploadSlot({
     !billing || billing.unlimited
       ? ""
       : billing.freeLeft && billing.freeLeft > 0
-        ? `${billing.freeLeft} free drift${billing.freeLeft === 1 ? "" : "s"} left, then ${billing.price} each`
-        : `${billing.price} per drift — you check out before they're built`;
+        ? `${billing.freeLeft} Free Drift${billing.freeLeft === 1 ? "" : "s"} Left, Then ${billing.price} Each`
+        : `${billing.price} per Drift — You Check Out Before They're Built`;
 
   if (progress) {
     const inLine = progress.total - progress.n;
@@ -554,7 +554,7 @@ function UploadSlot({
         {input}
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
           <div className="d-h2">
-            Uploading {progress.total > 1 ? `clip ${progress.n} of ${progress.total}` : "your clip"}
+            Uploading {progress.total > 1 ? `Clip ${progress.n} of ${progress.total}` : "Your Clip"}
           </div>
           <span className="d-faint">{progress.pct}%</span>
         </div>
@@ -562,13 +562,13 @@ function UploadSlot({
           <i style={{ width: `${progress.pct}%` }} />
         </div>
         <div className="d-faint" style={{ fontSize: 12 }}>
-          {progress.pct >= 100 ? "Checking the clip…" : "Keep this page open until the uploads finish."}
-          {inLine > 0 && ` ${inLine} more in line.`}
+          {progress.pct >= 100 ? "Checking the Clip…" : "Keep This Page Open Until the Uploads Finish."}
+          {inLine > 0 && ` ${inLine} More in Line.`}
         </div>
         <div className={`t-drop t-drop-more ${over ? "over" : ""}`} onClick={pick} onKeyDown={onKey} role="button" tabIndex={0} {...drop}>
-          <span className="big">+ Add more clips</span>
+          <span className="big">+ Add More Clips</span>
           <span className="d-faint" style={{ fontSize: 12 }}>
-            They upload next, in the order you pick them
+            They Upload Next, in the Order You Pick Them
           </span>
         </div>
       </div>
@@ -591,12 +591,12 @@ function UploadSlot({
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
       </div>
       <div className="d-eyebrow">Drift {index + 1}</div>
-      <div className="big">{index === 0 ? "Upload your clips" : "+ Add more clips"}</div>
+      <div className="big">{index === 0 ? "Upload Your Clips" : "+ Add More Clips"}</div>
       <div className="d-sub" style={{ fontSize: 13 }}>
-        Select several at once · {maxClip ? `up to ${maxClip}s each · ` : ""}each clip becomes a drift, in order
+        Select Several at Once · {maxClip ? `Up to ${maxClip}s Each · ` : ""}Each Clip Becomes a Drift, in Order
       </div>
       <span className="d-btn primary sm t-drop-pick" aria-hidden>
-        Select clips
+        Select Clips
       </span>
       {note && <div className="t-drop-note">{note}</div>}
     </div>
@@ -719,14 +719,14 @@ export default function TourBuilder({
         .then((r) => {
           notify.success(
             r.data?.status === "paid"
-              ? "Payment received — your drifts are building now"
+              ? "Payment Received — Your Drifts Are Building Now"
               : "Your payment is processing — your drifts start building as soon as it clears",
           );
           load();
         })
         .catch((e) => notify.error(apiError(e)));
     } else if (state === "cancel") {
-      notify.info("Checkout canceled — your clips are saved for later");
+      notify.info("Checkout Canceled — Your Clips Are Saved for Later");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -776,7 +776,7 @@ export default function TourBuilder({
     try {
       const r = await apiEndpoints.driftUpdateFlow(flow.id, { description: description.trim() || null });
       applyFlow(r.data.flow);
-      notify.success("Tour settings saved");
+      notify.success("Tour Settings Saved");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -792,9 +792,9 @@ export default function TourBuilder({
       applyFlow(r.data.flow);
       if (on) {
         const copied = await copyText(publicUrl(r.data.flow.publicPath));
-        notify.success(copied ? "Your tour is live — link copied" : "Your tour is live");
+        notify.success(copied ? "Your Tour Is Live — Link Copied" : "Your Tour Is Live");
         setShare("celebrate");
-      } else notify.success("Tour unpublished");
+      } else notify.success("Tour Unpublished");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -821,7 +821,7 @@ export default function TourBuilder({
     try {
       const r = await apiEndpoints.driftUpdateFlow(flow.id, { coverUrl: url || "" });
       applyFlow(r.data.flow);
-      notify.success(url ? "Cover updated" : "Cover back to the first drift");
+      notify.success(url ? "Cover Updated" : "Cover Back to the First Drift");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -831,14 +831,14 @@ export default function TourBuilder({
 
   const uploadCover = async (file: File) => {
     if (!flow) return;
-    if (!file.type.startsWith("image/")) return notify.error("Please choose an image (JPG, PNG or WebP)");
+    if (!file.type.startsWith("image/")) return notify.error("Please Choose an Image (JPG, PNG or WebP)");
     const fd = new FormData();
     fd.append("image", file);
     setCoverBusy(true);
     try {
       const r = await apiEndpoints.driftUploadFlowCover(flow.id, fd);
       applyFlow(r.data.flow);
-      notify.success("Cover uploaded");
+      notify.success("Cover Uploaded");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -849,7 +849,7 @@ export default function TourBuilder({
   const copyLink = async () => {
     if (!flow) return;
     const ok = await copyText(publicUrl(flow.publicPath));
-    notify[ok ? "success" : "error"](ok ? "Link copied" : "Couldn't copy the link");
+    notify[ok ? "success" : "error"](ok ? "Link Copied" : "Couldn't Copy the Link");
   };
 
   const shell = (body: React.ReactNode) => (
@@ -863,7 +863,7 @@ export default function TourBuilder({
   if (missing) {
     return shell(
       <div className="d-empty">
-        This tour doesn't exist (or isn't on this page).{" "}
+        This Tour Doesn't Exist (or Isn't on This Page).{" "}
         <Link to={homePath} style={{ color: "var(--accent)" }}>
           Back to {page.name}
         </Link>
@@ -908,7 +908,7 @@ export default function TourBuilder({
           ← {page.name} Tours
         </Link>
         {!readOnly && (
-          <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a separate tour on this page">
+          <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a Separate Tour on This Page">
             + New Tour
           </button>
         )}
@@ -938,9 +938,9 @@ export default function TourBuilder({
           </div>
           <div className="t-muted-row" style={{ marginTop: 8 }}>
             <span>
-              {flow.counts.ready}/{flow.counts.steps} drifts ready
+              {flow.counts.ready}/{flow.counts.steps} Drifts Ready
             </span>
-            <button className="d-btn ghost sm t-guide" onClick={() => setShowGuide(true)} title="How to film a great drift">
+            <button className="d-btn ghost sm t-guide" onClick={() => setShowGuide(true)} title="How to Film a Great Drift">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
               Capture Guide
             </button>
@@ -961,7 +961,7 @@ export default function TourBuilder({
             </a>
           )}
           {(flow.status === "PUBLISHED" || flow.publishedAt) && (
-            <button className="d-btn" onClick={() => setInsightsOpen(true)} title="Where visitors spend their time">
+            <button className="d-btn" onClick={() => setInsightsOpen(true)} title="Where Visitors Spend Their Time">
               Insights
             </button>
           )}
@@ -979,7 +979,7 @@ export default function TourBuilder({
               className="d-btn primary"
               onClick={() => publish(true)}
               disabled={publishing || !canPublish}
-              title={!canPublish ? (flow.counts.awaiting ? "Check out the new drifts first" : "Every drift needs to finish building first") : undefined}
+              title={!canPublish ? (flow.counts.awaiting ? "Check Out the New Drifts First" : "Every Drift Needs to Finish Building First") : undefined}
             >
               {publishing ? "Publishing…" : "Publish"}
             </button>
@@ -991,9 +991,9 @@ export default function TourBuilder({
         <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
           <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour Settings</div>
           <div className="t-cover">
-            <div className="t-cover-current">{flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No cover yet</span>}</div>
+            <div className="t-cover-current">{flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No Cover Yet</span>}</div>
             <div className="t-cover-controls">
-              <div className="d-label">Cover image</div>
+              <div className="d-label">Cover Image</div>
               <div className="d-sub" style={{ fontSize: 12.5 }}>
                 The picture on your page and in share previews. Pick a frame from the first drift — its start, middle or
                 end — or upload your own.
@@ -1006,7 +1006,7 @@ export default function TourBuilder({
                       type="button"
                       className={`t-cover-pick ${flow.coverUrl === url ? "on" : ""}`}
                       onClick={() => setCover(url)}
-                      title={`Use the ${COVER_LABELS[i]?.toLowerCase() || "frame"} of the first drift`}
+                      title={`Use the ${COVER_LABELS[i]?.toLowerCase() || "frame"} of the First Drift`}
                       disabled={coverBusy}
                     >
                       <img src={url} alt="" />
@@ -1045,7 +1045,7 @@ export default function TourBuilder({
                 className="d-input"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional — shown under the tour title and in share previews"
+                placeholder="Optional — Shown Under the Tour Title and in Share Previews"
                 maxLength={600}
               />
             </div>
@@ -1061,7 +1061,7 @@ export default function TourBuilder({
           {flow.status === "PUBLISHED" && (
             <div className="t-settings-row">
               <span className="d-sub" style={{ fontSize: 12.5 }}>
-                Unpublishing takes the tour's link offline until you publish again.
+                Unpublishing Takes the Tour's Link Offline Until You Publish Again.
               </span>
               <button className="d-btn ghost sm" onClick={() => publish(false)} disabled={publishing}>
                 {publishing ? "Working…" : "Unpublish Tour"}
@@ -1081,7 +1081,7 @@ export default function TourBuilder({
                     try {
                       const r = await apiEndpoints.driftUpdateFlow(flow.id, { isDemo: on });
                       applyFlow(r.data.flow);
-                      notify.success(on ? "This tour is now drift.li's demo tour" : "No longer the demo tour");
+                      notify.success(on ? "This Tour Is Now drift.li's Demo Tour" : "No Longer the Demo Tour");
                     } catch (err) {
                       notify.error(apiError(err));
                     } finally {
@@ -1100,19 +1100,19 @@ export default function TourBuilder({
         <div className="t-checkout t-rise">
           <div style={{ minWidth: 0 }}>
             <div className="d-h2">
-              {flow.counts.awaiting} new drift{flow.counts.awaiting === 1 ? "" : "s"} ready for checkout
+              {flow.counts.awaiting} New Drift{flow.counts.awaiting === 1 ? "" : "s"} Ready for Checkout
             </div>
             <p className="d-sub" style={{ fontSize: 13 }}>
               {billing.price} per drift · conversion + 1 year of hosting included. Nothing is built until checkout.
             </p>
             {!billing.paymentsEnabled && (
               <p className="d-sub" style={{ fontSize: 12.5, color: "var(--warn)" }}>
-                Checkout isn't switched on yet — contact us to activate paid drifts.
+                Checkout Isn't Switched On Yet — Contact Us to Activate Paid Drifts.
               </p>
             )}
           </div>
           <button className="d-btn primary" onClick={checkout} disabled={checkingOut || !billing.paymentsEnabled}>
-            {checkingOut ? "Opening checkout…" : `Checkout · ${money(billing.priceCents * flow.counts.awaiting, billing.currency)}`}
+            {checkingOut ? "Opening Checkout…" : `Checkout · ${money(billing.priceCents * flow.counts.awaiting, billing.currency)}`}
           </button>
         </div>
       )}
@@ -1167,10 +1167,10 @@ export default function TourBuilder({
                       <div className="t-path-side" onClick={(e) => e.stopPropagation()}>
                         {!readOnly && (
                           <span className="t-arrows">
-                            <button className="d-btn sm" onClick={() => reorderTo(i, i - 1)} disabled={i === 0} title="Move up" aria-label="Move up">
+                            <button className="d-btn sm" onClick={() => reorderTo(i, i - 1)} disabled={i === 0} title="Move Up" aria-label="Move up">
                               ↑
                             </button>
-                            <button className="d-btn sm" onClick={() => reorderTo(i, i + 1)} disabled={i === flow.steps.length - 1} title="Move down" aria-label="Move down">
+                            <button className="d-btn sm" onClick={() => reorderTo(i, i + 1)} disabled={i === flow.steps.length - 1} title="Move Down" aria-label="Move down">
                               ↓
                             </button>
                           </span>
@@ -1186,7 +1186,7 @@ export default function TourBuilder({
               })}
 
           {readOnly ? (
-            flow.steps.length === 0 && <div className="d-empty">No drifts in this tour yet.</div>
+            flow.steps.length === 0 && <div className="d-empty">No Drifts in This Tour Yet.</div>
           ) : (
             <UploadSlot
               key={flow.id}
@@ -1209,19 +1209,19 @@ export default function TourBuilder({
             {selectedProduct && isReady(selectedProduct.status) ? (
               <iframe key={selectedProduct.id + selectedProduct.updatedAt} src={`/embed/${selectedProduct.id}`} title={`Preview of ${selectedProduct.name}`} allow="fullscreen" />
             ) : selectedProduct?.status === "AWAITING_PAYMENT" ? (
-              <span style={{ padding: 20 }}>{selectedProduct.name} converts after checkout</span>
+              <span style={{ padding: 20 }}>{selectedProduct.name} Converts After Checkout</span>
             ) : selectedProduct?.status === "PROCESSING" ? (
               <div style={{ display: "grid", gap: 10, justifyItems: "center", padding: 20 }}>
                 <Spinner />
                 <span>Building {selectedProduct.name}…</span>
               </div>
             ) : (
-              <span style={{ padding: 20 }}>{readOnly ? "Pick a drift to preview it here" : "Upload a clip to preview it here"}</span>
+              <span style={{ padding: 20 }}>{readOnly ? "Pick a Drift to Preview It Here" : "Upload a Clip to Preview It Here"}</span>
             )}
           </div>
           {flow.steps.length > 0 && (
             <div className="d-card d-card-pad" style={{ display: "grid", gap: 8 }}>
-              <div className="d-eyebrow">The path</div>
+              <div className="d-eyebrow">The Path</div>
               <div className="t-chain">
                 {flow.steps.map((s, i) => (
                   <span key={s.id} className="t-chain">
@@ -1242,13 +1242,13 @@ export default function TourBuilder({
       {flow.status === "PUBLISHED" && (
         <div className="d-banner ok" style={{ marginTop: 20 }}>
           <span>
-            Live at <strong>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</strong> — changes you save show up right away.
+            Live at <strong>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</strong> — Changes You Save Show Up Right Away.
           </span>
           <button className="d-btn sm" onClick={() => setShare("open")}>
             Share
           </button>
           <button className="d-btn ghost sm" onClick={copyLink}>
-            Copy link
+            Copy Link
           </button>
         </div>
       )}

@@ -56,7 +56,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
     setSending(true);
     try {
       await apiEndpoints.driftCreatePageInvite(to, role);
-      notify.success(`Invite sent to ${to}`);
+      notify.success(`Invite Sent to ${to}`);
       setEmail("");
       load();
     } catch (e) {
@@ -86,7 +86,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
     setBusyId(m.id);
     try {
       await apiEndpoints.driftUpdatePageMember(m.id, next);
-      notify.success(m.you ? `You're now ${ROLE_INFO[next].as}` : `${m.email} is now ${ROLE_INFO[next].as}`);
+      notify.success(m.you ? `You're Now ${ROLE_INFO[next].as}` : `${m.email} Is Now ${ROLE_INFO[next].as}`);
       if (m.you) {
         invalidateMyPages();
         onSelfChange();
@@ -109,11 +109,11 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
     try {
       if (m.you) {
         await leavePage(m.id, checkAuth, navigate);
-        notify.success("You left the page");
+        notify.success("You Left the Page");
         return;
       }
       await apiEndpoints.driftRemovePageMember(m.id);
-      notify.success(`${m.email} was removed`);
+      notify.success(`${m.email} Was Removed`);
       load();
     } catch (e) {
       notify.error(apiError(e));
@@ -177,7 +177,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
       )}
 
       <div className="d-label" style={{ marginTop: 16 }}>
-        Invite someone
+        Invite Someone
       </div>
       <div className="tpg-invite-form">
         <input
@@ -198,7 +198,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
           ))}
         </select>
         <button className="d-btn primary" onClick={send} disabled={sending || !email.trim()}>
-          {sending ? "Sending…" : "Send invite"}
+          {sending ? "Sending…" : "Send Invite"}
         </button>
       </div>
       <div className="d-faint tpg-role-help">
@@ -208,7 +208,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
       {pending.length > 0 && (
         <>
           <div className="d-label" style={{ marginTop: 16 }}>
-            Pending invites
+            Pending Invites
           </div>
           <div className="d-list">
             {pending.map((i) => (
@@ -218,7 +218,7 @@ export function PagePeople({ clientPage, onSelfChange }: { clientPage: boolean; 
                     {i.email}
                   </span>
                   <span className="sub">
-                    {ROLE_INFO[i.role || "ADMIN"].label} · {i.status === "EXPIRED" ? "Expired — send a new invite" : "Invite sent"}
+                    {ROLE_INFO[i.role || "ADMIN"].label} · {i.status === "EXPIRED" ? "Expired — Send a New Invite" : "Invite Sent"}
                   </span>
                 </span>
                 {i.status === "PENDING" && (

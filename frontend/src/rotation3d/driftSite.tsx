@@ -224,7 +224,7 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
           <span aria-hidden>·</span>
           <a href="/privacy">Privacy</a>
         </nav>
-        <p>Drift.li is a division of PicDrift</p>
+        <p>Drift.li Is a Division of PicDrift</p>
       </footer>
 
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
@@ -272,8 +272,8 @@ export function WaitlistDialog({
         {state === "done" ? (
           <>
             <div className="d-eyebrow">{product.name}</div>
-            <h3>You're on the list</h3>
-            <p className="d-sub">We'll email {email.trim()} as soon as {product.name} opens.</p>
+            <h3>You're on the List</h3>
+            <p className="d-sub">We'll Email {email.trim()} as Soon as {product.name} Opens.</p>
             <button className="d-btn primary" onClick={onClose}>
               Done
             </button>
@@ -282,7 +282,7 @@ export function WaitlistDialog({
           <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
             <div className="d-eyebrow">{product.name} · Coming Soon</div>
             <h3>Join the Wait List</h3>
-            <p className="d-sub">Be the first to know when {product.name} opens.</p>
+            <p className="d-sub">Be the First to Know When {product.name} Opens.</p>
             <input
               className="d-input"
               type="email"

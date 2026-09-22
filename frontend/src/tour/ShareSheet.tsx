@@ -84,13 +84,13 @@ export function ShareSheet({
     const made = await ensureUnbranded();
     if (!made) return;
     const ok = await copyText(publicUrl(made));
-    notify[ok ? "success" : "error"](ok ? "Unbranded link copied" : "Couldn't copy the link");
+    notify[ok ? "success" : "error"](ok ? "Unbranded Link Copied" : "Couldn't Copy the Link");
   };
 
   const copy = async () => {
     const ok = await copyText(link);
     setCopied(ok);
-    if (!ok) notify.error("Couldn't copy the link");
+    if (!ok) notify.error("Couldn't Copy the Link");
   };
   const share = async () => {
     if (!canShare) return copy();
@@ -111,7 +111,7 @@ export function ShareSheet({
           <div className="t-sheet-hero">
             <div className={`t-live-ring ${celebrate ? "pulse" : ""}`}>{flow.thumb ? <img src={flow.thumb} alt="" /> : <span />}</div>
             <div style={{ minWidth: 0 }}>
-              <div className="d-eyebrow">{celebrate ? "It's live" : "Share"}</div>
+              <div className="d-eyebrow">{celebrate ? "It's Live" : "Share"}</div>
               <div className="t-sheet-title">{flow.title || flow.name}</div>
               <div className="d-sub" style={{ fontSize: 12.5 }}>
                 Anyone with the link can walk through it{celebrate ? " now" : ""}. Changes you save show up right away.
@@ -129,16 +129,16 @@ export function ShareSheet({
               <QrSvg text={link} size={148} />
             </div>
             <div className="t-sheet-side">
-              <div className="d-label">Open it on a phone</div>
+              <div className="d-label">Open It on a Phone</div>
               <div className="d-sub" style={{ fontSize: 12.5 }}>
                 Point the camera at the code. Tours feel best held in a hand, dragging through each stop.
               </div>
               <div className="t-actions">
                 <a className="d-btn" href={flow.publicPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-                  Open tour
+                  Open Tour
                 </a>
                 <button type="button" className="d-btn ghost" onClick={share}>
-                  {canShare ? "Share…" : "Copy link"}
+                  {canShare ? "Share…" : "Copy Link"}
                 </button>
               </div>
             </div>
@@ -147,16 +147,16 @@ export function ShareSheet({
             <div className="t-share-more">
               <div className="t-share-row">
                 <span className="grow">
-                  <b>Unbranded link</b>
-                  <small>For listing sites (MLS) that don't allow names, logos or contact buttons.</small>
+                  <b>Unbranded Link</b>
+                  <small>For Listing Sites (MLS) That Don't Allow Names, Logos or Contact Buttons.</small>
                 </span>
                 <button type="button" className="d-btn sm" onClick={() => void copyUnbranded()} disabled={ubBusy}>
-                  {ubBusy ? "Making…" : ubPath ? "Copy" : "Get link"}
+                  {ubBusy ? "Making…" : ubPath ? "Copy" : "Get Link"}
                 </button>
               </div>
               <div className="t-share-row">
                 <span className="grow">
-                  <b>Print kit</b>
+                  <b>Print Kit</b>
                   <small>A flyer, a window sign and QR cards — print them or save a PDF.</small>
                 </span>
                 <button type="button" className="d-btn sm" onClick={() => setPrintOpen(true)}>

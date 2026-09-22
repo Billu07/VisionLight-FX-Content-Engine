@@ -68,7 +68,7 @@ export default function OwnerReport() {
     body = (
       <div className="or-state">
         <div>
-          <h1>This report isn't available</h1>
+          <h1>This Report Isn't Available</h1>
           <p>The link may have been turned off. Ask whoever shared it for a new one.</p>
         </div>
       </div>
@@ -78,8 +78,8 @@ export default function OwnerReport() {
       state === "error" ? (
         <div className="or-state">
           <div>
-            <h1>Couldn't load the report</h1>
-            <p>Please try again in a moment.</p>
+            <h1>Couldn't Load the Report</h1>
+            <p>Please Try Again in a Moment.</p>
           </div>
         </div>
       ) : (
@@ -100,13 +100,13 @@ export default function OwnerReport() {
               </div>
             )}
             <div className="d-eyebrow" style={{ marginTop: 10 }}>
-              Tour report
+              Tour Report
             </div>
             <h1 className="or-title">{report.tour.title}</h1>
             <div className="or-meta">
               <RangeTabs value={days} onChange={setDays} />
               <span className="d-faint" style={{ fontSize: 12.5 }}>
-                Updated live
+                Updated Live
               </span>
             </div>
           </div>

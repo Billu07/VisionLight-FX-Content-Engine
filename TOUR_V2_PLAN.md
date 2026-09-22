@@ -473,3 +473,11 @@ Drift.li is a division of PicDrift
   listed as the proposed next phases in the session reply (capitalization pass, drag-direction learning, mobile zoom /
   rotation fixes, try-it-free ×, contact label = page owner, email compliance footer, tour renewal toggle, in-app
   notifications, checkout trust signals, Pro invite visibility, new house media).
+- 2026-09-22 — Quick fixes (meeting follow-up; clip limit stays 5 s by the user's call). Title Case pass over the tour UI
+  (376 strings in 26 files by an AST script — visible text only; short joining words lowercase, phrasal particles and the
+  last word up; multi-sentence help text and the client's own copy unchanged; the old enquiry presets saved in sentence
+  case read as Title Case). The contact button names the page — "Contact Harbour Homes" — and reaches it: its own link
+  when set, otherwise the page's message form (tagged "Contact {page}" in the inbox and the email); "Contact PicDrift"
+  only when a page has neither. Try It Free (/tour/start) got an × and lost its theme toggle (dark only, missed in
+  phase 1). Fixed on the way: the enquiry/contact form rendered inside the animated page hero, so the sections below it
+  painted over the form — it now renders at the page root. Verified against the mocked API (scratchpad/ui-shots.js).

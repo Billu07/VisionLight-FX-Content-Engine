@@ -55,7 +55,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
             </Link>
             <span className="t-inline">
               <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
-              <ContactButton page={page} className="d-btn sm" />
+              <ContactButton page={page} flowId={flow.id} className="d-btn sm" />
             </span>
           </div>
           <Link to={home} className="tpw-brand">
@@ -103,7 +103,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
       {!flow.isDemo && (
         <div className="tpw-foot">
           <EnquiryButton page={page} flowId={flow.id} />
-          <ContactButton page={page} />
+          <ContactButton page={page} flowId={flow.id} />
         </div>
       )}
     </div>
@@ -211,9 +211,9 @@ export default function TourPathway() {
   if (pageMissing) {
     return shell(
       <div className="d-empty">
-        This page doesn't exist.{" "}
+        This Page Doesn't Exist.{" "}
         <Link to="/tour" style={{ color: "var(--accent)" }}>
-          drift.li tour
+          drift.li Tour
         </Link>
       </div>,
     );
@@ -223,7 +223,7 @@ export default function TourPathway() {
   if (admin.isAdmin && mode === "edit") {
     if (adminFlowId) {
       return (
-        <Suspense fallback={shell(<Loading label="Opening the tour…" />)}>
+        <Suspense fallback={shell(<Loading label="Opening the Tour…" />)}>
         <TourBuilder
           key={adminFlowId}
           flowId={adminFlowId}
@@ -237,7 +237,7 @@ export default function TourPathway() {
         </Suspense>
       );
     }
-    if (lookup !== "none") return shell(<Loading label="Opening the tour…" />);
+    if (lookup !== "none") return shell(<Loading label="Opening the Tour…" />);
   }
 
   if (flowState === "loading") return shell(<Loading />);
@@ -251,12 +251,12 @@ export default function TourPathway() {
           </Link>
           <div className="d-card d-card-pad" style={{ marginTop: 16, display: "grid", gap: 10 }}>
             <div className="d-h2" style={{ fontSize: 19 }}>
-              This tour isn't live yet
+              This Tour Isn't Live Yet
             </div>
-            <p className="d-sub">The link may be unpublished, renamed, or still being built.</p>
+            <p className="d-sub">The Link May Be Unpublished, Renamed, or Still Being Built.</p>
             <div className="t-actions">
               <Link className="d-btn" to={page.path || "/tour"} style={{ textDecoration: "none" }}>
-                See {page.name}'s tours
+                See {page.name}'s Tours
               </Link>
               <ContactButton page={page} className="d-btn ghost" />
             </div>

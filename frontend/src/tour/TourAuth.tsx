@@ -3,12 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { apiEndpoints } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
 import { TOUR_STYLES } from "./tourUi";
 import type { PageRef, PageRole } from "./types";
 import { invalidateMyPages } from "./myPages";
 import {
   CREATOR_HOME,
+  CREATOR_LANDING,
   ensureCreatorProfile,
   errorMessage,
   isConfirmRequired,
@@ -66,7 +67,8 @@ const STYLES = `
 .ta-wrap{min-height:100dvh;display:grid;grid-template-rows:auto 1fr}
 .ta-body{display:grid;place-items:center;padding:24px 16px 48px}
 .ta-grid{width:100%;max-width:440px;display:grid;justify-items:center}
-.ta-card{width:100%;max-width:440px;justify-self:center;display:grid;gap:14px;padding:clamp(20px,4vw,28px)}
+.ta-card{position:relative;width:100%;max-width:440px;justify-self:center;display:grid;gap:14px;padding:clamp(20px,4vw,28px)}
+.ta-x{position:absolute;top:12px;right:12px;z-index:1}
 .ta-title{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
 .ta-google{width:100%;padding:12px 14px;font-size:14px;gap:10px}
 .ta-or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em}
@@ -94,7 +96,8 @@ export default function TourAuth() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profiles, profileSelectionRequired, isLoading, checkAuth } = useAuth();
-  const [theme, toggleTheme] = useDriftTheme();
+  // × — back where they came from (the Tour landing when they arrived straight here).
+  const close = () => (location.key !== "default" ? navigate(-1) : navigate(CREATOR_LANDING));
 
   const params = new URLSearchParams(location.search);
   const next = nextFromLocation(location.search);
@@ -232,10 +235,10 @@ export default function TourAuth() {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        setNotice("If that email has an account, a reset link is on its way.");
+        setNotice("If That Email Has an Account, a Reset Link Is on Its Way.");
         return;
       }
-      if (mode === "signup" && password.length < 8) throw new Error("Use at least 8 characters for your password.");
+      if (mode === "signup" && password.length < 8) throw new Error("Use at Least 8 Characters for Your Password.");
       rememberNext(next);
       if (mode === "signup") rememberAccountType(joining ? null : accountType);
       if (mode === "signup") {
@@ -251,7 +254,7 @@ export default function TourAuth() {
         // Supabase returns an identity-less user for an email that already exists.
         if (data.user && Array.isArray((data.user as any).identities) && (data.user as any).identities.length === 0) {
           setMode("login");
-          setError("You already have an account with this email — log in instead.");
+          setError("You Already Have an Account with This Email — Log In Instead.");
           return;
         }
         if (!data.session) {
@@ -262,7 +265,7 @@ export default function TourAuth() {
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email: em, password });
         if (error) throw error;
-        if (!data.session) throw new Error("Unable to start a session.");
+        if (!data.session) throw new Error("Unable to Start a Session.");
         await provisionOrAsk();
       }
     } catch (e) {
@@ -282,7 +285,7 @@ export default function TourAuth() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) throw error;
-      setNotice("Sent again — give it a minute and check spam too.");
+      setNotice("Sent Again — Give It a Minute and Check Spam Too.");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -291,34 +294,34 @@ export default function TourAuth() {
   };
 
   const inviteLine = invite ? `${invite.page.name} as ${ROLE_AS[invite.role || "ADMIN"]}` : "";
-  const eyebrow = ownPageMode ? "Your own page" : joining ? "Page invite" : mode === "login" ? "Creator login" : "Try It Free";
+  const eyebrow = ownPageMode ? "Your Own Page" : joining ? "Page Invite" : mode === "login" ? "Creator Login" : "Try It Free";
   const title = ownPageMode
-    ? "Create your own page"
+    ? "Create Your Own Page"
     : mode === "login"
-      ? "Welcome back"
+      ? "Welcome Back"
       : mode === "forgot"
-        ? "Reset your password"
+        ? "Reset Your Password"
         : mode === "sent"
-          ? "Check your inbox"
+          ? "Check Your Inbox"
           : joining
-            ? "Create your account"
-            : "Create your first tour";
+            ? "Create Your Account"
+            : "Create Your First Tour";
   const sub = ownPageMode
     ? "A page of your own for your tours. The pages you've joined stay just as they are."
     : mode === "login"
       ? joining
         ? inviteLine
           ? `Log in to join ${inviteLine}.`
-          : "Log in to accept your invite."
-        : "Log in to your creator space."
+          : "Log In to Accept Your Invite."
+        : "Log In to Your Creator Space."
       : mode === "forgot"
-        ? "We'll email you a link to set a new password."
+        ? "We'll Email You a Link to Set a New Password."
         : mode === "sent"
           ? ""
           : joining
             ? inviteLine
               ? `Then you'll join ${inviteLine}.`
-              : "Then you'll accept your invite."
+              : "Then You'll Accept Your Invite."
             : "Free to start. Turn three phone clips into an interactive tour in minutes.";
 
   const typePicker = (
@@ -344,21 +347,21 @@ export default function TourAuth() {
   const nameField = (
     <div>
       <label className="d-label" htmlFor="ta-name">
-        {joining ? "Your name" : "Your Page Name"}
+        {joining ? "Your Name" : "Your Page Name"}
       </label>
       <input
         id="ta-name"
         className="d-input"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder={joining ? "So the page's team knows it's you" : "Your name or business name"}
+        placeholder={joining ? "So the Page's Team Knows It's You" : "Your Name or Business Name"}
         autoComplete={joining ? "name" : "organization"}
       />
     </div>
   );
 
   return (
-    <div className="drift-ui d-page t-page" data-theme={theme}>
+    <div className="drift-ui d-page t-page" data-theme="dark">
       <DriftThemeStyles />
       <style>{TOUR_STYLES}</style>
       <style>{STYLES}</style>
@@ -367,15 +370,17 @@ export default function TourAuth() {
           <Link to="/" className="d-wordmark" style={{ textDecoration: "none" }}>
             drift<i>.li</i>
           </Link>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </header>
         <div className="ta-body">
           <div className="ta-grid">
             <div className="d-card ta-card">
+              <button type="button" className="d-x ta-x" onClick={close} aria-label="Close" title="Close">
+                ×
+              </button>
               {mode === "sent" ? (
                 <div className="ta-sent">
                   <div className="ico">✉</div>
-                  <div className="ta-title">Check your inbox</div>
+                  <div className="ta-title">Check Your Inbox</div>
                   <p className="d-sub">
                     We sent a confirmation link to <strong style={{ color: "var(--text)" }}>{email.trim()}</strong>. Open it on
                     this device and you'll land {joining ? "back on your invite" : "straight in your creator space"}.
@@ -384,10 +389,10 @@ export default function TourAuth() {
                   {error && <div className="d-banner err">{error}</div>}
                   <div className="ta-links" style={{ justifyContent: "center", marginTop: 6 }}>
                     <button type="button" onClick={resend} disabled={busy}>
-                      Resend email
+                      Resend Email
                     </button>
                     <button type="button" onClick={() => switchMode("login")}>
-                      Already confirmed? Log in
+                      Already Confirmed? Log In
                     </button>
                   </div>
                 </div>
@@ -407,11 +412,11 @@ export default function TourAuth() {
                     {nameField}
                     {error && <div className="d-banner err">{error}</div>}
                     <button type="button" className="d-btn primary ta-submit" onClick={createOwnPage} disabled={busy}>
-                      {busy ? "Creating…" : "Create my page"}
+                      {busy ? "Creating…" : "Create My Page"}
                     </button>
                   </div>
                   <div className="ta-links">
-                    <Link to={CREATOR_HOME}>← Back to my pages</Link>
+                    <Link to={CREATOR_HOME}>← Back to My Pages</Link>
                   </div>
                 </>
               ) : (
@@ -444,7 +449,7 @@ export default function TourAuth() {
                         )}
                       </span>
                       <button type="button" className="d-btn primary" onClick={continueSignedIn} disabled={busy}>
-                        {busy ? "One moment…" : joining ? "Continue to the invite" : "Continue with this account"}
+                        {busy ? "One Moment…" : joining ? "Continue to the Invite" : "Continue with This Account"}
                       </button>
                     </div>
                   )}
@@ -454,7 +459,7 @@ export default function TourAuth() {
                         <GoogleMark />
                         Continue with Google
                       </button>
-                      <div className="ta-or">or</div>
+                      <div className="ta-or">Or</div>
                     </>
                   )}
 
@@ -488,7 +493,7 @@ export default function TourAuth() {
                           type="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+                          placeholder={mode === "signup" ? "At Least 8 Characters" : "Your Password"}
                           autoComplete={mode === "signup" ? "new-password" : "current-password"}
                           required
                           minLength={mode === "signup" ? 8 : undefined}
@@ -499,49 +504,49 @@ export default function TourAuth() {
                     {notice && <div className="d-banner ok">{notice}</div>}
                     <button type="submit" className="d-btn primary ta-submit" disabled={busy}>
                       {busy
-                        ? "One moment…"
+                        ? "One Moment…"
                         : mode === "signup"
                           ? joining
-                            ? "Create account"
+                            ? "Create Account"
                             : "Create My Free Account"
                           : mode === "login"
-                            ? "Log in"
-                            : "Send reset link"}
+                            ? "Log In"
+                            : "Send Reset Link"}
                     </button>
                   </form>
 
                   <div className="ta-links">
                     {mode === "signup" && (
                       <span>
-                        Have an account?{" "}
+                        Have an Account?{" "}
                         <button type="button" onClick={() => switchMode("login")}>
-                          Log in
+                          Log In
                         </button>
                       </span>
                     )}
                     {mode === "login" && (
                       <>
                         <span>
-                          New here?{" "}
+                          New Here?{" "}
                           <button type="button" onClick={() => switchMode("signup")}>
-                            {joining ? "Create an account" : "Try It Free"}
+                            {joining ? "Create an Account" : "Try It Free"}
                           </button>
                         </span>
                         <button type="button" onClick={() => switchMode("forgot")}>
-                          Forgot password?
+                          Forgot Password?
                         </button>
                       </>
                     )}
                     {mode === "forgot" && (
                       <button type="button" onClick={() => switchMode("login")}>
-                        ← Back to log in
+                        ← Back to Log In
                       </button>
                     )}
                   </div>
 
                   {mode === "signup" && (
                     <div className="ta-fine">
-                      By continuing you agree to the <a href="/terms">Terms</a> and{" "}
+                      By Continuing You Agree to the <a href="/terms">Terms</a> and{" "}
                       <a href="/privacy">Privacy Policy</a>.
                     </div>
                   )}

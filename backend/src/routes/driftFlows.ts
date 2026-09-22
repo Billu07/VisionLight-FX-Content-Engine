@@ -189,6 +189,7 @@ const PAGE_SELECT = {
   tourSettings: true,
 } as const;
 
+/** The contact button when a page has no link of its own AND takes no messages. */
 const DEFAULT_CONTACT = {
   label: process.env.DRIFT_TOUR_CONTACT_LABEL || "Contact PicDrift",
   url: process.env.DRIFT_TOUR_CONTACT_URL || "mailto:picdrift@picdrift.com",
@@ -208,7 +209,13 @@ const serializePage = (org: any) => {
     path: org.slug ? pagePublicPath(org.slug) : null,
     accountType: (org.tourAccountType ?? null) as string | null,
     logoUrl: typeof s.logoUrl === "string" && s.logoUrl ? (s.logoUrl as string) : null,
-    contact: { label: label || DEFAULT_CONTACT.label, url: url || DEFAULT_CONTACT.url },
+    // "Contact {page}": its own link, else its message form (url null — the page's team gets it);
+    // a page with neither falls back to PicDrift.
+    contact: url
+      ? { label: label || `Contact ${org.name}`, url }
+      : enquirySettingsOf(s).enabled && org.slug
+        ? { label: label || `Contact ${org.name}`, url: null }
+        : { label: label || DEFAULT_CONTACT.label, url: DEFAULT_CONTACT.url },
     contactLabel: label || null,
     contactUrl: url || null,
     demoFlowId: typeof s.demoFlowId === "string" && s.demoFlowId ? (s.demoFlowId as string) : null,

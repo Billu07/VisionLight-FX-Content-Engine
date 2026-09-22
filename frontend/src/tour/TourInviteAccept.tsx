@@ -75,20 +75,20 @@ export default function TourInviteAccept() {
     <TourShell>
       <div style={{ maxWidth: 540, margin: "4vh auto 0" }}>
         <div className="d-card d-card-pad t-rise" style={{ display: "grid", gap: 14 }}>
-          <div className="d-eyebrow">Page invite</div>
+          <div className="d-eyebrow">Page Invite</div>
           {error && !info ? (
             <>
               <h1 className="d-h1" style={{ fontSize: 22 }}>
-                This invite can't be used
+                This Invite Can't Be Used
               </h1>
               <div className="d-banner err">{error}</div>
               <Link to="/tour" className="d-btn" style={{ textDecoration: "none", justifySelf: "start" }}>
-                drift.li tour
+                drift.li Tour
               </Link>
             </>
           ) : !info || isLoading ? (
             <div className="d-faint" style={{ fontSize: 13 }}>
-              Loading your invite…
+              Loading Your Invite…
             </div>
           ) : (
             <>
@@ -100,13 +100,13 @@ export default function TourInviteAccept() {
                 able to {ROLE_LINE[role].can}. The invite was sent to <b style={{ color: "var(--text)" }}>{info.email}</b>.
               </p>
               {info.status === "EXPIRED" ? (
-                <div className="d-banner warn">This invite has expired — ask {info.page.name} to send a new one.</div>
+                <div className="d-banner warn">This Invite Has Expired — Ask {info.page.name} to Send a New One.</div>
               ) : info.status === "ACCEPTED" ? (
                 <div className="d-banner ok" style={{ flexWrap: "wrap" }}>
-                  <span>This invite has already been accepted.</span>
+                  <span>This Invite Has Already Been Accepted.</span>
                   {info.page.path && (
                     <Link to={info.page.path} className="d-btn sm" style={{ textDecoration: "none" }}>
-                      Open the page
+                      Open the Page
                     </Link>
                   )}
                 </div>
@@ -114,21 +114,21 @@ export default function TourInviteAccept() {
                 <>
                   {signedInEmail && (
                     <p className="d-sub" style={{ fontSize: 13, margin: 0 }}>
-                      Signed in as <b style={{ color: "var(--text)" }}>{signedInEmail}</b>.
+                      Signed In as <b style={{ color: "var(--text)" }}>{signedInEmail}</b>.
                     </p>
                   )}
                   {error && <div className="d-banner err">{error}</div>}
                   <button className="d-btn primary" style={{ padding: "13px 18px", fontSize: 14.5 }} onClick={accept} disabled={busy}>
-                    {busy ? "Accepting…" : "Accept invite"}
+                    {busy ? "Accepting…" : "Accept Invite"}
                   </button>
                 </>
               ) : (
                 <div className="t-actions">
                   <Link className="d-btn primary" to={signupUrl} style={{ textDecoration: "none" }}>
-                    Create an account
+                    Create an Account
                   </Link>
                   <Link className="d-btn" to={loginUrl} style={{ textDecoration: "none" }}>
-                    Log in
+                    Log In
                   </Link>
                 </div>
               )}

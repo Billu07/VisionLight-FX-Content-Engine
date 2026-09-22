@@ -94,7 +94,7 @@ export class CreatorConfirmRequired extends Error {
   readonly needsConfirmation = true;
   email: string;
   constructor(email: string) {
-    super("Confirm to create a separate creator space.");
+    super("Confirm to Create a Separate Creator Space.");
     this.email = email;
   }
 }
@@ -113,7 +113,7 @@ export async function ensureCreatorProfile(
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("You're not signed in yet.");
+  if (!session?.access_token) throw new Error("You're Not Signed In Yet.");
   setAuthToken(session.access_token);
   let r;
   try {

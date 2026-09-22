@@ -5,7 +5,15 @@
  */
 
 export const ENQUIRY_LABEL_MAX = 28;
-export const DEFAULT_ENQUIRY_LABEL = "Book a viewing";
+export const DEFAULT_ENQUIRY_LABEL = "Book a Viewing";
+
+/** The preset labels as saved before the Title Case pass (2026-09-22) read as the new ones. */
+const PRESET_CASE: Record<string, string> = {
+  "book a viewing": "Book a Viewing",
+  "ask a question": "Ask a Question",
+  "request info": "Request Info",
+  "get a quote": "Get a Quote",
+};
 
 export type EnquirySettings = { enabled: boolean; label: string; askPhone: boolean };
 
@@ -13,7 +21,7 @@ export function enquirySettingsOf(tourSettings: unknown): EnquirySettings {
   const raw = tourSettings && typeof tourSettings === "object" ? (tourSettings as Record<string, unknown>).enquiries : null;
   const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const label = typeof s.label === "string" ? s.label.trim().slice(0, ENQUIRY_LABEL_MAX) : "";
-  return { enabled: s.enabled === true, label: label || DEFAULT_ENQUIRY_LABEL, askPhone: s.askPhone === true };
+  return { enabled: s.enabled === true, label: PRESET_CASE[label.toLowerCase()] || label || DEFAULT_ENQUIRY_LABEL, askPhone: s.askPhone === true };
 }
 
 /** What the player needs to show the button — null while it's switched off. */

@@ -22,7 +22,7 @@ function GoToMyPage() {
       .then((path) => {
         if (!alive) return;
         if (path) navigate(path, { replace: true });
-        else setError("Your page doesn't have a link yet.");
+        else setError("Your Page Doesn't Have a Link Yet.");
       })
       .catch((e) => alive && setError(apiError(e)));
     return () => {
@@ -34,7 +34,7 @@ function GoToMyPage() {
     return (
       <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <div className="d-faint" style={{ fontSize: 13 }}>
-          Opening your page…
+          Opening Your Page…
         </div>
       </div>
     );
@@ -87,12 +87,12 @@ function EditRedirect() {
         <div className="d-empty">
           {error}{" "}
           <Link to={CREATOR_HOME} style={{ color: "var(--accent)" }}>
-            Back to your page
+            Back to Your Page
           </Link>
         </div>
       ) : (
         <div className="d-faint" style={{ fontSize: 13 }}>
-          Opening the tour…
+          Opening the Tour…
         </div>
       )}
     </TourShell>

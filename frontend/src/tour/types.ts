@@ -101,8 +101,9 @@ export type Page = {
   path: string | null;
   accountType: string | null;
   logoUrl: string | null;
-  /** the effective contact button (defaults to "Contact PicDrift") */
-  contact: { label: string; url: string };
+  /** the effective contact button: "Contact {page}" → its link, or its message form when url is
+   *  null (the page takes messages); "Contact PicDrift" when it has neither */
+  contact: { label: string; url: string | null };
   /** what the admin set (null = default) */
   contactLabel: string | null;
   contactUrl: string | null;

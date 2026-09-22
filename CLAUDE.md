@@ -346,8 +346,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `pickedTourBackground` treats a stored colour equal to the manifest's `detectedBg` (older builds) as not picked —
   the public payload serves the default, the builder shows "Default · drift.li Dark". A demo tour (the site's
   `isDemo`, or the page's own `demoFlowId`) comes back with `isDemo` on the public pathway → no page back link, brand,
-  enquiry or contact. The client wants **Title Case** on UI text ("That Sounds Good") — new strings follow it; a full
-  pass is owed.
+  enquiry or contact. The client wants **Title Case** on UI text ("That Sounds Good"): done across the tour UI on
+  2026-09-22 — major words capitalized, short joining words lowercase unless first/last ("Keep the Moments That
+  Matter"), phrasal particles up ("Log In"), drift.li / emails / links untouched; one-line text only — multi-sentence
+  help paragraphs keep sentence case; the client's own copy (TourLanding, CaptureGuide, landings) untouched. **Write
+  new UI strings in Title Case.** Contact button (`ContactButton`, tourPageParts): "Contact {page}" — its own link when
+  set, else (url null, when the page takes enquiries) it opens the page's message form (`EnquirySheet`, exported, sent
+  with `via: "contact"` → the lead's button reads "Contact {page}"); only a page with neither falls back to
+  "Contact PicDrift". `EnquirySheet` portals into the `.drift-ui.d-page` root (animated `.t-rise` sections are their own
+  layer and painted over it). /tour/start (Try It Free) has an × (back, or the Tour landing) and is dark only.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on

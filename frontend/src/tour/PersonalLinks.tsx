@@ -41,7 +41,7 @@ export function PersonalLinks({ flow }: { flow: Flow }) {
       await load();
       if (token) {
         const ok = await copyText(urlFor(token));
-        notify.success(ok ? `Link for ${name} copied — send it to them` : `Link for ${name} is ready`);
+        notify.success(ok ? `Link for ${name} Copied — Send It to Them` : `Link for ${name} Is Ready`);
       }
     } catch (e) {
       notify.error(apiError(e));
@@ -52,7 +52,7 @@ export function PersonalLinks({ flow }: { flow: Flow }) {
 
   const copy = async (l: ShareLink) => {
     const ok = await copyText(urlFor(l.token));
-    notify[ok ? "success" : "error"](ok ? `Link for ${l.label} copied` : "Couldn't copy the link");
+    notify[ok ? "success" : "error"](ok ? `Link for ${l.label} Copied` : "Couldn't Copy the Link");
   };
 
   const remove = async (l: ShareLink) => {
@@ -69,7 +69,7 @@ export function PersonalLinks({ flow }: { flow: Flow }) {
   };
 
   const status = (l: ShareLink) => {
-    if (!l.opens) return "Not opened yet";
+    if (!l.opens) return "Not Opened Yet";
     const parts = [
       `Opened ${l.opens === 1 ? "once" : `${l.opens} times`}`,
       l.lastOpenedAt ? `last ${timeAgo(l.lastOpenedAt)}` : "",
@@ -83,7 +83,7 @@ export function PersonalLinks({ flow }: { flow: Flow }) {
     <div className="t-links">
       <div>
         <div className="d-label" style={{ margin: 0 }}>
-          Send it to someone
+          Send It to Someone
         </div>
         <div className="d-sub" style={{ fontSize: 12.5, margin: "4px 0 0" }}>
           Make a link for one person. You'll see when they open it and how much they explore — they see the same tour.
@@ -95,11 +95,11 @@ export function PersonalLinks({ flow }: { flow: Flow }) {
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           maxLength={60}
-          placeholder="Their name, e.g. Sam Carter"
+          placeholder="Their Name, e.g. Sam Carter"
           aria-label="Who the link is for"
         />
         <button type="submit" className="d-btn primary" disabled={busy || !label.trim()}>
-          {busy ? "Creating…" : "Create link"}
+          {busy ? "Creating…" : "Create Link"}
         </button>
       </form>
       {links === null ? (

@@ -198,7 +198,7 @@ export function PinEditor({
   }, [playing, frames.length]);
 
   const close = async () => {
-    if (dirty && !(await confirmAction("Close without saving your pin changes?"))) return;
+    if (dirty && !(await confirmAction("Close Without Saving Your Pin Changes?"))) return;
     onClose();
   };
   useEffect(() => {
@@ -274,7 +274,7 @@ export function PinEditor({
 
   const remove = async (key: string) => {
     const p = pins.find((x) => x.key === key);
-    if (p?.title.trim() && !(await confirmAction(`Delete the pin "${p.title.trim()}"?`))) return;
+    if (p?.title.trim() && !(await confirmAction(`Delete the Pin "${p.title.trim()}"?`))) return;
     setPins((prev) => prev.filter((x) => x.key !== key));
     setSel(null);
     setDirty(true);
@@ -286,7 +286,7 @@ export function PinEditor({
       setSel(untitled.key);
       setFrame(untitled.frame);
       setMissing(untitled.key);
-      notify.error("Give every pin a label");
+      notify.error("Give Every Pin a Label");
       setTimeout(() => titleRef.current?.focus(), 60);
       return;
     }
@@ -303,7 +303,7 @@ export function PinEditor({
       setDirty(false);
       setMissing(null);
       if (r.data?.flow) onSaved(r.data.flow);
-      notify.success(saved.length ? "Pins saved — they're live on this drift" : "Pins removed");
+      notify.success(saved.length ? "Pins Saved — They're Live on This Drift" : "Pins Removed");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -383,7 +383,7 @@ export function PinEditor({
                       </button>
                     );
                   })}
-                {placing && <div className="pe-hint">Tap the spot you want to label</div>}
+                {placing && <div className="pe-hint">Tap the Spot You Want to Label</div>}
                 {frames.length > 0 && loaded < frames.length && (
                   <div className="pe-loading" aria-hidden>
                     <i style={{ width: `${Math.round((loaded / frames.length) * 100)}%` }} />
@@ -430,7 +430,7 @@ export function PinEditor({
                   }}
                   disabled={!placing && pins.length >= maxPins}
                 >
-                  {placing ? "Cancel" : "+ Add pin"}
+                  {placing ? "Cancel" : "+ Add Pin"}
                 </button>
               </div>
 
@@ -453,7 +453,7 @@ export function PinEditor({
                       }}
                     >
                       <span className="pe-num">{i + 1}</span>
-                      <span className="pe-item-t">{p.title.trim() || "Untitled pin"}</span>
+                      <span className="pe-item-t">{p.title.trim() || "Untitled Pin"}</span>
                     </button>
                   ))}
                 </div>
@@ -470,11 +470,11 @@ export function PinEditor({
                     className="d-input"
                     value={selPin.title}
                     maxLength={TITLE_MAX}
-                    placeholder="e.g. Quartz island"
+                    placeholder="e.g. Quartz Island"
                     onChange={(e) => update(selPin.key, { title: e.target.value })}
                   />
                   <label className="d-label" htmlFor="pe-note">
-                    Note <span className="d-faint">(optional)</span>
+                    Note <span className="d-faint">(Optional)</span>
                   </label>
                   <textarea
                     id="pe-note"
@@ -482,25 +482,25 @@ export function PinEditor({
                     rows={2}
                     value={selPin.note}
                     maxLength={NOTE_MAX}
-                    placeholder="Shown when someone taps the pin"
+                    placeholder="Shown When Someone Taps the Pin"
                     onChange={(e) => update(selPin.key, { note: e.target.value })}
                   />
                   {selPlacement && !selPlacement.visible && (
                     <div className="pe-offview">
-                      Not in view on this part of the drift.
+                      Not in View on This Part of the Drift.
                       <button type="button" className="d-btn ghost sm" onClick={() => setFrame(selPin.frame)}>
-                        Show it
+                        Show It
                       </button>
                     </div>
                   )}
                   <div className="pe-meta">
                     {selPin.keys && selPin.keys.length > 0 && (
                       <button type="button" className="d-btn ghost sm" onClick={() => update(selPin.key, { keys: null })}>
-                        Undo fine-tuning
+                        Undo Fine-tuning
                       </button>
                     )}
                     <button type="button" className="d-btn danger sm" onClick={() => void remove(selPin.key)}>
-                      Delete pin
+                      Delete Pin
                     </button>
                   </div>
                 </div>
@@ -514,7 +514,7 @@ export function PinEditor({
             {dirty ? "Cancel" : "Done"}
           </button>
           <button type="button" className="d-btn primary" onClick={save} disabled={saving || loading || !!loadError || !dirty}>
-            {saving ? "Saving…" : "Save pins"}
+            {saving ? "Saving…" : "Save Pins"}
           </button>
         </div>
       </div>

@@ -18,8 +18,8 @@ export const PRINT_PAPER: Record<PrintPaper, { w: number; h: number; css: string
 
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; hint: string }[] = [
   { value: "flyer", label: "Flyer", hint: "The cover photo, the title and a QR code — for open houses and handouts." },
-  { value: "sign", label: "Window sign", hint: "A big QR code people can scan from the street." },
-  { value: "cards", label: "QR cards", hint: "Eight small cards to cut out and leave around." },
+  { value: "sign", label: "Window Sign", hint: "A Big QR Code People Can Scan from the Street." },
+  { value: "cards", label: "QR Cards", hint: "Eight Small Cards to Cut Out and Leave Around." },
 ];
 
 /** A template's page in millimetres (the window sign is landscape). */
@@ -83,13 +83,13 @@ export function PrintSheet({ template, paper, content }: { template: PrintTempla
         <div className="pk-cover">{cover ? <img src={cover} alt="" /> : null}</div>
         <div className="pk-flyer-body">
           {brandLine}
-          <div className="pk-kicker">Interactive tour</div>
+          <div className="pk-kicker">Interactive Tour</div>
           <div className="pk-title">{title}</div>
           {description && <div className="pk-desc">{description}</div>}
           <div className="pk-scan">
             <Qr text={url} sizeMm={44} />
             <div className="pk-scan-text">
-              <b>Scan to walk through</b>
+              <b>Scan to Walk Through</b>
               <span>Open it on your phone and drag across each space to look around.</span>
               <code>{short}</code>
             </div>
@@ -104,9 +104,9 @@ export function PrintSheet({ template, paper, content }: { template: PrintTempla
       <div className="pk-sheet pk-sign" style={style}>
         <div className="pk-sign-text">
           {brandLine}
-          <div className="pk-sign-head">Scan to tour inside</div>
+          <div className="pk-sign-head">Scan to Tour Inside</div>
           <div className="pk-title">{title}</div>
-          <div className="pk-sign-sub">Point your phone's camera at the code, then drag across each space.</div>
+          <div className="pk-sign-sub">Point Your Phone's Camera at the Code, Then Drag Across Each Space.</div>
           <code className="pk-url">{short}</code>
         </div>
         <Qr text={url} sizeMm={Math.min(h - 50, 130)} />
@@ -119,9 +119,9 @@ export function PrintSheet({ template, paper, content }: { template: PrintTempla
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="pk-card">
           <div className="pk-card-text">
-            <div className="pk-kicker">Interactive tour</div>
+            <div className="pk-kicker">Interactive Tour</div>
             <div className="pk-card-title">{title}</div>
-            <div className="pk-card-sub">Scan to explore</div>
+            <div className="pk-card-sub">Scan to Explore</div>
             {brand && <div className="pk-card-brand">{brand.name}</div>}
           </div>
           <Qr text={url} sizeMm={30} />

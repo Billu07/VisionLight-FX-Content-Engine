@@ -1,12 +1,28 @@
+import { useState } from "react";
 import type { Page } from "./types";
+import { EnquirySheet } from "./EnquirySheet";
 
-/** The page's contact button ("Contact PicDrift" unless the page set its own). */
-export function ContactButton({ page, className = "d-btn" }: { page: Page; className?: string }) {
-  const web = /^https?:/i.test(page.contact.url);
+/** The page's contact button — "Contact {page}". Its own link when it set one; otherwise the page's
+ *  message form (the enquiry sheet, sent to its team); "Contact PicDrift" when it has neither. */
+export function ContactButton({ page, flowId = null, className = "d-btn" }: { page: Page; flowId?: string | null; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const url = page.contact.url;
+  if (!url) {
+    if (!page.slug || !page.enquiries?.enabled) return null;
+    return (
+      <>
+        <button type="button" className={className} onClick={() => setOpen(true)}>
+          {page.contact.label}
+        </button>
+        {open && <EnquirySheet page={page} flowId={flowId} title={page.contact.label} via="contact" onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
+  const web = /^https?:/i.test(url);
   return (
     <a
       className={className}
-      href={page.contact.url}
+      href={url}
       target={web ? "_blank" : undefined}
       rel={web ? "noreferrer" : undefined}
       style={{ textDecoration: "none" }}
@@ -21,7 +37,7 @@ export function ContactButton({ page, className = "d-btn" }: { page: Page; class
 const H_Y = 110;
 const H_LINE = `M 34 ${H_Y} L 396 ${H_Y}`;
 const H_STOPS = [
-  { x: 112, label: "Living room", up: true },
+  { x: 112, label: "Living Room", up: true },
   { x: 198, label: "Kitchen", up: false },
   { x: 284, label: "Terrace", up: true },
   { x: 370, label: "Garden", up: false },
