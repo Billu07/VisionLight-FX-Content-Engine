@@ -269,8 +269,16 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   admin + public view) · `/tour/{page}/{tour}` (the tour's main link = pathway menu; admins get the
   builder) · `/tour/{page}/{tour}/{drift}` (player; drift segment derived from the name, unique per tour —
   `stepDriftSlugs`) · `/tour/invite/{token}` · `drift.li/{page}/tour` → `/tour/{page}`.
-- **Buttons**: every tour drift has Home (→ pathway) + the next drift's name, last → #1 (`relinkFlow`,
-  only READY drifts, writes on change, `relinkAllFlows()` at boot, re-run when a drift turns READY).
+- **Buttons** (2026-09-23, client): every tour drift shows the SAME row — `‹ Prev · Menu · Next ›`.
+  Naming the next room read as a destination rather than a step, so the name is gone. The row is
+  built in `SpinViewer` from `flowNav` (`tourNav`): Menu → `flow.publicPath`, Prev → the stop before
+  (on the FIRST drift, Prev is the menu), Next → the stop after, looping to #1 at the end; a
+  one-drift tour shows Menu alone. Because it comes from `flow.stops`, the unbranded player
+  (`/u/{code}`, whose stops the server rewrites) gets the same row for free. Clicks still go through
+  `fireCta`, so in-app swaps, fullscreen and tracking are unchanged. `relinkFlow` still writes
+  `ctaPrimary`/`ctaSecondary` (Home + next drift, last → #1; only READY drifts, writes on change,
+  `relinkAllFlows()` at boot, re-run when a drift turns READY) — the player ignores them for tour
+  drifts, but they remain the stored truth for anything that reads a product's CTAs.
 - **Pay per drift** (`services/driftBilling.ts`): free while `Organization.freeDrifts` last, then
   `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour) → webhook
   `/api/drift/billing/webhook` (raw body, mounted BEFORE express.json; events `checkout.session.completed` / `.async_payment_succeeded` /
@@ -373,7 +381,16 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   pathway and builder; a superadmin not yet managing sees Public, "Admin" = Manage). `PageSwitcher` is also the account
   menu (pages · Signed in as · Log Out); Dashboard hides when the view switch shows. The page and the builder show
   **Path only** (Cards removed). Page: admin view = Create New Tour + Page Settings (accent) + Leave Page (members) +
-  the link; public view = View Demo / enquiry / contact. **A tour in the list is a directory entry**
+  the link; public view = View Demo / enquiry / contact. **Client pass 2026-09-23**: the header's
+  "TOUR" reads at the wordmark's size (`.t-kind`, one lockup with drift.li); the page hero is the
+  NAME first with "Tours" under it (`.tpg-kind`); the visitor's line is "Explore the Live Interactive
+  Tours."; counts read "9 Drifts". `.t-back` is a pill (accent on accent-soft) everywhere it appears —
+  it was easy to miss. A DEMO tour's pathway now carries `← Drift Tours` → `/tour/drift` (it had no way
+  out at all); every pathway ends with a `.tpw-foot-end` row: **Learn More** (→ /tour) + **Share Tour**
+  (copies the tour's menu link, `ShareTourButton`). The /tour landing's closing section is one
+  **View Drift Tours** → `/tour/drift` instead of repeating the two CTAs above it. On phones the home
+  hero's caption + "Take a Tour" get their own 44px band (`.dh-visual{padding-top}`) — pinned to the
+  top corners they sat on the drift frame, which read as broken alignment. **A tour in the list is a directory entry**
   (2026-09-23, client): cover + name + drift count, and for a visitor a `.tpg-go` arrow on the right —
   the strip of clickable drift previews and the "Start Tour" button are gone (`TourPathList`), and the row
   opens the tour's PATHWAY, not the tour. Admins keep their tools on the right instead of the arrow.

@@ -130,6 +130,9 @@ const Arrow = () => (
   </svg>
 );
 
+// drift.li's own page of featured tours (the Drift channel).
+const DRIFT_TOURS = "/tour/drift";
+
 // "Take a Tour" opens drift.li's demo tour (set in Admin → drift.li → Tour).
 function useDemoPath() {
   const [path, setPath] = useState("/tour/demo");
@@ -316,9 +319,16 @@ export default function TourLanding() {
           </div>
         </section>
 
+        {/* The closing section used to repeat the two CTAs from the card above it. It now
+            sends people to the Drift channel — the tours themselves are the best argument. */}
         <section className="tl-section tl-close">
           <h2 className="tl-h2">Ready for Tour?</h2>
-          <Cta demoPath={demoPath} />
+          <div className="tl-cta">
+            <Link className="d-btn primary tl-pill" to={DRIFT_TOURS}>
+              View Drift Tours
+              <Arrow />
+            </Link>
+          </div>
         </section>
       </div>
     </TourShell>

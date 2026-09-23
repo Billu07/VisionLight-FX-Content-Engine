@@ -17,7 +17,8 @@ import { invalidateMyPages } from "./myPages";
 export const TOUR_STYLES = `
 .t-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:22px}
 .t-title{font-size:clamp(24px,4vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--text)}
-.t-kind{margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);vertical-align:middle}
+/* "TOUR" reads at the wordmark's own size, as one lockup with drift.li. */
+.t-kind{margin-left:9px;font-size:inherit;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);vertical-align:baseline}
 .t-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 .t-card{display:grid;grid-template-rows:auto 1fr;overflow:hidden;cursor:pointer;transition:border-color .16s,transform .16s}
 .t-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}
@@ -70,8 +71,11 @@ export const TOUR_STYLES = `
 .t-empty .step{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--text)}
 .t-empty .step b{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:11px;flex:none;border:1px solid var(--accent-border)}
 .t-empty .step span{color:var(--muted)}
-.t-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);text-decoration:none}
-.t-back:hover{color:var(--text)}
+/* The way back is a real target, not a whisper — it was easy to miss (client, 2026-09-23). */
+.t-back{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font-size:13.5px;font-weight:700;
+  color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border);text-decoration:none;
+  transition:filter .16s,transform .16s}
+.t-back:hover{filter:brightness(1.12);transform:translateX(-2px)}
 .t-name-input{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:8px 10px}
 .t-muted-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
 

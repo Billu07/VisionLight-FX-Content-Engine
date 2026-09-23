@@ -72,6 +72,7 @@ export const TOUR_PAGE_STYLES = `
 .tpg-cover{width:62px;aspect-ratio:4/5;border-radius:12px;overflow:hidden;background:var(--surface-3);flex:none}
 .tpg-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .tpg-meta{min-width:0;display:grid;gap:5px}
+.tpg-kind{margin-top:2px}
 .tpg-name{font-weight:800;font-size:16px;letter-spacing:-.01em;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The arrow that says the row opens (a visitor's view — admins get their tools). */
 .tpg-go{margin-left:auto;flex:none;padding-left:14px;color:var(--faint);font-size:26px;line-height:1;transition:color .16s,transform .16s}
@@ -104,6 +105,8 @@ export const TOUR_PAGE_STYLES = `
 .tpw-go{color:var(--faint);font-size:22px;line-height:1}
 .tpw-strip:hover .tpw-go{color:var(--accent)}
 .tpw-foot{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+/* The closing row (Learn More · Share Tour) sits a little apart from the page's own buttons. */
+.tpw-foot-end{margin-top:14px;padding-top:18px;border-top:1px solid var(--border)}
 @media(max-width:560px){
   .tpw-rail{padding-left:42px}
   .tpw-rail::before{left:15px}

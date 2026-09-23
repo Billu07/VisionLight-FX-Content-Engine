@@ -86,7 +86,7 @@ function TourPathList({ items, renderActions }: { items: TourItem[]; renderActio
                 {it.name}
               </div>
               <div className="t-muted-row">
-                <span>{plural(it.total, "drift")}</span>
+                <span>{plural(it.total, "Drift")}</span>
                 {it.status && <StatusPill status={it.status} flow />}
               </div>
             </div>
@@ -681,9 +681,10 @@ export default function TourPage() {
         <div style={{ minWidth: 0 }}>
           <div className="tpg-brand">
             {page.logoUrl ? <img className="tpg-logo" src={page.logoUrl} alt="" /> : <span className="tpg-mark">{initial}</span>}
+            {/* The page is the name first; "Tours" says what it holds (client, 2026-09-23). */}
             <div style={{ minWidth: 0 }}>
-              <div className="d-eyebrow">Tours</div>
               <h1 className="tpg-title">{page.name}</h1>
+              <div className="d-eyebrow tpg-kind">Tours</div>
             </div>
           </div>
           {editing ? (
@@ -738,7 +739,7 @@ export default function TourPage() {
             </>
           ) : (
             <>
-              <p className="tpg-sub">Interactive Tours You Explore with a Finger — Pick One to Start.</p>
+              <p className="tpg-sub">Explore the Live Interactive Tours.</p>
               <div className="tpg-cta">
                 {pub.demo && (
                   <Link className="d-btn" to={pub.demo.path} style={{ textDecoration: "none" }}>

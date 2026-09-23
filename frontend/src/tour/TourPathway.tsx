@@ -49,8 +49,15 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   }, []);
   return (
     <div className="tpw t-rise">
-      {/* A demo tour stands on its own — no way back to (or messages for) the page it lives on —
-          unless it lives on the Drift channel, drift.li's own page. */}
+      {/* A demo tour carries no page branding or messages — it stands on its own — but it still
+          needs a way out, and that way is drift.li's own page of tours (client, 2026-09-23). */}
+      {flow.isDemo && page.slug !== CHANNEL_SLUG && (
+        <div className="tpw-top">
+          <Link className="t-back" to={`/tour/${CHANNEL_SLUG}`}>
+            ← Drift Tours
+          </Link>
+        </div>
+      )}
       {(!flow.isDemo || page.slug === CHANNEL_SLUG) && (
         <>
           <div className="tpw-top">
@@ -118,7 +125,46 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
           <ContactButton page={page} flowId={flow.id} />
         </div>
       )}
+      {/* Every tour ends the same way: what this is, and how to pass it on. */}
+      <div className="tpw-foot tpw-foot-end">
+        <Link className="d-btn" to="/tour" style={{ textDecoration: "none" }}>
+          Learn More
+        </Link>
+        <ShareTourButton path={flow.publicPath} />
+      </div>
     </div>
+  );
+}
+
+/** Share Tour: copies this tour's menu address — the link a visitor should be handed. */
+function ShareTourButton({ path }: { path: string }) {
+  const [done, setDone] = useState(false);
+  const copy = async () => {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // No clipboard permission (or an older browser): fall back to a hidden selection.
+      const el = document.createElement("textarea");
+      el.value = url;
+      el.setAttribute("readonly", "");
+      el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el);
+      el.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* nothing else to try — the address is in the bar either way */
+      }
+      el.remove();
+    }
+    setDone(true);
+    window.setTimeout(() => setDone(false), 1800);
+  };
+  return (
+    <button type="button" className="d-btn" onClick={copy}>
+      {done ? "Link Copied" : "Share Tour"}
+    </button>
   );
 }
 

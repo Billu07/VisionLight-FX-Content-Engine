@@ -107,6 +107,10 @@ export const HOME_SCENE_STYLES = `
 .dh-now-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap;animation:dh-fade .5s ease}
 @keyframes dh-fade{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){.dh-now-t{display:none}}
+/* Phones: the caption and "Take a Tour" get a band of their own above the scene. They are
+   pinned to the top corners, and on a narrow screen that put them on the drift frame's own
+   top-left corner — which read as broken alignment (client, 2026-09-23). */
+@media(max-width:700px){.dh-visual{padding-top:44px}.dh-now,.dh-chip-explore{top:0}}
 
 @media(prefers-reduced-motion:reduce){
   .dh-rove,.dh-ping,.dh-sweep,.dh-lift,.dh-beat,.dh-draw,.dh-now-in{animation:none}

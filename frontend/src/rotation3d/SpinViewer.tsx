@@ -1733,6 +1733,23 @@ export default function SpinViewer({
     if (onInternalNavigate && onInternalNavigate(s.playerPath)) return;
     window.location.href = s.playerPath;
   };
+  // A tour drift always carries the same three buttons — ‹ Prev · Menu · Next › — instead of
+  // naming the next room, which read as a destination rather than a step (client, 2026-09-23).
+  // They are built from the flow's own stops, so the unbranded player (/u/{code}, whose stops
+  // the server rewrites) shows the same row without knowing anything about it.
+  const tourNav = (() => {
+    if (!flowNav) return null;
+    const stops = flowNav.stops || [];
+    const menu: SpinCta = { label: "Menu", url: flowNav.publicPath };
+    if (stops.length < 2) return { menu, prev: null, next: null }; // a one-drift tour: just the menu
+    const i = flowNav.index;
+    return {
+      menu,
+      // Nothing sits behind the first drift, so there Prev is the way back to the menu.
+      prev: i > 0 ? { label: "Prev", url: stops[i - 1].playerPath } : menu,
+      next: { label: "Next", url: stops[(i + 1) % stops.length].playerPath } as SpinCta,
+    };
+  })();
   // "Tour Powered by …" / "View Powered by …" on flow drifts.
   const poweredKind =
     driftMode && flowNav?.kind ? flowNav.kind.charAt(0).toUpperCase() + flowNav.kind.slice(1).toLowerCase() + " " : "";
@@ -1900,7 +1917,24 @@ export default function SpinViewer({
         </div>
       )}
 
-      {(ctaPrimary || ctaSecondary) && (
+      {tourNav ? (
+        <div className="r3d-ctas r3d-tournav" ref={ctasRef}>
+          {tourNav.prev && (
+            <button className="r3d-cta r3d-nav" onClick={() => fireCta("secondary", tourNav.prev!)}>
+              <span aria-hidden>‹</span> Prev
+            </button>
+          )}
+          <button className="r3d-cta r3d-nav" onClick={() => fireCta("secondary", tourNav.menu)}>
+            Menu
+          </button>
+          {tourNav.next && (
+            <button className="r3d-cta r3d-nav r3d-next" onClick={() => fireCta("primary", tourNav.next!)}>
+              Next <span aria-hidden>›</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        (ctaPrimary || ctaSecondary) && (
         <div className={`r3d-ctas ${ctaPlacement !== "CENTER" ? `r3d-ctas-${ctaPlacement.toLowerCase()}` : ""}`} ref={ctasRef}>
           {ctaPrimary && (
             <button className="r3d-cta r3d-primary" onClick={() => fireCta("primary", ctaPrimary)}>
@@ -1913,6 +1947,7 @@ export default function SpinViewer({
             </button>
           )}
         </div>
+        )
       )}
 
       {activeForm && (
@@ -2232,13 +2267,17 @@ const R3D_CSS = `
    the next drift (ctaSecondary) and Home steps back; a brand drift keeps its own
    primary CTA in front, the way its creator ordered them. The two sets are kept
    disjoint with :not() so neither can override the other by source order. */
-.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-primary,.r3d-tour .r3d-cta.r3d-ghost{background:var(--r3d-primary);border:1px solid transparent;color:var(--r3d-accent-ink,#04121a);font-weight:700;box-shadow:0 10px 26px -14px rgba(34,211,238,.55);backdrop-filter:none}
-.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-ghost,.r3d-tour .r3d-cta.r3d-primary{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#e8edf4;font-weight:600;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:none}
-.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-primary:hover,.r3d-tour .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
-.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-ghost:hover,.r3d-tour .r3d-cta.r3d-primary:hover{background:rgba(255,255,255,.13)}
+.r3d-drift .r3d-cta.r3d-primary,.r3d-cta.r3d-nav.r3d-next{background:var(--r3d-primary);border:1px solid transparent;color:var(--r3d-accent-ink,#04121a);font-weight:700;box-shadow:0 10px 26px -14px rgba(34,211,238,.55);backdrop-filter:none}
+.r3d-drift .r3d-cta.r3d-ghost,.r3d-cta.r3d-nav:not(.r3d-next){background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#e8edf4;font-weight:600;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:none}
+.r3d-drift .r3d-cta.r3d-primary:hover,.r3d-cta.r3d-nav.r3d-next:hover{filter:brightness(1.08)}
+.r3d-drift .r3d-cta.r3d-ghost:hover,.r3d-cta.r3d-nav:not(.r3d-next):hover{background:rgba(255,255,255,.13)}
 /* On light footage the quiet pill inverts, or it would disappear into the frame. */
-.r3d-drift.r3d-light:not(.r3d-tour) .r3d-cta.r3d-ghost,.r3d-tour.r3d-light .r3d-cta.r3d-primary{background:rgba(11,15,25,.06);border-color:rgba(11,15,25,.16);color:#0b0f19}
-.r3d-drift.r3d-light:not(.r3d-tour) .r3d-cta.r3d-ghost:hover,.r3d-tour.r3d-light .r3d-cta.r3d-primary:hover{background:rgba(11,15,25,.12)}
+.r3d-drift.r3d-light .r3d-cta.r3d-ghost,.r3d-light .r3d-cta.r3d-nav:not(.r3d-next){background:rgba(11,15,25,.06);border-color:rgba(11,15,25,.16);color:#0b0f19}
+.r3d-drift.r3d-light .r3d-cta.r3d-ghost:hover,.r3d-light .r3d-cta.r3d-nav:not(.r3d-next):hover{background:rgba(11,15,25,.12)}
+/* ‹ Prev · Menu · Next › — the same row on every drift of every tour, so the way through
+   is a constant and only the drift changes. The arrows say which way each one goes. */
+.r3d-tournav .r3d-cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.r3d-tournav .r3d-cta span{font-size:1.25em;line-height:1;opacity:.75;margin-top:-.1em}
 /* ── Tour context (flow drifts only): progress dots top-middle (top-right on
    phones, where the title block needs the room); the title block reads
    page · tour · drift; the helper cue is a hand icon + arrow. Brand drifts never
