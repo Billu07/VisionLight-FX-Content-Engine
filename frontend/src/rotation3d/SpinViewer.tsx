@@ -181,19 +181,6 @@ const PLATFORM_ACCENT = "#22d3ee";
 // axis that fits and the chrome sits on the ground beside it rather than cropping the room
 // down to a slot.
 const FILL_MAX_MISMATCH = 1.35;
-// Landscape footage wider than this is worth turning the phone for.
-const TURN_MIN_ASPECT = 1.2;
-
-/**
- * Screen deltas → the footage's own axes.
- *
- * A rotated stage renders with `rotate(90deg) translateY(-100%)` from its top-left, which
- * puts a local point (lx, ly) at (H − ly, lx) on the screen. Inverting that, a finger moving
- * DOWN the screen (+dy) is moving RIGHT across the footage (+dx), and moving RIGHT is moving
- * UP. So once the visitor turns the phone, the drag feels exactly as it does unrotated.
- */
-export const mapDrag = (dx: number, dy: number, rotated: boolean): { dx: number; dy: number } =>
-  rotated ? { dx: dy, dy: -dx } : { dx, dy };
 
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
@@ -552,17 +539,6 @@ export default function SpinViewer({
       stage.classList.add("r3d-introing"); // hides the resting hint during the demo
     };
 
-    // "Is this an upright phone?" — a viewport question, so it stays true while the stage
-    // itself is rotated. Deciding from the stage's own box would flip back and forth: the
-    // moment it turns it is landscape again. matchMedia keeps it current for free.
-    const uprightPhone = window.matchMedia?.("(max-width: 560px) and (orientation: portrait)");
-    let portraitPhone = !!uprightPhone?.matches;
-    const onUpright = (e: MediaQueryListEvent) => {
-      portraitPhone = e.matches;
-      applyRotation();
-    };
-    uprightPhone?.addEventListener?.("change", onUpright);
-
     // --- frame images (real mode) ---
     // EVERY device plays the lighter 1080px set when the product has one (desktop too): a
     // drift is drawn a few hundred pixels wide to about a laptop's width, so the 2048px set
@@ -607,10 +583,6 @@ export default function SpinViewer({
       return [p[0], c * p[1] - s * p[2], s * p[1] + c * p[2]];
     };
 
-    // Turned a quarter turn (a landscape drift on an upright phone) and the footage's own
-    // shape, learned from the first frame that decodes.
-    let rotated = false;
-    let frameAR = 0;
     // Edge to edge, chrome floating over the footage. A phone or touch screen always plays
     // that way; a desktop page keeps the framed layout until the visitor asks for fullscreen
     // — that is what the button is for (client, 2026-09-23). It can flip while mounted, so
@@ -624,14 +596,7 @@ export default function SpinViewer({
 
     const fit = () => {
       const r = stage.getBoundingClientRect();
-      // A rotated element reports its VISUAL box here — width and height swapped — so size
-      // the backing store from the LAYOUT box, which is what the canvas actually fills.
-      // Unrotated the two are the same, so every other player is untouched.
-      // The AABB of a box turned a quarter turn is exactly that box with its sides
-      // swapped, so swapping back is exact — clientWidth would round to whole pixels.
-      const rw = rotated ? r.height : r.width;
-      const rh = rotated ? r.width : r.height;
-      const w = Math.round(rw * DPR), h = Math.round(rh * DPR);
+      const w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
       // Only re-size the backing store on a REAL change — setting cv.width/height
       // (even to the same value) clears the canvas, so skipping no-op resizes avoids
       // flicker during the resize bursts in-app browsers fire while overscrolling.
@@ -1275,13 +1240,11 @@ export default function SpinViewer({
       if (!dragging) return;
       const now = performance.now();
       const dt = Math.max(1, now - lastT);
-      const d = mapDrag(e.clientX - lastX, e.clientY - lastY, rotated);
-      const dx = d.dx;
-      const dy = d.dy;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
 
       if (axis === "") {
-        const t = mapDrag(e.clientX - startX, e.clientY - startY, rotated);
-        const tdx = t.dx, tdy = t.dy;
+        const tdx = e.clientX - startX, tdy = e.clientY - startY;
         if (Math.abs(tdx) < 6 && Math.abs(tdy) < 6) { lastX = e.clientX; lastY = e.clientY; lastT = now; return; }
         if (vertical ? Math.abs(tdy) >= Math.abs(tdx) : Math.abs(tdx) >= Math.abs(tdy)) {
           axis = "rotate";
@@ -1546,22 +1509,13 @@ export default function SpinViewer({
         stage.style.removeProperty("--r3d-side");
         if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
       }
-      applyRotation();
-      refit();
-    };
-    /** Turn the stage (or put it back) and resize the canvas to the box it now has. */
-    const applyRotation = () => {
-      const want = immersive && portraitPhone && frameAR >= TURN_MIN_ASPECT;
-      if (want === rotated) return;
-      rotated = want;
-      stage.classList.toggle("r3d-rot", want);
       refit();
     };
     const onTouchLike = () => applyImmersive();
     touchLike?.addEventListener?.("change", onTouchLike);
-    applyImmersive(); // decide it now — everything it leans on (applyRotation, refit) exists above
+    applyImmersive(); // decide it now — refit(), which it calls, exists above
 
-    const onOrient = () => { updateBigDesktop(); applyRotation(); refit(); scheduleLandscapeZoom(); };
+    const onOrient = () => { updateBigDesktop(); refit(); scheduleLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -1689,10 +1643,6 @@ export default function SpinViewer({
         }
         if (!alive) return;
         imgs[i] = im;
-        if (!frameAR && im.naturalWidth && im.naturalHeight) {
-          frameAR = im.naturalWidth / im.naturalHeight; // the footage's shape — decides the turn
-          applyRotation();
-        }
         markFramesIn([urls![i]]); // revisiting this drift can skip the loader
         dirty = true; // repaint once a frame is decoded (no auto-spin to do it)
         loaded++;
@@ -1849,10 +1799,8 @@ export default function SpinViewer({
       stage.removeEventListener("click", onClick);
       document.removeEventListener("fullscreenchange", onFsChange);
       window.removeEventListener("resize", onOrient);
-      uprightPhone?.removeEventListener?.("change", onUpright);
       touchLike?.removeEventListener?.("change", onTouchLike);
       stage.classList.remove("r3d-immersive", "r3d-siderail", "r3d-bare");
-      stage.classList.remove("r3d-rot"); // a swap re-runs this effect: re-decided on the next draw
       window.removeEventListener("orientationchange", onOrient);
       orientMql?.removeEventListener?.("change", onOrient);
       ro?.disconnect();
@@ -1929,17 +1877,6 @@ export default function SpinViewer({
       <canvas ref={canvasRef} />
       {/* crossfade snapshot of the previous drift, faded out on a swap (see effect) */}
       <canvas className="r3d-xfade" ref={xfadeRef} aria-hidden hidden />
-      {/* Only ever seen on a turned stage (CSS), counter-rotated so it reads upright in the
-          hand that is still holding the phone in portrait, and gone a few seconds later. */}
-      {canImmerse && (
-        <div className="r3d-turn" aria-hidden>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="2" width="11" height="20" rx="2.5" />
-            <path d="M18 9a6 6 0 0 1 2 4.5M20 18l-2-2.5 3-.6" />
-          </svg>
-          <span>Turn Your Phone</span>
-        </div>
-      )}
       <div className="r3d-scrim-top" />
       <div className="r3d-scrim-bot" />
 
@@ -2457,8 +2394,8 @@ const R3D_CSS = `
    it back; while a finger is actually dragging (.r3d-grabbing) it fades, so nothing sits
    on the footage while it moves. Both are the same fade, and the scrims above and below
    go with it — with nothing left over the footage there is nothing to keep legible. */
-.r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-turn,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
-.r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-turn,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
+.r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
+.r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 .r3d-immersive:not(.r3d-siderail).r3d-ground::before{display:none}
@@ -2472,26 +2409,6 @@ const R3D_CSS = `
   padding:0 clamp(10px,1.2vw,20px);gap:10px}
 .r3d-siderail .r3d-ctas .r3d-cta{flex:0 0 auto;width:100%}
 .r3d-siderail .r3d-zoomcol{bottom:calc(24px + env(safe-area-inset-bottom))}
-/* ── A quarter turn (2026-09-23, client) ─────────────────────────────────────────
-   A landscape room on an upright phone: the stage lays out in landscape (its width
-   and height swapped) and renders rotated from its top-left corner, so turning the
-   phone gives an upright, edge-to-edge room instead of a cropped slot. !important
-   because pseudo-fullscreen sets the same geometry properties that way. */
-.r3d-stage.r3d-rot{position:fixed!important;inset:auto!important;top:0!important;left:0!important;
-  width:100svh!important;height:100vw!important;transform-origin:0 0!important;
-  transform:rotate(90deg) translateY(-100%)!important;z-index:2147483000}
-/* Turned, the scrub gesture runs down the screen — the browser must not take it for a scroll. */
-.r3d-stage.r3d-rot,.r3d-stage.r3d-rot canvas{touch-action:none}
-/* It already fills the screen, so there is nothing for fullscreen to add. */
-.r3d-rot .r3d-iconbtn[data-fs]{display:none}
-.r3d-turn{display:none}
-.r3d-rot .r3d-turn{display:inline-flex;position:absolute;left:50%;top:50%;z-index:9;align-items:center;gap:9px;
-  padding:10px 16px;border-radius:999px;white-space:nowrap;pointer-events:none;color:#eef1f6;
-  font-size:13.5px;font-weight:700;background:rgba(8,12,20,.82);border:1px solid rgba(255,255,255,.16);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  transform:translate(-50%,-50%) rotate(-90deg);animation:r3dturn 5.5s ease forwards}
-@keyframes r3dturn{0%{opacity:0}10%{opacity:1}76%{opacity:1}100%{opacity:0}}
-@media(prefers-reduced-motion:reduce){.r3d-rot .r3d-turn{animation:r3dturn 5.5s steps(1,end) forwards}}
 /* ‹ Prev · Menu · Next › — the same row on every drift of every tour, so the way through
    is a constant and only the drift changes. The arrows say which way each one goes. */
 .r3d-tournav .r3d-cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}

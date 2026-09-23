@@ -189,20 +189,17 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `r3d-grabbing`; one `:is()` rule fades both, scrims included. The progress rail rides the SCREEN's
     edge in fill mode (the frame's own edges are off screen) and is canvas-drawn, so it survives the tap.
     The drag helper hangs off `ctasRef.offsetTop` instead of the frame's bottom edge.
-  - **A quarter turn on phones** (`r3d-rot`, 2026-09-23, client): a landscape drift on an UPRIGHT phone
-    would lose most of the room to a crop, so the stage lays out in landscape (`width:100svh;height:100vw`)
-    and renders `rotate(90deg) translateY(-100%)` from its top-left — turn the phone and the room is
-    upright and edge to edge. Decided by `applyRotation()` (NOT inside `draw()`: the stage's own box swaps
-    when it turns, which would flip the decision back and forth) from a viewport media query
-    `(max-width:560px) and (orientation:portrait)` plus the footage's aspect (`TURN_MIN_ASPECT` 1.2),
-    re-run when the first frame decodes, on orientation change and on the query. Two things this depends
-    on: `fit()` must size the backing store from the LAYOUT box — a rotated element reports its visual
-    AABB through `getBoundingClientRect`, with the sides swapped, which stretched the footage into
-    stripes — and the drag must go through the pure `mapDrag(dx, dy, rotated)` (screen deltas → the
-    footage's axes: down the screen is right across the room), in BOTH the delta and the axis-choice
-    reads. `touch-action:none` while turned, or the browser takes the downward scrub for a scroll.
-    A counter-rotated "Turn Your Phone" hint (`.r3d-turn`) reads upright for the hand still holding the
-    phone in portrait and fades after ~5s.
+  - **The player follows the device; it never turns the drift itself** (2026-09-23, client: "we don't
+    want to make them turn their phone. It needs to respond only IF they turn their phone"). An earlier
+    pass rotated the stage a quarter turn for a landscape drift on an upright phone — that is REMOVED,
+    hint and all. Upright, a 16:9 drift fills the width with ground above and below; turn the phone and
+    the pre-existing landscape takeover (`updateLandscapeTakeover`, auto pseudo-fullscreen on a touch
+    device) covers the screen, and turning back hands the page over again. Don't re-add a forced turn.
+  - **Fullscreen is the browser's real one**: `toggleFs` calls `requestFullscreen`/`webkitRequestFullscreen`
+    on the stage (verified: `document.fullscreenElement` is set), so a desktop or Android visitor gets
+    true fullscreen beyond the browser, the same API a video uses. The CSS `r3d-pseudo-fs` is ONLY the
+    fallback for iPhone Safari, which grants element fullscreen to `<video>` alone. drift.li pages link
+    `/drift.webmanifest` (`display: standalone`), so Add to Home Screen is the chrome-less route there.
   - **The player wears drift.li's skin** (2026-09-23, client): the old indigo/purple defaults put a
     purple badge, loading ring and CTA pill on every drift.li drift, so the player looked like a
     different product from the pages around it. `.r3d-drift` now sets `--r3d-primary:#22d3ee` /
