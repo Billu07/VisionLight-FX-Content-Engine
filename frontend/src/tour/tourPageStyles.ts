@@ -66,22 +66,16 @@ export const TOUR_PAGE_STYLES = `
 }
 .tpg-row{position:relative;display:grid;gap:12px;grid-template-columns:minmax(0,1fr);align-items:center;padding:12px 14px;border-radius:18px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow-sm);transition:border-color .16s}
 .tpg-row:hover{border-color:var(--border-strong)}
-@media(min-width:960px){.tpg-row{grid-template-columns:250px minmax(0,1fr) auto}}
+@media(min-width:960px){.tpg-row{grid-template-columns:minmax(0,1fr) auto}}
 .tpg-tour{display:flex;align-items:center;gap:12px;min-width:0;cursor:pointer;border-radius:12px}
 .tpg-tour:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .tpg-cover{width:62px;aspect-ratio:4/5;border-radius:12px;overflow:hidden;background:var(--surface-3);flex:none}
 .tpg-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .tpg-meta{min-width:0;display:grid;gap:5px}
 .tpg-name{font-weight:800;font-size:16px;letter-spacing:-.01em;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tpg-line{position:relative;display:flex;align-items:flex-start;gap:12px;overflow-x:auto;padding:4px 2px 6px;min-width:0;scrollbar-width:thin}
-.tpg-line::before{content:"";position:absolute;left:24px;right:24px;top:32px;height:2px;border-radius:2px;background:var(--border-strong)}
-.tpg-drift{position:relative;display:grid;justify-items:center;gap:6px;width:66px;flex:none;text-decoration:none;color:var(--muted);font-size:11px;font-weight:600}
-.tpg-drift-img{position:relative;width:46px;height:58px;border-radius:11px;overflow:hidden;background:var(--surface-3);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--border-strong);transition:transform .18s,box-shadow .18s}
-.tpg-drift-img img{width:100%;height:100%;object-fit:cover;display:block}
-.tpg-drift-img b{position:absolute;left:3px;top:3px;font-size:9.5px;font-weight:800;color:#fff;background:rgba(0,0,0,.55);border-radius:5px;padding:0 4px;line-height:15px}
-.tpg-drift:hover{color:var(--text)}
-.tpg-drift:hover .tpg-drift-img{transform:translateY(-2px);box-shadow:0 0 0 2px var(--accent)}
-.tpg-drift-name{max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The arrow that says the row opens (a visitor's view — admins get their tools). */
+.tpg-go{margin-left:auto;flex:none;padding-left:14px;color:var(--faint);font-size:26px;line-height:1;transition:color .16s,transform .16s}
+.tpg-tour:hover .tpg-go,.tpg-tour:focus-visible .tpg-go{color:var(--accent);transform:translateX(2px)}
 .tpg-actions{display:flex;flex-wrap:wrap;gap:6px}
 @media(min-width:960px){.tpg-actions{justify-content:flex-end}}
 

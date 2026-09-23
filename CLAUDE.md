@@ -169,6 +169,20 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     so the tour desktop zoom step (`TOUR_DESKTOP_ZOOM`) only applies to wide footage — it used to cap
     portrait at 98% of the canvas, which ran the frame under the top bar and over the buttons, the hand and
     the cue. The cue is also clamped above the CTA row.
+  - **The player wears drift.li's skin** (2026-09-23, client): the old indigo/purple defaults put a
+    purple badge, loading ring and CTA pill on every drift.li drift, so the player looked like a
+    different product from the pages around it. `.r3d-drift` now sets `--r3d-primary:#22d3ee` /
+    `--r3d-secondary:#38bdf8` as LITERALS (the studio injects `--primary-brand` globally, so a
+    `var(…, fallback)` never reached the fallback); a brand's own `primaryColor`/`secondaryColor`
+    still wins because the stage carries them inline. The loading ring is flat `var(--r3d-primary)`
+    — the client asked for the same teal as "Drift Live Interactive" under it, not a gradient.
+    Buttons speak the pages' language: the action that carries you FORWARD is the accent fill
+    (ink from `--r3d-accent-ink`, dark on a bright accent, white on a deep brand colour), the other
+    is a quiet surface pill. On a TOUR the forward action is the next drift (`ctaSecondary`) and Home
+    steps back; a brand drift keeps its own `ctaPrimary` in front. The two sets are kept disjoint with
+    `:not(.r3d-tour)` so neither wins by source order, and `.r3d-light` inverts the quiet pill.
+    Stage classes: `r3d-tour` (flowNav present) and `r3d-ground` (the background is still drift.li's
+    `#0d1119`) — `r3d-tour.r3d-ground` also gets the pages' aurora wash and a matching loader ground.
   - **Loading ahead** (`driftNav`, reworked 2026-09-22): the drift on screen owns the network while it is
     still opening, then the next stop trickles in behind it, then warming runs at full width. SpinViewer's
     `holdForegroundLoad()` returns `{usable, release}` — `usable()` at the 36-frame coarse ring, `release()`
@@ -359,7 +373,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   pathway and builder; a superadmin not yet managing sees Public, "Admin" = Manage). `PageSwitcher` is also the account
   menu (pages · Signed in as · Log Out); Dashboard hides when the view switch shows. The page and the builder show
   **Path only** (Cards removed). Page: admin view = Create New Tour + Page Settings (accent) + Leave Page (members) +
-  the link; public view = View Demo / enquiry / contact. New-tour card = `.tpg-new` (accent, big input, scrolls into
+  the link; public view = View Demo / enquiry / contact. **A tour in the list is a directory entry**
+  (2026-09-23, client): cover + name + drift count, and for a visitor a `.tpg-go` arrow on the right —
+  the strip of clickable drift previews and the "Start Tour" button are gone (`TourPathList`), and the row
+  opens the tour's PATHWAY, not the tour. Admins keep their tools on the right instead of the arrow.
+  New-tour card = `.tpg-new` (accent, big input, scrolls into
   view). Builder toolbar: Start Tour · Insights · Tour Settings · Share|Publish (Unpublish lives in Tour Settings,
   Capture Guide in the meta row). A tour drift's background defaults to drift.li's dark ground
   (`TOUR_DEFAULT_BACKGROUND` #0d1119): processing no longer fills the detected colour in for tour steps, and

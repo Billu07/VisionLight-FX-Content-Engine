@@ -171,6 +171,11 @@ const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
 const TOUR_DESKTOP_ZOOM = 1.25;
 
 // Is the player background a light color? (so we flip text/controls to dark).
+// drift.li's own palette: the ground a tour drift sits on and the accent every
+// platform surface uses. A brand that set its own colours overrides both.
+const PLATFORM_GROUND = "#0d1119";
+const PLATFORM_ACCENT = "#22d3ee";
+
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
   const s = bg.trim().toLowerCase();
@@ -269,9 +274,15 @@ export default function SpinViewer({
   const iconCue = driftMode && !!flowNav && !helperStart && !helperEnd;
   const playerBrand = getPlayerBranding();
   const lightBg = isLightColor(background);
+  // Left on drift.li's ground (the default for a tour drift) → the player carries the
+  // same aurora wash as the pages behind it. A creator's own colour keeps its flat fill.
+  const onPlatformGround = !background || background.trim().toLowerCase() === PLATFORM_GROUND;
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
+    // Text sitting ON the accent fill: dark on a bright accent (drift.li's cyan),
+    // white on a deep brand colour.
+    ["--r3d-accent-ink" as any]: isLightColor(primaryColor || PLATFORM_ACCENT) ? "#04121a" : "#fff",
     ...(background ? { background } : {}),
   };
   const stageRef = useRef<HTMLDivElement>(null);
@@ -1727,7 +1738,7 @@ export default function SpinViewer({
     driftMode && flowNav?.kind ? flowNav.kind.charAt(0).toUpperCase() + flowNav.kind.slice(1).toLowerCase() + " " : "";
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${flowNav ? "r3d-tour" : ""} ${flowNav && onPlatformGround ? "r3d-ground" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -2199,11 +2210,35 @@ const R3D_CSS = `
 .r3d-drift.r3d-light .r3d-legal span{color:rgba(0,0,0,.3)}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
-/* Right (secondary) CTA is purple; the left (primary) stays the brand blue. */
-/* Drift CTAs: solid colours (no gradient) — left blue, right purple, all drifts. */
-.r3d-drift .r3d-cta.r3d-primary{background:#3b82f6;border:none;box-shadow:0 10px 30px -12px rgba(59,130,246,.6)}
-.r3d-drift .r3d-cta.r3d-ghost{background:#8b5cf6;border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(139,92,246,.6)}
-.r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
+/* ── drift.li's skin (2026-09-23, client) ──────────────────────────────────────
+   The player is part of the platform, so it wears what the tour pages wear: the
+   cyan accent (the old indigo/purple default put a purple badge, ring and pill on
+   every drift.li drift), drift.li's ground, and the pages' button language. A brand
+   that set its own colours still wins — the stage carries those inline, which beats
+   this rule. (Literal values, not var(--primary-brand, …): the studio injects that
+   variable globally, so a fallback here would never be reached.) */
+.r3d-drift{--r3d-primary:#22d3ee;--r3d-secondary:#38bdf8}
+.r3d-tour.r3d-ground::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:
+  radial-gradient(52% 44% at 10% 0%,rgba(34,211,238,.13),transparent 70%),
+  radial-gradient(48% 40% at 100% 6%,rgba(59,130,246,.15),transparent 70%),
+  radial-gradient(60% 50% at 50% 112%,rgba(37,99,235,.10),transparent 70%)}
+.r3d-tour.r3d-ground .r3d-loader{background:#0d1119}
+/* The ring is the one teal the client asked for — the same as "Drift Live Interactive"
+   under it — rather than a gradient that drifts to blue at its tail. A brand with its
+   own colour rings in that colour. */
+.r3d-drift .r3d-ring-fg{stroke:var(--r3d-primary)}
+/* Buttons speak the pages' language: the action that carries you FORWARD is the
+   accent fill, the other is a quiet surface pill. On a tour that forward action is
+   the next drift (ctaSecondary) and Home steps back; a brand drift keeps its own
+   primary CTA in front, the way its creator ordered them. The two sets are kept
+   disjoint with :not() so neither can override the other by source order. */
+.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-primary,.r3d-tour .r3d-cta.r3d-ghost{background:var(--r3d-primary);border:1px solid transparent;color:var(--r3d-accent-ink,#04121a);font-weight:700;box-shadow:0 10px 26px -14px rgba(34,211,238,.55);backdrop-filter:none}
+.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-ghost,.r3d-tour .r3d-cta.r3d-primary{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#e8edf4;font-weight:600;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:none}
+.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-primary:hover,.r3d-tour .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
+.r3d-drift:not(.r3d-tour) .r3d-cta.r3d-ghost:hover,.r3d-tour .r3d-cta.r3d-primary:hover{background:rgba(255,255,255,.13)}
+/* On light footage the quiet pill inverts, or it would disappear into the frame. */
+.r3d-drift.r3d-light:not(.r3d-tour) .r3d-cta.r3d-ghost,.r3d-tour.r3d-light .r3d-cta.r3d-primary{background:rgba(11,15,25,.06);border-color:rgba(11,15,25,.16);color:#0b0f19}
+.r3d-drift.r3d-light:not(.r3d-tour) .r3d-cta.r3d-ghost:hover,.r3d-tour.r3d-light .r3d-cta.r3d-primary:hover{background:rgba(11,15,25,.12)}
 /* ── Tour context (flow drifts only): progress dots top-middle (top-right on
    phones, where the title block needs the room); the title block reads
    page · tour · drift; the helper cue is a hand icon + arrow. Brand drifts never

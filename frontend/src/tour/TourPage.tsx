@@ -4,7 +4,6 @@ import { apiEndpoints, setActiveProfile } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { confirmAction, notify } from "../lib/notifications";
 import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
-import { isReady } from "./types";
 import { StatusPill, TourShell, apiError, copyText, publicUrl, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton, PathArtH } from "./tourPageParts";
@@ -28,9 +27,7 @@ type TourItem = {
   name: string;
   thumb: string | null;
   path: string;
-  startPath: string | null;
   total: number;
-  drifts: { id: string; name: string; thumb: string | null; path: string }[];
   status?: string;
   building?: number;
   failed?: number;
@@ -45,9 +42,7 @@ const fromPublic = (f: PublicFlow): TourItem => ({
   name: f.title || f.name,
   thumb: f.thumb,
   path: f.publicPath,
-  startPath: f.entryPath,
   total: f.steps.length,
-  drifts: f.steps.map((s) => ({ id: s.id, name: s.name, thumb: s.thumb, path: s.playerPath })),
 });
 
 const fromAdmin = (f: Flow): TourItem => ({
@@ -55,11 +50,7 @@ const fromAdmin = (f: Flow): TourItem => ({
   name: f.name,
   thumb: f.thumb,
   path: f.publicPath,
-  startPath: f.entryPath,
   total: f.counts.steps,
-  drifts: f.steps
-    .filter((s) => s.product && isReady(s.product.status))
-    .map((s) => ({ id: s.id, name: s.product!.name, thumb: s.product!.thumb, path: s.product!.playerPath })),
   status: f.status,
   building: f.counts.processing,
   failed: f.counts.failed,
@@ -99,27 +90,16 @@ function TourPathList({ items, renderActions }: { items: TourItem[]; renderActio
                 {it.status && <StatusPill status={it.status} flow />}
               </div>
             </div>
+            {/* A visitor's row is a directory entry: the arrow says it opens, and it
+                opens the tour's menu — not the tour itself. Admins get their tools
+                on the right instead. */}
+            {!renderActions && (
+              <span className="tpg-go" aria-hidden>
+                ›
+              </span>
+            )}
           </div>
-          <div className="tpg-line" aria-label={`${it.name}: drifts`}>
-            {it.drifts.map((d, j) => (
-              <Link key={d.id} to={d.path} className="tpg-drift" title={d.name}>
-                <span className="tpg-drift-img">
-                  {d.thumb ? <img src={d.thumb} alt="" loading="lazy" /> : null}
-                  <b>{j + 1}</b>
-                </span>
-                <span className="tpg-drift-name">{d.name}</span>
-              </Link>
-            ))}
-          </div>
-          <div className="tpg-actions">
-            {renderActions
-              ? renderActions(it)
-              : it.startPath && (
-                  <Link className="d-btn primary sm" to={it.startPath} style={{ textDecoration: "none" }}>
-                    ▶ Start Tour
-                  </Link>
-                )}
-          </div>
+          {renderActions ? <div className="tpg-actions">{renderActions(it)}</div> : null}
         </li>
       ))}
     </ol>
