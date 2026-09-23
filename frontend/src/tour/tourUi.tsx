@@ -336,7 +336,7 @@ export const TOUR_STYLES = `
 .t-switch-me{padding:10px 10px 4px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid var(--border);margin-top:4px}
 .t-switch-out{color:var(--muted)}
 /* ── Header: "drift.li" → the drift.li home, "tour" → the Tour landing; the page's view switch ── */
-.t-brandrow{display:flex;align-items:center;gap:16px;min-width:0}
+.t-brandrow{display:flex;flex-wrap:wrap;align-items:center;gap:16px;min-width:0}
 .t-wordmark{display:inline-flex;align-items:baseline;white-space:nowrap}
 .t-wordmark a{color:inherit;text-decoration:none}
 .t-wordmark a:hover{opacity:.82}
@@ -345,7 +345,40 @@ export const TOUR_STYLES = `
 .t-view .d-tab{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650}
 .t-view svg{flex:none}
 @media(max-width:700px){.t-view-x{display:none}}
-@media(max-width:460px){.t-brandrow{gap:10px}.t-view .d-tab{padding:7px 10px}.t-view svg{display:none}.t-switch-btn{max-width:132px}}
+/* ── Small screens: the header reflows in bands instead of colliding ──────────────
+   The actions used to wrap under themselves and sit on top of the Admin/Public
+   switch, and the page switcher ran off the right edge. Below 620px the switch
+   drops to a row of its own, the actions keep to one line, and every label that
+   can grow (the page name) truncates rather than pushing the row wider. */
+@media(max-width:620px){
+  /* display:contents dissolves the brand row, so the wordmark, the actions and the
+     switch become the header's own flex items and can be ordered independently:
+     wordmark and actions share the top line, the switch takes the row below. */
+  .t-page .d-topbar{flex-wrap:wrap;align-items:center;padding:11px 14px;gap:9px 8px}
+  .t-brandrow{display:contents}
+  .t-page .d-topbar .t-wordmark{order:1;flex:0 1 auto;min-width:0}
+  .t-topactions{order:2;flex:0 1 auto;flex-wrap:nowrap;justify-content:flex-end;gap:6px;min-width:0}
+  .t-topactions .d-btn{white-space:nowrap}
+  .t-page .d-topbar .t-view{order:3;flex:1 0 100%;width:100%;display:flex}
+  .t-view .d-tab{flex:1;justify-content:center}
+  .t-switch-btn{max-width:min(46vw,150px)}
+}
+@media(max-width:460px){
+  .t-brandrow{gap:8px}
+  .t-view .d-tab{padding:7px 10px}
+  .t-view svg{display:none}
+  .t-page .d-topbar{padding:10px 12px}
+  .d-wordmark.t-wordmark{font-size:17px}
+  .t-topactions .d-btn.sm{padding:6px 9px;font-size:11px}
+  .t-switch-btn{max-width:min(40vw,124px)}
+}
+/* The narrowest phones (320px): the wordmark gives up its "TOUR" half rather than
+   letting anything overflow the screen. */
+@media(max-width:360px){
+  .d-wordmark.t-wordmark{font-size:16px}
+  .t-wordmark .t-kind{margin-left:6px}
+  .t-switch-btn{max-width:min(38vw,108px)}
+}
 `;
 
 /** Which side of a page its team is looking at — the switch in the header. */
