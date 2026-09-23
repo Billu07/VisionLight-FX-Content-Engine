@@ -171,11 +171,20 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     the cue. The cue is also clamped above the CTA row.
   - **Tour drifts play edge to edge** (`immersive`, 2026-09-23, client): the footage used to be drawn
     INSIDE a band (56px top bar, ~160px bottom stack), so a room sat in the middle with dead ground
-    round it. `immersive = driftMode && flowNav && !hero && !landing` → class `r3d-immersive`, and the
-    sizing branch in `draw()` fills instead of fitting: COVER when the screen and the footage are close
-    in shape (`mismatch <= FILL_MAX_MISMATCH` 1.35), otherwise fill the axis that fits, because covering
-    a portrait clip on a wide desktop would cut the room to a slot. Brand drifts, the hero takeover and
-    Rotation3D keep the framed layout — do NOT widen the scope without re-checking them.
+    round it. **WHEN it fills** is decided by `applyImmersive()` inside the effect, not at render time,
+    because it changes while mounted: a phone or touch screen (`(max-width:820px), (pointer:coarse)`)
+    ALWAYS fills; a desktop page stays framed until fullscreen — that is what the ⛶ button is for
+    (client's call, 2026-09-23). It re-runs on `fullscreenchange`, inside `setPseudo` (the iPhone
+    fallback never fires that event) and on the media query. `canImmerse` (the component) only says
+    which drifts may: `driftMode && flowNav && !hero && !landing`. The class `r3d-immersive` is toggled
+    imperatively — do NOT put it back in the JSX className.
+    **HOW it fills**: COVER when the screen and the footage are close in shape
+    (`mismatch <= FILL_MAX_MISMATCH` 1.35), otherwise fill the axis that fits, because covering a
+    portrait clip on a wide desktop would cut the room to a slot. When that leaves ground either side
+    (≥132px), `r3d-siderail` moves the Prev · Menu · Next row INTO that column, stacked, width from the
+    `--r3d-side` custom property — better than lying over the footage, and the drift keeps its full
+    height. Brand drifts, the hero takeover and Rotation3D keep the framed layout — do NOT widen the
+    scope without re-checking them.
     Chrome floats over the footage: a tap on it toggles `r3d-bare`, and an active drag rides the existing
     `r3d-grabbing`; one `:is()` rule fades both, scrims included. The progress rail rides the SCREEN's
     edge in fill mode (the frame's own edges are off screen) and is canvas-drawn, so it survives the tap.

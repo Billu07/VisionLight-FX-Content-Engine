@@ -296,10 +296,10 @@ export default function SpinViewer({
   // Left on drift.li's ground (the default for a tour drift) → the player carries the
   // same aurora wash as the pages behind it. A creator's own colour keeps its flat fill.
   const onPlatformGround = !background || background.trim().toLowerCase() === PLATFORM_GROUND;
-  // A tour drift plays edge to edge with its chrome floating over the footage. Brand
-  // drifts, the hero takeover and Rotation3D keep the framed layout (a product photo
-  // wants its margins; a room does not).
-  const immersive = driftMode && !!flowNav && !hero && !landing;
+  // Which drifts CAN play edge to edge. Whether one does right now is decided inside the
+  // effect (see applyImmersive) — it depends on the screen and on fullscreen, both of which
+  // change while the player is mounted.
+  const canImmerse = driftMode && !!flowNav && !hero && !landing;
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
@@ -611,6 +611,16 @@ export default function SpinViewer({
     // shape, learned from the first frame that decodes.
     let rotated = false;
     let frameAR = 0;
+    // Edge to edge, chrome floating over the footage. A phone or touch screen always plays
+    // that way; a desktop page keeps the framed layout until the visitor asks for fullscreen
+    // — that is what the button is for (client, 2026-09-23). It can flip while mounted, so
+    // it is a local that applyImmersive() keeps current, not a render-time constant.
+    let immersive = false;
+    let sideRail = false;
+    const touchLike = window.matchMedia?.("(max-width: 820px), (pointer: coarse)");
+    const fullscreenNow = () =>
+      !!(document.fullscreenElement || (document as any).webkitFullscreenElement) ||
+      stage.classList.contains("r3d-pseudo-fs");
 
     const fit = () => {
       const r = stage.getBoundingClientRect();
@@ -844,6 +854,17 @@ export default function SpinViewer({
       if (realMode) drawFrameImage(frame, cx, cy, scale);
       else drawSynthetic(q, cx, cy, scale);
 
+      // Pillarboxed — a tall clip on a wide screen. The ground either side is room enough
+      // for the buttons, which beats laying them over the footage (client, 2026-09-23).
+      const sideGap = immersive && frameRect.w > 0 ? (W - frameRect.w) / 2 / DPR : 0;
+      const wantSide = sideGap >= 132;
+      if (wantSide) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
+      if (wantSide !== sideRail) {
+        sideRail = wantSide;
+        stage.classList.toggle("r3d-siderail", wantSide);
+        if (!wantSide) stage.style.removeProperty("--r3d-side");
+      }
+
       // Drift on mobile: the canvas frame is vertically centered but the headline
       // block is pinned near the top — on tall phones that strands the copy far
       // above the product. Anchor the headline block's BOTTOM just above the frame
@@ -877,7 +898,9 @@ export default function SpinViewer({
         const handH = handRef.current?.offsetHeight || 28;
         const cueH = cueRef.current?.offsetHeight || 26;
         const stageH = H / DPR;
-        const ctaTop = ctasRef.current?.offsetTop || stageH - 120;
+        // With the buttons in the side column there is nothing above to hang from, so the
+        // helper keeps its own place near the bottom of the footage.
+        const ctaTop = sideRail ? stageH - 96 : ctasRef.current?.offsetTop || stageH - 120;
         const topPx = Math.max(12, ctaTop - (handH + 7 + cueH) - 16);
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
@@ -1457,6 +1480,7 @@ export default function SpinViewer({
       pseudoFs = on;
       stage.classList.toggle("r3d-pseudo-fs", on);
       document.documentElement.classList.toggle("r3d-fs-lock", on);
+      applyImmersive(); // the iPhone/fallback path never fires fullscreenchange
       syncFsIcon();
       scheduleLandscapeZoom();
     };
@@ -1503,12 +1527,28 @@ export default function SpinViewer({
         setPseudo(!pseudoFs); // no native fullscreen (iOS Safari) → pseudo
       }
     };
-    const onFsChange = () => { syncFsIcon(); scheduleLandscapeZoom(); };
+    const onFsChange = () => { syncFsIcon(); scheduleLandscapeZoom(); applyImmersive(); };
     // Re-fit AND repaint synchronously. fit() resizes the backing store; drawing
     // right away (instead of waiting for the next RAF) means the canvas is never
     // shown for a frame at the old buffer size stretched into the new box — which
     // is the squish/distortion seen when an in-app browser resizes the viewport.
     const refit = () => { fit(); draw(); };
+    /** Edge to edge or framed, re-decided whenever the screen or fullscreen changes. */
+    const applyImmersive = () => {
+      const want = canImmerse && (!!touchLike?.matches || fullscreenNow());
+      if (want === immersive) return;
+      immersive = want;
+      stage.classList.toggle("r3d-immersive", want);
+      if (!want) {
+        // Framed again: drop everything that only makes sense over the footage.
+        sideRail = false;
+        stage.classList.remove("r3d-bare", "r3d-siderail");
+        stage.style.removeProperty("--r3d-side");
+        if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
+      }
+      applyRotation();
+      refit();
+    };
     /** Turn the stage (or put it back) and resize the canvas to the box it now has. */
     const applyRotation = () => {
       const want = immersive && portraitPhone && frameAR >= TURN_MIN_ASPECT;
@@ -1517,6 +1557,10 @@ export default function SpinViewer({
       stage.classList.toggle("r3d-rot", want);
       refit();
     };
+    const onTouchLike = () => applyImmersive();
+    touchLike?.addEventListener?.("change", onTouchLike);
+    applyImmersive(); // decide it now — everything it leans on (applyRotation, refit) exists above
+
     const onOrient = () => { updateBigDesktop(); applyRotation(); refit(); scheduleLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
@@ -1806,6 +1850,8 @@ export default function SpinViewer({
       document.removeEventListener("fullscreenchange", onFsChange);
       window.removeEventListener("resize", onOrient);
       uprightPhone?.removeEventListener?.("change", onUpright);
+      touchLike?.removeEventListener?.("change", onTouchLike);
+      stage.classList.remove("r3d-immersive", "r3d-siderail", "r3d-bare");
       stage.classList.remove("r3d-rot"); // a swap re-runs this effect: re-decided on the next draw
       window.removeEventListener("orientationchange", onOrient);
       orientMql?.removeEventListener?.("change", onOrient);
@@ -1875,7 +1921,7 @@ export default function SpinViewer({
     driftMode && flowNav?.kind ? flowNav.kind.charAt(0).toUpperCase() + flowNav.kind.slice(1).toLowerCase() + " " : "";
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${flowNav ? "r3d-tour" : ""} ${immersive ? "r3d-immersive" : ""} ${flowNav && onPlatformGround ? "r3d-ground" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${flowNav ? "r3d-tour" : ""} ${flowNav && onPlatformGround ? "r3d-ground" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1885,7 +1931,7 @@ export default function SpinViewer({
       <canvas className="r3d-xfade" ref={xfadeRef} aria-hidden hidden />
       {/* Only ever seen on a turned stage (CSS), counter-rotated so it reads upright in the
           hand that is still holding the phone in portrait, and gone a few seconds later. */}
-      {immersive && (
+      {canImmerse && (
         <div className="r3d-turn" aria-hidden>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="4" y="2" width="11" height="20" rx="2.5" />
@@ -2413,8 +2459,19 @@ const R3D_CSS = `
    go with it — with nothing left over the footage there is nothing to keep legible. */
 .r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-turn,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
 .r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-turn,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
-/* Filling the screen, the footage IS the background — the ground never shows. */
-.r3d-immersive.r3d-ground::before{display:none}
+/* Filling the screen, the footage IS the background — the ground never shows. (Not when
+   it is pillarboxed: there the ground is exactly what the buttons sit on.) */
+.r3d-immersive:not(.r3d-siderail).r3d-ground::before{display:none}
+/* ── The ground beside a tall clip is where the buttons go ──────────────────────────
+   A portrait room on a wide screen keeps its full height, so there is nothing below it
+   to put the buttons on — but there is a column either side. --r3d-side is how wide that
+   column measures this frame; the row becomes a column inside it. */
+.r3d-siderail .r3d-ctas{left:auto;right:0;top:50%;bottom:auto;transform:translateY(-50%);
+  flex-direction:column;align-items:stretch;justify-content:center;
+  width:min(var(--r3d-side,200px),300px);max-width:none;margin:0;
+  padding:0 clamp(10px,1.2vw,20px);gap:10px}
+.r3d-siderail .r3d-ctas .r3d-cta{flex:0 0 auto;width:100%}
+.r3d-siderail .r3d-zoomcol{bottom:calc(24px + env(safe-area-inset-bottom))}
 /* ── A quarter turn (2026-09-23, client) ─────────────────────────────────────────
    A landscape room on an upright phone: the stage lays out in landscape (its width
    and height swapped) and renders rotated from its top-left corner, so turning the
