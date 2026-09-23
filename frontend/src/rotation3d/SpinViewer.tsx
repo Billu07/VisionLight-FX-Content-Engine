@@ -175,6 +175,12 @@ const TOUR_DESKTOP_ZOOM = 1.25;
 // platform surface uses. A brand that set its own colours overrides both.
 const PLATFORM_GROUND = "#0d1119";
 const PLATFORM_ACCENT = "#22d3ee";
+// How far the screen's shape may differ from the footage's before filling it edge to edge
+// would cost too much of the frame. Up to here a tour drift COVERS the screen (true full
+// bleed, the overflow cropped); past it — a portrait clip on a wide desktop — it fills the
+// axis that fits and the chrome sits on the ground beside it rather than cropping the room
+// down to a slot.
+const FILL_MAX_MISMATCH = 1.35;
 
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
@@ -277,6 +283,10 @@ export default function SpinViewer({
   // Left on drift.li's ground (the default for a tour drift) → the player carries the
   // same aurora wash as the pages behind it. A creator's own colour keeps its flat fill.
   const onPlatformGround = !background || background.trim().toLowerCase() === PLATFORM_GROUND;
+  // A tour drift plays edge to edge with its chrome floating over the footage. Brand
+  // drifts, the hero takeover and Rotation3D keep the framed layout (a product photo
+  // wants its margins; a room does not).
+  const immersive = driftMode && !!flowNav && !hero && !landing;
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
@@ -740,7 +750,21 @@ export default function SpinViewer({
       const bandBottom = (W / DPR <= 560 ? 150 : 162) * DPR;
       const bandH = Math.max(H * 0.6, H - bandTop - bandBottom);
       const bandCy = bandTop + bandH / 2;
-      if (capFit) {
+      if (immersive) {
+        // Full bleed. `box` is the frame's longest side (drawFrameImage divides by the
+        // aspect), so COVER needs the box big enough that BOTH sides reach the screen,
+        // and CONTAIN is the same comparison the other way round. Which one we use is
+        // decided by how differently the screen and the footage are shaped: close enough
+        // and we fill (a little crop nobody misses), too far apart and filling would cut
+        // the room in half, so we fill the axis that fits instead.
+        const img0 = realMode ? nearestLoaded(frame) : null;
+        const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : W / H;
+        const screenAR = W / H;
+        const mismatch = screenAR >= ar0 ? screenAR / ar0 : ar0 / screenAR;
+        const cover = ar0 >= 1 ? Math.max(W, H * ar0) : Math.max(H, W / ar0);
+        const contain = ar0 >= 1 ? Math.min(W, H * ar0) : Math.min(H, W / ar0);
+        base = (mismatch <= FILL_MAX_MISMATCH ? cover : contain) / 4.2;
+      } else if (capFit) {
         // box (the frame's largest side) = base * 4.2.
         const img0 = realMode ? nearestLoaded(frame) : null;
         const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
@@ -771,7 +795,8 @@ export default function SpinViewer({
       const cx = W / 2 + panX * DPR;
       // Centre drift frames in the band (a hair above the old 0.46H) so a tall frame
       // sits between the top bar and the controls instead of straddling them.
-      const cy = (capFit ? Math.min(H * cyFactor, bandCy) : H * cyFactor) + panY * DPR;
+      // Filling the screen means the middle of the screen, not the middle of a band.
+      const cy = (immersive ? H / 2 : capFit ? Math.min(H * cyFactor, bandCy) : H * cyFactor) + panY * DPR;
 
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
@@ -810,7 +835,29 @@ export default function SpinViewer({
       // bottom (the real frame rect when drawn; the box half-height otherwise —
       // the old code used `scale`, i.e. half the true height, so the arrow landed
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
-      if (driftMode && hintRef.current) {
+      if (immersive && driftMode && hintRef.current) {
+        // No visible bottom edge to hang from: the helper sits where a player's controls
+        // sit — just above the buttons — and the cue keeps its natural place under the hand.
+        const handH = handRef.current?.offsetHeight || 28;
+        const cueH = cueRef.current?.offsetHeight || 26;
+        const stageH = H / DPR;
+        const ctaTop = ctasRef.current?.offsetTop || stageH - 120;
+        const topPx = Math.max(12, ctaTop - (handH + 7 + cueH) - 16);
+        hintRef.current.style.top = topPx + "px";
+        hintRef.current.style.bottom = "auto";
+        if (cueRef.current) cueRef.current.style.marginTop = "0px";
+        if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
+        // Same settle-then-reveal as the framed layout: fade in once the anchor stops moving.
+        if (!hintRevealed && realMode && frameRect.w > 0) {
+          hintStableFrames = Math.abs(topPx - lastHintTop) < 1.5 ? hintStableFrames + 1 : 0;
+          lastHintTop = topPx;
+          if (hintStableFrames >= 5) {
+            hintRevealed = true;
+            hintRef.current.classList.remove("r3d-hint-init");
+          }
+        }
+        placeHelperX();
+      } else if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
         const frameHcss = (realMode && frameRect.h > 0 ? frameRect.h : scale * 4.2) / DPR;
         // Anchor the column by the HAND (it's the top item): it rides ~16% UP onto
@@ -957,7 +1004,14 @@ export default function SpinViewer({
         // The rail runs the way the footage pans: along the bottom edge for
         // horizontal drifts (starting left for LTR, right for RTL) and along the
         // RIGHT edge for vertical ones (starting top for TTB, bottom for BTT).
-        const fx0 = frameRect.x, fy0 = frameRect.y, fw0 = frameRect.w, fh0 = frameRect.h;
+        // Full bleed: the frame's own edges are off the screen, so the rail rides the
+        // screen's edge instead — the way a video player's progress bar does. It is drawn
+        // on the canvas, so it survives a tap that puts the rest of the chrome away.
+        const inset = 10 * DPR;
+        const rail = immersive
+          ? { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }
+          : frameRect;
+        const fx0 = rail.x, fy0 = rail.y, fw0 = rail.w, fh0 = rail.h;
         let sx: number, sy: number, ex: number, ey: number;
         if (vertical) {
           sx = ex = fx0 + fw0;
@@ -1217,9 +1271,13 @@ export default function SpinViewer({
       stage.classList.remove("r3d-grabbing");
     };
 
+    let tapX = 0, tapY = 0, tapT = 0;
     const onDown = (e: PointerEvent) => {
       attn?.activity();
       setWarmPaused(true); // the drag owns the network and the main thread
+      tapX = e.clientX;
+      tapY = e.clientY;
+      tapT = performance.now();
       userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
@@ -1245,6 +1303,16 @@ export default function SpinViewer({
       if (pointers.size < 2) pinchD = 0;
       if (!pointers.size) up();
       if (isControl(e.target)) return;
+      // A tap — not a drag — on the footage puts the chrome away so the room is
+      // unobstructed; the next tap brings it back. The progress rail stays either way.
+      if (
+        immersive &&
+        !pointers.size &&
+        Math.hypot(e.clientX - tapX, e.clientY - tapY) < 12 &&
+        performance.now() - tapT < 450
+      ) {
+        stage.classList.toggle("r3d-bare");
+      }
       const now = performance.now();
       // Drift: no double-tap zoom (accidental double-taps caused a jarring zoom).
       if (!driftMode && now - lastTap < 300) {
@@ -1755,7 +1823,7 @@ export default function SpinViewer({
     driftMode && flowNav?.kind ? flowNav.kind.charAt(0).toUpperCase() + flowNav.kind.slice(1).toLowerCase() + " " : "";
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${flowNav ? "r3d-tour" : ""} ${flowNav && onPlatformGround ? "r3d-ground" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${flowNav ? "r3d-tour" : ""} ${immersive ? "r3d-immersive" : ""} ${flowNav && onPlatformGround ? "r3d-ground" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -2274,6 +2342,16 @@ const R3D_CSS = `
 /* On light footage the quiet pill inverts, or it would disappear into the frame. */
 .r3d-drift.r3d-light .r3d-cta.r3d-ghost,.r3d-light .r3d-cta.r3d-nav:not(.r3d-next){background:rgba(11,15,25,.06);border-color:rgba(11,15,25,.16);color:#0b0f19}
 .r3d-drift.r3d-light .r3d-cta.r3d-ghost:hover,.r3d-light .r3d-cta.r3d-nav:not(.r3d-next):hover{background:rgba(11,15,25,.12)}
+/* ── Full bleed: .r3d-immersive (2026-09-23, client) ─────────────────────────────────────────────
+   A tour drift fills the screen and the chrome floats over it, so it reads as the room
+   rather than a picture of one. A tap hides the chrome (.r3d-bare) and the next brings
+   it back; while a finger is actually dragging (.r3d-grabbing) it fades, so nothing sits
+   on the footage while it moves. Both are the same fade, and the scrims above and below
+   go with it — with nothing left over the footage there is nothing to keep legible. */
+.r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
+.r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
+/* Filling the screen, the footage IS the background — the ground never shows. */
+.r3d-immersive.r3d-ground::before{display:none}
 /* ‹ Prev · Menu · Next › — the same row on every drift of every tour, so the way through
    is a constant and only the drift changes. The arrows say which way each one goes. */
 .r3d-tournav .r3d-cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
