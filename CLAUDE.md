@@ -169,6 +169,31 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     so the tour desktop zoom step (`TOUR_DESKTOP_ZOOM`) only applies to wide footage — it used to cap
     portrait at 98% of the canvas, which ran the frame under the top bar and over the buttons, the hand and
     the cue. The cue is also clamped above the CTA row.
+  - **Tour drifts play edge to edge** (`immersive`, 2026-09-23, client): the footage used to be drawn
+    INSIDE a band (56px top bar, ~160px bottom stack), so a room sat in the middle with dead ground
+    round it. `immersive = driftMode && flowNav && !hero && !landing` → class `r3d-immersive`, and the
+    sizing branch in `draw()` fills instead of fitting: COVER when the screen and the footage are close
+    in shape (`mismatch <= FILL_MAX_MISMATCH` 1.35), otherwise fill the axis that fits, because covering
+    a portrait clip on a wide desktop would cut the room to a slot. Brand drifts, the hero takeover and
+    Rotation3D keep the framed layout — do NOT widen the scope without re-checking them.
+    Chrome floats over the footage: a tap on it toggles `r3d-bare`, and an active drag rides the existing
+    `r3d-grabbing`; one `:is()` rule fades both, scrims included. The progress rail rides the SCREEN's
+    edge in fill mode (the frame's own edges are off screen) and is canvas-drawn, so it survives the tap.
+    The drag helper hangs off `ctasRef.offsetTop` instead of the frame's bottom edge.
+  - **A quarter turn on phones** (`r3d-rot`, 2026-09-23, client): a landscape drift on an UPRIGHT phone
+    would lose most of the room to a crop, so the stage lays out in landscape (`width:100svh;height:100vw`)
+    and renders `rotate(90deg) translateY(-100%)` from its top-left — turn the phone and the room is
+    upright and edge to edge. Decided by `applyRotation()` (NOT inside `draw()`: the stage's own box swaps
+    when it turns, which would flip the decision back and forth) from a viewport media query
+    `(max-width:560px) and (orientation:portrait)` plus the footage's aspect (`TURN_MIN_ASPECT` 1.2),
+    re-run when the first frame decodes, on orientation change and on the query. Two things this depends
+    on: `fit()` must size the backing store from the LAYOUT box — a rotated element reports its visual
+    AABB through `getBoundingClientRect`, with the sides swapped, which stretched the footage into
+    stripes — and the drag must go through the pure `mapDrag(dx, dy, rotated)` (screen deltas → the
+    footage's axes: down the screen is right across the room), in BOTH the delta and the axis-choice
+    reads. `touch-action:none` while turned, or the browser takes the downward scrub for a scroll.
+    A counter-rotated "Turn Your Phone" hint (`.r3d-turn`) reads upright for the hand still holding the
+    phone in portrait and fades after ~5s.
   - **The player wears drift.li's skin** (2026-09-23, client): the old indigo/purple defaults put a
     purple badge, loading ring and CTA pill on every drift.li drift, so the player looked like a
     different product from the pages around it. `.r3d-drift` now sets `--r3d-primary:#22d3ee` /
