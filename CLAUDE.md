@@ -178,9 +178,13 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     fallback never fires that event) and on the media query. `canImmerse` (the component) only says
     which drifts may: `driftMode && flowNav && !hero && !landing`. The class `r3d-immersive` is toggled
     imperatively — do NOT put it back in the JSX className.
-    **HOW it fills**: COVER when the screen and the footage are close in shape
-    (`mismatch <= FILL_MAX_MISMATCH` 1.35), otherwise fill the axis that fits, because covering a
-    portrait clip on a wide desktop would cut the room to a slot. When that leaves ground either side
+    **HOW it fills**: it never crops (2026-09-24). `FILL_MAX_MISMATCH` is 1, so it covers only when the
+    screen and the footage already share a shape, and otherwise fills the axis that fits and lets the
+    chrome sit on the ground beside it. At 1.35 it was throwing away up to a quarter of the room — ~18%
+    of a vertical clip's height on a phone — which is what the client saw. Raise the constant if a little
+    crop is ever worth a little more bleed; it is the only knob. For the same reason the landscape 2×
+    zoom (`updateLandscapeZoom`, "client spec: portrait 1×, landscape 2×") is skipped while immersive:
+    it was measured against the FRAMED layout and doubles up on a full-bleed fill. When that leaves ground either side
     (≥132px), `r3d-siderail` moves the Prev · Menu · Next row INTO that column, stacked, width from the
     `--r3d-side` custom property — better than lying over the footage, and the drift keeps its full
     height. Brand drifts, the hero takeover and Rotation3D keep the framed layout — do NOT widen the
@@ -389,8 +393,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 - **Clip clean-up** (2026-09-15, no schema change): tour clips (step upload, replace, paid conversion — `processClip`
   `cleanup: true`; brand drifts and Rotation3D unchanged; env `TOUR_CLIP_CLEANUP=off` turns it off) extract through
   `services/driftCleanup.ts` `extractFramesForCleanup` (the PNG frames + a 256×256 gray copy of each in ONE ffmpeg pass).
-  `planCleanup` (async, yields every 20ms) detects the pan direction, trims still ends (up to ~2% of the pan into the
-  motion, 2 still frames kept) and steadies translational shake (smoothed path → a per-frame crop, margin 1–6%); anything
+  `planCleanup` (async, yields every 20ms) detects the pan direction, and CAN trim still ends (up to
+  `MAX_TRIM_SHARE` 0.4 of the clip) and steady translational shake (a per-frame crop, margin 1–6%) — but since
+  2026-09-24 **neither is applied**: the client's footage is the point ("some part of the original footage feels
+  cut off or cropped"), so the pipeline analyses for DIRECTION only and passes every frame through whole.
+  `TOUR_CLIP_TRIM=on` / `TOUR_CLIP_STEADY=on` bring them back (steady only lines up when trimming too — its path is
+  measured over the kept frames). The stored `manifest.cleanup` reports what was APPLIED, not what was planned, so
+  the builder's line can't claim a trim that never happened; anything
   unclear leaves the clip as uploaded (zooms, diagonals, noise, screen recordings). `buildSpinFromVideo({ cleanup })`
   applies it (`steadyCropFor`) and stores the report in `manifest.cleanup`; `processClip` sets `driftDirection` from it;
   the builder's step card shows "Auto clean-up: …" (`serializeStepProduct` → `cleanup`).

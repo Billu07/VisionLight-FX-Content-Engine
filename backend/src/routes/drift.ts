@@ -190,7 +190,10 @@ export const processClip = (opts: {
   uploaderId: string | null;
   frameCount: number;
   removal: "white" | "black" | "ai" | "none";
-  /** tour clips: trim still ends, steady shake, detect the pan direction (env TOUR_CLIP_CLEANUP=off turns it off) */
+  /** tour clips: analyse the footage to detect which way it pans (env TOUR_CLIP_CLEANUP=off
+   *  turns the analysis off entirely). It does NOT alter the footage: trimming the still ends
+   *  and steadying shake are opt-in per TOUR_CLIP_TRIM / TOUR_CLIP_STEADY, because both take
+   *  part of the room away (client, 2026-09-24). */
   cleanup?: boolean;
 }) => {
   const { clip, productId, orgId, videoPath, mimetype, uploaderId, frameCount, removal } = opts;

@@ -248,8 +248,15 @@ export const buildSpinFromVideo = async (params: {
         plan = null;
       }
     }
-    const files = plan ? extracted.slice(plan.start, plan.end + 1) : extracted;
-    const steady = plan?.steady ?? null;
+    // Nothing is taken away from a creator's footage (client, 2026-09-24: "some part of the
+    // original footage feels cut off or cropped"). The analysis still runs — it is what tells
+    // us which way the clip pans — but the two things that REMOVE footage are opt-in now:
+    // trimming the still ends could take up to 40% of the clip, and steadying re-crops every
+    // frame by 1–6% a side. Both are worth having one day; neither is worth losing the room.
+    // The steady path is measured over the KEPT frames, so it only lines up when we trim.
+    const trimming = !!plan && process.env.TOUR_CLIP_TRIM === "on";
+    const files = trimming ? extracted.slice(plan!.start, plan!.end + 1) : extracted;
+    const steady = trimming && process.env.TOUR_CLIP_STEADY === "on" ? plan!.steady ?? null : null;
     const frameSize = steady ? await sharp(path.join(framesDir, files[0])).metadata() : null;
 
     // Content-aware player background from a representative frame's corner.
@@ -300,7 +307,18 @@ export const buildSpinFromVideo = async (params: {
       defaultFrame: Math.round(frames.length / 12),
       width: MAX_FRAME_WIDTH,
       detectedBg,
-      ...(plan ? { cleanup: plan.report } : {}),
+      // Report what was APPLIED, not what was planned — the builder shows this line to the
+      // creator, and it should never claim to have trimmed something it left alone.
+      ...(plan
+        ? {
+            cleanup: {
+              ...plan.report,
+              ...(trimming ? {} : { trimmedStart: 0, trimmedEnd: 0, trimmedStartS: 0, trimmedEndS: 0 }),
+              ...(steady ? {} : { steadied: false }),
+              frames: files.length,
+            },
+          }
+        : {}),
     };
   } finally {
     await fs.rm(framesDir, { recursive: true, force: true }).catch(() => undefined);

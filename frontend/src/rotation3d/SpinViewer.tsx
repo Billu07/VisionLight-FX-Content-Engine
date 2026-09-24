@@ -175,12 +175,14 @@ const TOUR_DESKTOP_ZOOM = 1.25;
 // platform surface uses. A brand that set its own colours overrides both.
 const PLATFORM_GROUND = "#0d1119";
 const PLATFORM_ACCENT = "#22d3ee";
-// How far the screen's shape may differ from the footage's before filling it edge to edge
-// would cost too much of the frame. Up to here a tour drift COVERS the screen (true full
-// bleed, the overflow cropped); past it — a portrait clip on a wide desktop — it fills the
-// axis that fits and the chrome sits on the ground beside it rather than cropping the room
-// down to a slot.
-const FILL_MAX_MISMATCH = 1.35;
+// How far the screen's shape may differ from the footage's before we stop covering it.
+// Covering crops whatever overflows, and at 1.35 that was up to a quarter of the room —
+// a vertical clip on a phone lost ~18% of its height. The client's footage is the point
+// ("some part of the original footage feels cut off or cropped", 2026-09-24), so this is
+// 1: cover only when the shapes already match, and otherwise fill the axis that fits and
+// let the chrome sit on the ground beside it. Nothing of the room is ever thrown away.
+// Raise it if a little crop is ever worth a little more bleed — it is the only knob.
+const FILL_MAX_MISMATCH = 1;
 
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
@@ -1423,7 +1425,11 @@ export default function SpinViewer({
     const updateLandscapeZoom = () => {
       // Client spec: portrait → 1×, landscape → 2× (main player only, any touch
       // device — not gated to fullscreen; never the tiny hero/gallery tiles).
-      const want = isTouchDevice && !hero && isLandscape();
+      // NOT when the drift already fills the screen: that zoom was measured against the
+      // framed layout, where landscape left the footage small in a band. On top of a
+      // full-bleed fill it doubles up and throws away three quarters of the room, which
+      // is the "cut off or cropped" the client saw (2026-09-24).
+      const want = isTouchDevice && !hero && isLandscape() && !immersive;
       if (want && !autoLandscapeZoom && zoomTarget <= 1.05) {
         zoomTarget = clampZoom(2);
         autoLandscapeZoom = true;
