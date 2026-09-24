@@ -432,23 +432,42 @@ export default function SpinViewer({
     // Direction-aware: the cue sits on the edge the drift STARTS from and moves to
     // the far edge at the end — LTR starts left, RTL starts right. Vertical drifts
     // (TTB/BTT) keep the cue centred under the frame; only its arrow turns.
+    // Edge to edge, chrome floating over the footage. A phone or touch screen always plays
+    // that way; a desktop page keeps the framed layout until the visitor asks for fullscreen
+    // — that is what the button is for (client, 2026-09-23). It can flip while mounted, so
+    // it is a local that applyImmersive() keeps current, not a render-time constant.
+    let immersive = false;
+    let sideRail = false;
+    const touchLike = window.matchMedia?.("(max-width: 820px), (pointer: coarse)");
+    const fullscreenNow = () =>
+      !!(document.fullscreenElement || (document as any).webkitFullscreenElement) ||
+      stage.classList.contains("r3d-pseudo-fs");
+
     const placeHelperX = () => {
       const el = hintRef.current;
       if (!driftMode || !el || frameRect.w <= 0) return;
       const stageW = cv.width / DPR;
       const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
+      // Filling the screen, the frame's own edges are off it, so the cue would sit flush in
+      // the corner — and at the far end of a drift it landed ON the zoom buttons. Give it a
+      // margin, and a wider one on the side the zoom column is using when that is showing
+      // (client, 2026-09-24).
+      const zoom = stage.querySelector(".r3d-zoomcol") as HTMLElement | null;
+      const zoomShowing = !!zoom && zoom.offsetParent !== null;
+      const inset = immersive ? 26 : 8;
+      const rightInset = immersive && zoomShowing ? 72 : inset;
       if (vertical) {
         const hintW = el.offsetWidth || 120;
         el.style.right = "auto";
-        el.style.left = Math.max(8, Math.min(stageW - hintW - 8, fx + fw / 2 - hintW / 2)) + "px";
+        el.style.left = Math.max(inset, Math.min(stageW - hintW - inset, fx + fw / 2 - hintW / 2)) + "px";
       } else if (helperBack !== dirSign < 0) {
         // back on LTR, or forward on RTL → the frame's RIGHT edge
         el.style.left = "auto";
-        el.style.right = Math.max(8, stageW - (fx + fw)) + "px";
+        el.style.right = Math.max(rightInset, stageW - (fx + fw)) + "px";
       } else {
         // forward on LTR, or back on RTL → the frame's LEFT edge
         el.style.right = "auto";
-        el.style.left = Math.max(8, fx) + "px";
+        el.style.left = Math.max(inset, fx) + "px";
       }
       el.style.transform = "none";
     };
@@ -582,17 +601,6 @@ export default function SpinViewer({
       const c = Math.cos(a), s = Math.sin(a);
       return [p[0], c * p[1] - s * p[2], s * p[1] + c * p[2]];
     };
-
-    // Edge to edge, chrome floating over the footage. A phone or touch screen always plays
-    // that way; a desktop page keeps the framed layout until the visitor asks for fullscreen
-    // — that is what the button is for (client, 2026-09-23). It can flip while mounted, so
-    // it is a local that applyImmersive() keeps current, not a render-time constant.
-    let immersive = false;
-    let sideRail = false;
-    const touchLike = window.matchMedia?.("(max-width: 820px), (pointer: coarse)");
-    const fullscreenNow = () =>
-      !!(document.fullscreenElement || (document as any).webkitFullscreenElement) ||
-      stage.classList.contains("r3d-pseudo-fs");
 
     const fit = () => {
       const r = stage.getBoundingClientRect();
@@ -1975,7 +1983,7 @@ export default function SpinViewer({
         <div className="r3d-track"><div className="r3d-fill" ref={fillRef} /></div>
       </div>
 
-      <div className="r3d-hint" ref={hintRef}>
+      <div className={`r3d-hint ${iconCue ? "r3d-hint-icon" : ""}`} ref={hintRef}>
         {driftMode ? (
           <>
             <div className="r3d-drift-hand" ref={handRef} aria-hidden>
@@ -2403,6 +2411,31 @@ const R3D_CSS = `
    go with it — with nothing left over the footage there is nothing to keep legible. */
 .r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
 .r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
+/* ── The drag cue in full screen (2026-09-24, client) ───────────────────────────────
+   A tour stop with no helper copy draws its hand INSIDE the cue row (in place of the
+   text), and the animated hand sits above it. Framed, those two are far apart — one on
+   the footage, one below it — but filling the screen they stack into what looks like the
+   same hand twice. There, the cue's own hand is the helper, and it takes over the sway. */
+.r3d-immersive .r3d-hint-icon .r3d-drift-hand{display:none}
+.r3d-immersive .r3d-hint-icon .r3d-cue-hand{animation:r3dsway 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.r3d-immersive .r3d-hint-icon .r3d-cue-hand{animation:none}}
+/* And on a big screen it scales with the scene: the shared clamps top out near a phone's
+   size, which left a stray little icon in the corner of a 27-inch display. */
+@media (min-width:821px) and (pointer:fine){
+  .r3d-immersive .r3d-cue-hand svg{width:clamp(24px,3.4vmin,34px);height:clamp(24px,3.4vmin,34px)}
+  .r3d-immersive .r3d-drift-arrow svg{width:clamp(26px,3.6vmin,36px);height:clamp(26px,3.6vmin,36px)}
+  .r3d-immersive .r3d-drift-hand{width:clamp(34px,4.6vmin,48px);height:clamp(34px,4.6vmin,48px)}
+  .r3d-immersive .r3d-drift-hand svg{width:clamp(22px,3vmin,31px);height:clamp(22px,3vmin,31px)}
+  .r3d-immersive .r3d-hint span{font-size:clamp(15px,1.9vmin,19px)}
+  .r3d-immersive .r3d-drift-cue{gap:12px}
+}
+/* In REAL fullscreen the screen is the player — the zoom buttons are page furniture, and
+   they sat exactly where the drag cue ends up (client, 2026-09-24). Wheel and pinch still
+   zoom. Kept as separate rules: one selector an older browser cannot parse would drop the
+   whole list with it. */
+.r3d-stage:fullscreen .r3d-zoomcol{display:none}
+.r3d-stage:-webkit-full-screen .r3d-zoomcol{display:none}
+.r3d-pseudo-fs .r3d-zoomcol{display:none}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 .r3d-immersive:not(.r3d-siderail).r3d-ground::before{display:none}

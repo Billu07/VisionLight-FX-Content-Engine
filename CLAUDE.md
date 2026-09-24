@@ -185,6 +185,15 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `--r3d-side` custom property — better than lying over the footage, and the drift keeps its full
     height. Brand drifts, the hero takeover and Rotation3D keep the framed layout — do NOT widen the
     scope without re-checking them.
+    **The chrome in full screen** (2026-09-24, client): the +/- zoom column is hidden in REAL
+    fullscreen (`:fullscreen`, `:-webkit-full-screen`, `.r3d-pseudo-fs` — three separate rules, since
+    one selector an old browser cannot parse would drop the whole list); wheel and pinch still zoom. The
+    drag cue keeps a 26px margin off the screen edge instead of sitting flush (72px on the side the zoom
+    column uses when it IS showing) — at the far end of a drift it used to land exactly on those
+    buttons. A tour stop with no helper copy draws its hand inside the CUE row, and the animated
+    `.r3d-drift-hand` above it: framed those are far apart, filling the screen they stack into the same
+    hand twice, so `.r3d-immersive .r3d-hint-icon` hides the second one and the cue's hand takes over
+    the sway. On a desktop the cue scales with the scene (the shared clamps top out near phone size).
     Chrome floats over the footage: a tap on it toggles `r3d-bare`, and an active drag rides the existing
     `r3d-grabbing`; one `:is()` rule fades both, scrims included. The progress rail rides the SCREEN's
     edge in fill mode (the frame's own edges are off screen) and is canvas-drawn, so it survives the tap.
