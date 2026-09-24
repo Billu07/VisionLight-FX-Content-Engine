@@ -127,6 +127,10 @@ export const markFramesIn = (urls: string[]) => {
   for (const u of urls) if (u) framesIn.add(u);
 };
 
+/** How many frames make a drift playable: one spread pass over the whole pan. SpinViewer
+ *  reveals on exactly this many (its COARSE), and a swap skips the loader on them. */
+export const REVEAL_RING = 36;
+
 /** Are this payload's frames ready to play (all of them, or `need` of them)? */
 export const framesReady = (urls: string[], need?: number): boolean => {
   if (!urls.length) return false;
@@ -140,7 +144,9 @@ export const framesReady = (urls: string[], need?: number): boolean => {
 
 const WARM_CONCURRENCY = 6;
 // How many connections the next drift may use while the one on screen is still filling in.
-const WARM_TRICKLE = 2;
+// Its own frames are asked for at HIGH priority and these at low, so the browser still
+// serves the drift being watched first; this only decides how fast the one behind it fills.
+const WARM_TRICKLE = 4;
 const WARM_DELAY_MS = 250;
 // Players whose drift is not playable yet (see holdForegroundLoad) — nothing warms while
 // one of these is open — and players still filling in a playable drift (warming trickles).
@@ -263,7 +269,11 @@ export function warmFrames(product: any, opts: { full?: boolean } = {}) {
   if (!all.length) return;
   const first = Math.min(Math.max(0, Number(product?.defaultFrame) || 0), all.length - 1);
   enqueueWarm(all[first]);
-  const step = Math.max(1, Math.floor(all.length / 16));
+  // Warm in the order the PLAYER wants them: a spread across the whole pan, as many as it
+  // reveals on (REVEAL_RING), then the gaps. A sparser spread than that left a drift that
+  // was mostly warm still short of the ring it opens with, so the swap showed a loader for
+  // frames it did not need yet (client, 2026-09-24).
+  const step = Math.max(1, Math.floor(all.length / REVEAL_RING));
   for (let i = 0; i < all.length; i += step) enqueueWarm(all[i]);
   if (opts.full !== false && !constrainedNetwork()) for (const url of all) enqueueWarm(url);
   scheduleWarm();

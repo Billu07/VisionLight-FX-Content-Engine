@@ -1,4 +1,4 @@
-import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused } from "./driftNav";
+import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -1614,10 +1614,14 @@ export default function SpinViewer({
       // whole 360 is usable within ~a second, then keep filling the gaps so the
       // spin sharpens toward full frame count — no waiting for all 120/180.
       const seq = progressiveOrder(n, START_FRAME);
-      const COARSE = Math.min(n, 36); // a turntable already reads well at ~36
-      // Tour drifts reveal only when EVERY frame is ready, so the first drag is already
-      // smooth; brand drifts keep the quick coarse reveal (the rest sharpen underneath).
-      const REVEAL_AT = flowNav ? n : COARSE;
+      const COARSE = Math.min(n, REVEAL_RING); // one spread pass — what warming fills first
+      // Open as soon as the drift is USABLE — the coarse ring, a complete pass of the
+      // footage — and let the rest sharpen underneath, the way a video starts on what is
+      // buffered rather than on the whole file. Tours used to wait for every frame, which
+      // meant a visitor who moved briskly outran the warm queue and then sat through a full
+      // load on each stop (client, 2026-09-24). nearestLoaded() draws the best frame it has,
+      // so the drift is whole from the first moment, just briefly coarser.
+      const REVEAL_AT = COARSE;
       let revealed = false;
       let cursor = 0;
 
@@ -1671,7 +1675,7 @@ export default function SpinViewer({
       // spin is still usable, and keeps sharpening as frames arrive).
       revealTimer = setTimeout(() => {
         if (!revealed) { revealed = true; finishLoad(); }
-      }, flowNav ? 8000 : 1500); // tours: never hold the loader past 8s on a slow link
+      }, flowNav ? 3000 : 1500); // never hold the loader past this on a slow link
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -1695,7 +1699,10 @@ export default function SpinViewer({
     // or seen before). A swap used to hide it either way, so the next stop of a tour opened on
     // frames that were still downloading — that's what made dragging feel laggy with no sign
     // of loading. Not ready → the loader shows its progress over the crossfade.
-    const framesAreIn = realMode && framesReady(urls!, flowNav ? undefined : Math.min(urls!.length, 36));
+    // Skipping the loader asks the same question the reveal does: is a usable ring already
+    // in? (It used to demand every frame of a tour stop, so a swap that was 95% warm still
+    // showed a loader.) Not ready → the loader shows its progress over the crossfade.
+    const framesAreIn = realMode && framesReady(urls!, Math.min(urls!.length, REVEAL_RING));
     // Directional handoff (tour stops only): the OUTGOING drift slides on the way its
     // own footage travelled while the next one settles in from the far side — LTR
     // exits left and enters from the right, TTB exits upward and enters from below.

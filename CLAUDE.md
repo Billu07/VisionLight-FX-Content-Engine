@@ -223,8 +223,14 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     auto-resume) holds new background requests while a finger is on the drift. Depth: `warmFlowAhead(flow)`
     (called from `Rotation3DPlayer` beside `prefetchDriftTargets`) takes the next stop in FULL and the one
     after it COARSE, walking `flow.stops` — CTA links alone missed the loop back to #1. Data-saver/2G:
-    coarse only, and nothing while a drift is still filling in. Tour drifts reveal only at 100% (8s
-    fallback); brand drifts keep the 36-frame coarse reveal. Pages prefetch a drift link with
+    coarse only, and nothing while a drift is still filling in. **Every drift reveals on the ring, not on the
+    last frame** (2026-09-24, client: "every drift now loads when I click next"): `REVEAL_AT =
+    COARSE` for tours too (3s fallback), and a swap skips the loader on the same count. Waiting
+    for 100% meant a visitor who moved briskly outran the warm queue and then sat through a full
+    load at each stop — measured on a 180-frame drift over a slow link, the first open went 4.7s →
+    1.6s and an early Next 2.4s-with-loader → 145ms without. `driftNav.REVEAL_RING` (36) is the one
+    number: SpinViewer's COARSE, the loader-skip count, AND the spread `warmFrames` fills first, so
+    what is warmed is exactly what the next drift opens on. `WARM_TRICKLE` is 4. Pages prefetch a drift link with
     `prefetchDriftPath` (pathway Start Tour + strips). The drift→drift crossfade copies the canvas to a
     second canvas — never `toDataURL()` (a main-thread PNG encode per swap).
   - Tour thumbnails use the mobile frame. New R2 frame / cover / logo / thumbnail uploads send
