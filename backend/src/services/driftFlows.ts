@@ -118,7 +118,7 @@ export const creditOf = (settings: unknown): TourCredit | null => {
   return c && typeof c === "object" && typeof c.pageName === "string" && c.pageName ? (c as TourCredit) : null;
 };
 
-/** What a saved tour's pathway shows: "Tour by {creator}" → their page. */
+/** What a featured tour's pathway shows: "Captured by {creator}" → their page. */
 export const publicCredit = (settings: unknown): { name: string; path: string | null } | null => {
   const c = creditOf(settings);
   return c ? { name: c.pageName, path: c.pageSlug ? pagePublicPath(c.pageSlug) : null } : null;

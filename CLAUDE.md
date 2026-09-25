@@ -30,13 +30,16 @@ One codebase, multiple product lines (scoped by host + `Organization.productLine
 - **Storage**: managed media (Cloudflare R2) via `backend/src/utils/managedStorage.ts`,
   namespaced (`drift/…`).
 - **Media processing**: ffmpeg in-process on the VPS (frame extraction), gated by
-  `services/rotation3d/processingQueue.ts` (`ROT3D_PROCESS_CONCURRENCY`, default 1). This is the
-  scaling ceiling. **Measured 2026-09-26**: one 180-frame drift costs 16–19 CPU-seconds (only
-  ~2.5s of it ffmpeg; the rest is sharp encoding 360 WebPs) and 65–95 MB at its peak, and both
-  ffmpeg and sharp already run ~3× parallel while the uploads run 8-wide — so one conversion
-  keeps ~3 cores busy and never idles. On 2 vCPU a second worker adds NO throughput; leave the
-  number at 1 until processing has its own box. Admin → drift.li → Tour shows the queue
-  ("N Converting · M Waiting", polled every 10s) so congestion is visible.
+  `services/rotation3d/processingQueue.ts`. This is the scaling ceiling. **Measured 2026-09-26**:
+  one 180-frame drift costs 16–19 CPU-seconds (only ~2.5s of it ffmpeg; the rest is sharp
+  encoding 360 WebPs) and 65–95 MB at its peak, and both ffmpeg and sharp already run ~3×
+  parallel while the uploads run 8-wide — so one conversion keeps ~3 cores busy and never idles.
+  A second worker therefore buys **fairness, not throughput** (the second uploader stops waiting
+  out the first one's whole drift), which is worth it from 4 cores but not on 2. So the gate
+  **follows the box**: one conversion per 2 cores, capped at 2 → 2 vCPU gives 1, 4 vCPU gives 2.
+  `ROT3D_PROCESS_CONCURRENCY` overrides it, and the queue says at boot what it chose and warns
+  when the number is too high for the cores (`[r3d-queue]`). Admin → drift.li → Tour shows the
+  queue ("N Converting · M Waiting", polled every 10s) so congestion is visible.
 - **Infra**: `cloudflare/` (gitignored — use `git add -f`) holds the OG worker + setup docs.
 
 ## Deploy flow (important)
@@ -529,7 +532,8 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   shows it read-only as "Featured from {page}". Entries copied BEFORE this are ordinary flows with a credit and no
   `featureOf`: they keep working; remove and re-save one to make it live. Saving the same tour again returns the entry
   already there (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
-  pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Tour by {creator}"** top right (always) linking to their
+  pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Captured by {creator}"** top right (always, client
+  2026-09-26 — it credits whoever filmed it) linking to their
   page; back link = "← Drift Tours". On the channel page, Hidden Tours read **Library** and Unhide/Hide read
   **Feature / Move to Library**. Any page's Featured Tours can be ordered (↑ ↓, `PUT /api/drift/my/page/tour-order`,
   EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link.
@@ -547,19 +551,22 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   page PATCH — of the four quota columns only those two still bite a tour page (tours are unlimited, per-tour drifts
   are capped by `TOUR_MAX_DRIFTS_PER_TOUR`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on
-  two lines on desktop, four product cards). **Reworked 2026-09-26 (client)**: the hero is ONE CENTRED
-  COLUMN — the copy over the scene, which runs full width beneath it — and the "Take a Tour" chip over the
-  scene is gone (with the demo-tour fetch that only fed it; `TakeATour` deleted). The rail's four names are
-  now a **picker** (`.dh-pick` in DriftHomeScene): pick one and the playhead glides there, then the journey
-  carries on from it. They are HTML, not SVG labels — `DriftStage` is `aria-hidden`, so anything focusable
-  inside it is unreachable — and each is placed at `stopPct(i)` (its stop's share of the stage width) so it
-  stands under its own dot at any size; below 440px they fall back to a centred row. The scene's viewBox is
-  cropped to the art (`BOX = 0 26 480 280`, stage `aspect-ratio:480/280`, horizon 73%): empty box at either
-  end becomes empty screen once the stage is a full-width block. The world colours (`--w-cyan/violet/emerald`)
-  live on `.dh-visual`, not the SVG, so the picker and caption wear them too — a world's class remaps
-  `--accent`, and cyan is left alone (remapping it to itself is a cycle). Nothing hangs off a corner any
-  more, which is what the iOS alignment complaint was. A short screen (`min-width:1024px and
-  max-height:900px`) scales the hero down so the picker is in the first view on a 768px laptop.
+  two lines on desktop, four product cards). **Reworked 2026-09-26 (client)**: the hero STAYS TWO COLUMNS
+  ("the right side animation"); what changed is what sits ON the scene. Two things were pinned to its
+  corners — the chip naming the world on the left, "Take a Tour" on the right. The chip is **gone**
+  (with the demo-tour fetch that only fed it; `TakeATour` deleted) and the **variant text is centred over
+  the animation** (`.dh-now`, absolute at `left:50%`, one line — it wraps onto the drift otherwise — in the
+  band above the frame). *Read the note carefully if it comes up again: "the other text needs to be
+  centralized over the animations" means THAT chip, not the headline; centring the whole hero was my first,
+  wrong reading.* The rail's four names are now a **picker** (`.dh-pick`): pick one and the playhead glides
+  there, then the journey carries on from it. They are HTML, not SVG labels — `DriftStage` is `aria-hidden`,
+  so anything focusable inside it is unreachable — and each is placed at `stopPct(i)` (its stop's share of
+  the stage width) so it stands under its own dot at any size; below 440px they fall back to a centred row.
+  The viewBox is cropped to `BOX = 0 8 480 298` (stage `aspect-ratio:480/298`, horizon 75%): it keeps the
+  band the chip sits in and ends just under the rail, where the picker takes over in the flow. The world
+  colours (`--w-cyan/violet/emerald`) live on `.dh-visual`, not the SVG, so the picker and chip wear them
+  too — a world's class remaps `--accent`, and cyan is left alone (remapping it to itself is a cycle).
+  Nothing hangs off a corner any more, which is what the iOS alignment complaint was.
   The hero's scene is **`rotation3d/DriftHomeScene.tsx`**
   (2026-09-17): this is the parent page, so one Drift frame stands on the shared `DriftStage` floor with all
   four worlds drawn side by side inside it (Tour room + stops · View horizon + sightline · Memory frames +

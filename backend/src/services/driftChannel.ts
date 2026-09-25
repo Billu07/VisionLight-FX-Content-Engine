@@ -14,7 +14,7 @@ import {
  * and features tours made by creators. A superadmin saves a creator's tour to the channel's
  * library, which lands in Hidden Tours; featuring it = unhiding it, and the page's Featured
  * Tours can be put in order. Every entry remembers who made it (`settings.credit`) and its
- * pathway credits them ("Tour by …", top right).
+ * pathway credits them ("Captured by …", top right).
  *
  * An entry POINTS at the creator's tour (`settings.featureOf`) rather than copying it, so an
  * edit to the original shows on the channel the moment it is made — copies went stale and
@@ -143,7 +143,7 @@ export async function resolveOwnFeatures(entries: any[]): Promise<any[]> {
  * The creator's audience tools do NOT come along: their Meta pixel must not fire on drift.li's
  * channel, their stored CTAs point at their own pathway, and their enquiry button would post a
  * lead to whichever page the URL names — the channel. Someone who wants to reach them has the
- * "Tour by …" credit on the pathway, which links to their page.
+ * "Captured by …" credit on the pathway, which links to their page.
  */
 export const presentOnChannel = (
   payload: any,

@@ -1,3 +1,5 @@
+import os from "node:os";
+
 // Bounded-concurrency in-memory queue for Rotation3D video processing.
 //
 // Why: uploads respond instantly, but frame extraction (ffmpeg) is CPU-heavy
@@ -16,16 +18,37 @@
 // (full + mobile) — and holds 65–95 MB at its peak. ffmpeg runs ~3x parallel on its
 // own, sharp likewise, and the uploads already go 8 at a time (UPLOAD_CONCURRENCY),
 // so ONE conversion keeps roughly three cores busy and never idles waiting on the
-// network. On 2 vCPU a second worker therefore adds no throughput at all: the same
-// CPU-seconds are interleaved, both drifts take twice as long to appear, and peak
-// memory doubles next to Postgres and the API. Leave this at 1 until processing has
-// a box of its own (TOUR_V3_PLAN G2); then it belongs on that box, not this one.
-// Rule of thumb for a bigger box: one worker per ~3 free cores, memory permitting.
+// network.
+//
+// What a second worker buys is therefore NOT throughput — the work is CPU-bound, so
+// the same CPU-seconds simply interleave — it is FAIRNESS: the second person to
+// upload stops waiting for the first person's whole drift before theirs starts. On
+// 2 vCPU that trade is not worth it (both drifts take twice as long to appear and
+// peak memory doubles beside Postgres and the API); from 4 it is, which is why the
+// default below follows the box rather than being a flat number.
+//
+// One conversion per 2 cores, capped at 2 until a bigger box has been measured:
+// 2 vCPU → 1 (what this has always done), 4 vCPU → 2. Set ROT3D_PROCESS_CONCURRENCY
+// to override — and mind the memory, ~95 MB of peak per worker.
 
-const CONCURRENCY = Math.max(1, Number(process.env.ROT3D_PROCESS_CONCURRENCY) || 1);
+const CORES = Math.max(1, os.cpus().length);
+const CONCURRENCY = Math.max(1, Number(process.env.ROT3D_PROCESS_CONCURRENCY) || Math.min(2, Math.floor(CORES / 2)));
 
 let active = 0;
 const waiting: Array<() => void> = [];
+
+// Said once at boot, because the number is the difference between "the queue is busy" and
+// "the queue is stuck", and it is decided by the box rather than by anything in the repo.
+console.log(
+  `[r3d-queue] converting ${CONCURRENCY} drift${CONCURRENCY === 1 ? "" : "s"} at a time on ${CORES} core${CORES === 1 ? "" : "s"}` +
+    (process.env.ROT3D_PROCESS_CONCURRENCY ? " (set by ROT3D_PROCESS_CONCURRENCY)" : ""),
+);
+if (CONCURRENCY * 2 > CORES) {
+  console.warn(
+    `[r3d-queue] ${CONCURRENCY} workers on ${CORES} cores: a conversion wants about 3 cores and ~95 MB, so they will ` +
+      `contend with each other and with the API. Lower ROT3D_PROCESS_CONCURRENCY unless this box only converts.`,
+  );
+}
 
 function pump() {
   if (active >= CONCURRENCY) return;

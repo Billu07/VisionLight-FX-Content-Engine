@@ -5,11 +5,11 @@ import { HomeScene, HOME_SCENE_STYLES } from "./DriftHomeScene";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
- * Movement": the headline stands centred over one Drift on the shared grid floor, with all
- * four worlds passing through it as the playhead travels, and a picker under the rail for
- * anyone who would rather choose (DriftHomeScene; reworked 2026-09-26 from two columns, and
- * the "Take a Tour" chip over the scene went with it — the client asked for it gone, and the
- * page's own CTAs already lead into Tour). Below: Tour (available now) and View · Memory ·
+ * Movement": beside the headline stands one Drift on the shared grid floor, with all four
+ * worlds passing through it as the playhead travels, a picker under the rail for anyone who
+ * would rather choose, and the world's own name centred over the scene (DriftHomeScene). The
+ * "Take a Tour" chip that used to sit in its top-right corner is gone — the client asked for
+ * it, and the page's own CTAs already lead into Tour. Below: Tour (available now) and View ·
  * Path (coming soon, each with a wait list), then one closing call. On the drift design
  * tokens — the glow is dark-theme only, light stays flat. Header, footer and the wait-list
  * dialog come from driftSite (shared with the /view, /memory and /path landings).
@@ -72,15 +72,12 @@ const PRODUCTS: Product[] = [
 
 const STYLES = `
 /* ── Hero ──
-   One centred column: the copy over the scene, which now runs the full width beneath it
-   (client, 2026-09-26). The scene is pulled up under the CTA so the two read as one block
-   rather than a headline with a picture below it. */
-.dh-hero{display:grid;justify-items:center;text-align:center;gap:0;padding:clamp(22px,3.4vw,44px) 0 clamp(18px,2.6vw,30px)}
-.dh-copy{position:relative;z-index:2;max-width:min(100%,940px)}
-/* Capped, and pulled up under the CTA: at full width the Drift dwarfs the words it belongs to,
-   and the picker ends up a screen further down than the headline. */
-.dh-hero .dh-visual{width:100%;max-width:min(100%,720px);margin-top:clamp(-16px,-1.1vw,-4px)}
-@media(min-width:1440px){.dh-hero .dh-visual{max-width:780px}}
+   The words on the left, the Drift on the right — the client calls it "the right side
+   animation" and it stays that way. What changed on 2026-09-26 is what sits ON the scene:
+   "Take a Tour" is gone, and the chip naming the world is centred over it (see .dh-now). */
+.dh-hero{display:grid;gap:clamp(34px,6vw,56px);align-items:center;padding:clamp(34px,6vw,80px) 0 clamp(28px,4vw,52px)}
+@media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px}}
+.dh-copy{min-width:0}
 .dh-kicker{display:inline-flex;align-items:center;gap:14px;font-size:12.5px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
 .dh-kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .dh-h1{margin:22px 0 0;font-size:clamp(44px,7.4vw,106px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}
@@ -89,20 +86,18 @@ const STYLES = `
 @media(min-width:1024px){.dh-h1{font-size:clamp(52px,5.1vw,80px)}.dh-h1 .ln{white-space:nowrap}}
 .dh-h1 em{font-style:normal;color:var(--accent)}
 .drift-ui[data-theme="dark"] .dh-h1 em{background:linear-gradient(90deg,#22d3ee 0%,#38bdf8 48%,#a78bfa 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.dh-lead{margin:24px auto 0;font-size:clamp(18px,2.1vw,24px);line-height:1.45;color:var(--muted);max-width:34ch}
+.dh-lead{margin:24px 0 0;font-size:clamp(18px,2.1vw,24px);line-height:1.45;color:var(--muted);max-width:30ch}
 .dh-kinds{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:26px;font-size:15.5px;font-weight:650;letter-spacing:.05em;color:var(--muted)}
-.dh-copy .dh-kinds{justify-content:center}
 .dh-kinds i{font-style:normal;color:var(--faint)}
 .dh-go{display:inline-flex;align-items:center;gap:12px;margin-top:32px;padding:17px 30px;border-radius:999px;font-size:16px;font-weight:700;text-decoration:none}
-/* A short screen (a 768px laptop, a phone turned sideways): the hero gives back the room the
-   copy was taking, so the scene AND its picker are in the first view rather than below it. */
-@media(min-width:1024px) and (max-height:900px){
-  .dh-hero{padding-top:18px}
-  .dh-h1{font-size:clamp(42px,3.9vw,60px);margin-top:16px}
+/* A short screen (a 768px laptop): the copy gives back a little room, so the scene and its
+   picker are in the first view beside it rather than running past the fold. */
+@media(min-width:1024px) and (max-height:820px){
+  .dh-hero{padding:24px 0 20px}
+  .dh-h1{font-size:clamp(42px,3.9vw,62px);margin-top:16px}
   .dh-lead{margin-top:16px;font-size:clamp(17px,1.5vw,20px)}
-  .dh-copy .dh-kinds{margin-top:16px}
+  .dh-kinds{margin-top:16px}
   .dh-go{margin-top:20px;padding:14px 26px;font-size:15px}
-  .dh-hero .dh-visual{max-width:min(100%,600px)}
 }
 .dh-go svg,.dh-pill svg{transition:transform .2s}
 .dh-go:hover svg,.dh-pill:hover svg{transform:translateX(3px)}

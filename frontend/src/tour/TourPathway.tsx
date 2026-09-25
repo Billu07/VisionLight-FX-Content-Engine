@@ -68,10 +68,10 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
               {flow.credit &&
                 (flow.credit.path ? (
                   <Link className="d-btn sm tpw-credit" to={flow.credit.path} title={`See more from ${flow.credit.name}`}>
-                    Tour by <b>{flow.credit.name}</b>
+                    Captured by <b>{flow.credit.name}</b>
                   </Link>
                 ) : (
-                  <span className="d-pill tpw-credit">Tour by {flow.credit.name}</span>
+                  <span className="d-pill tpw-credit">Captured by {flow.credit.name}</span>
                 ))}
               <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
               <ContactButton page={page} flowId={flow.id} className="d-btn sm" />

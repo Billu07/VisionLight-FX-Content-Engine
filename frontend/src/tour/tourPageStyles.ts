@@ -50,7 +50,7 @@ export const TOUR_PAGE_STYLES = `
 .tpg-new-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
 .tpg-new-foot .d-faint{font-size:12.5px}
 
-/* Pathway: "Tour by {creator}" on tours saved to the Drift channel. */
+/* Pathway: "Captured by {creator}" on tours featured on the Drift channel. */
 .tpw-credit{display:inline-flex;align-items:center;gap:5px;font-weight:600}
 .tpw-credit b{font-weight:800;color:var(--accent)}
 

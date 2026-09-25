@@ -30,12 +30,11 @@ export const HOME_WORLDS: HomeWorld[] = [
   { key: "PATH", name: "Path", title: "Connect the Experience", tone: "emerald" },
 ];
 
-// ── geometry (view box 480 × 280, starting 26 down; the floor's horizon is at 73%) ──
-// The box is cropped to the scene: it starts just above the frame and ends just under the rail.
-// Empty box at either end is empty SCREEN once the stage is a full-width block — above it as a
-// gap under the headline, below it as a gap before the picker. The stage's aspect-ratio is
-// overridden to match (see the styles).
-const BOX = { x: 0, y: 26, w: 480, h: 280 };
+// ── geometry (view box 480 × 298, starting 8 down; the floor's horizon is at 75%) ──
+// The box ends just under the rail, where the picker takes over in the flow; a box that ran on
+// past it would open a gap between the two. The top keeps a band above the frame, which is
+// where the world's name sits. The stage's aspect-ratio is overridden to match (see the styles).
+const BOX = { x: 0, y: 8, w: 480, h: 298 };
 const CELL = 340; // one world, the width of the window
 const WIN = { x: 70, y: 48, w: CELL, h: 210 };
 const RAIL = { x: 92, y: 288, w: 296 };
@@ -60,7 +59,7 @@ export const HOME_SCENE_STYLES = `
 .dh-visual .emerald{--accent:var(--w-emerald)}
 /* The scene's own box ends just below the rail (see BOX), so the stage has to as well —
    otherwise the picker under it starts a stage-height's worth of empty floor away. */
-.dh-stagewrap .ds-stage{aspect-ratio:480/280}
+.dh-stagewrap .ds-stage{aspect-ratio:480/298}
 .dh-svg{overflow:visible}
 .w-cyan{color:var(--w-cyan)}
 .w-violet{color:var(--w-violet)}
@@ -129,14 +128,23 @@ export const HOME_SCENE_STYLES = `
   .dh-pick button{position:static;transform:none}
 }
 
-/* What is on screen right now (the card copy, so the hero says what the products are). */
-.dh-now{display:flex;justify-content:center;margin-top:10px}
+/* What is on screen right now (the card copy, so the hero says what the products are).
+   Centred over the animation, in the band above the frame — the client's "centralize the
+   variant related text over that animation" (2026-09-26). It used to be pinned to the top-left
+   corner, beside a "Take a Tour" chip in the right one; the chip is gone and this takes the
+   middle. The chip is translucent, so where the band is tight it reads over the frame's edge
+   rather than pushing anything down. */
+.dh-now{position:absolute;left:50%;top:0;transform:translateX(-50%);z-index:4;max-width:100%;
+  padding:8px 13px;border-radius:14px;background:color-mix(in srgb,var(--surface) 82%,transparent);
+  border:1px solid var(--border);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .dh-now b{font-size:13px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
 .dh-now span{font-size:13.5px;font-weight:650;color:var(--text)}
 .dh-now em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;
   padding:5px 9px;border-radius:999px;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border)}
 .dh-now em.on{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-border)}
-.dh-now-in{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;animation:dh-fade .5s ease}
+/* One line, always: the band above the frame is about 48px, and a chip that wraps lands on
+   the drift itself. Below 560px the title drops out (.dh-now-t), so it stays short there too. */
+.dh-now-in{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap;white-space:nowrap;animation:dh-fade .5s ease}
 @keyframes dh-fade{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){.dh-now-t{display:none}}
 
@@ -409,7 +417,7 @@ export function HomeScene() {
   return (
     <div className="dh-visual" ref={hostRef}>
       <div className="dh-stagewrap" onPointerMove={follow} onPointerLeave={release} onPointerCancel={release}>
-      <DriftStage horizon="73%">
+      <DriftStage horizon="75%">
         <svg className="dh-svg" viewBox={`${BOX.x} ${BOX.y} ${BOX.w} ${BOX.h}`}>
           <defs>
             <clipPath id="dh-window">

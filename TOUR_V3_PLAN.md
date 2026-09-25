@@ -61,7 +61,10 @@ Agreed behaviour: **whichever way the finger first moves becomes the scrub axis 
 
 **B2. Drop the second "tour". `S`** — _"in mobile, when in menu, the second 'tour' text at the top left can be removed… too much 'tour' reference and looks congested."_ The header wordmark is `drift.li TOUR`, and the page beneath says "Tours" again. On phones, keep the wordmark's kind label and drop the repeat.
 
-**B3. "Captured by" branding. `S–M`** — replace the contact label wording with the captured-by credit, centre credits on mobile, standardise alignment. Needs his exact wording.
+**B3. "Captured by" branding. `S`. ANSWERED + SHIPPED 2026-09-26.** It is the credit on a
+FEATURED tour: the pathway reads **"Captured by {creator}"** instead of "Tour by {creator}" —
+it credits whoever went and filmed it, not the thing. One string, both places it renders
+(`TourPathway`, linked and unlinked).
 
 **B4. Declutter + shift content up. `M`** — remove redundant labels, tighten the button rows, move the block up the page.
 
@@ -160,19 +163,24 @@ name and address filled in. Then one live-mode payment end to end._
 
 ## E. drift.li landing
 
-**E1. Rework the hero scene. `M–L`. SHIPPED 2026-09-26.**
-_As built (16 browser checks + a screenshot matrix at 1440 / 1366×768 / 1024 / 700 / 412): the
-hero is one centred column — copy over the scene, which runs full width beneath it — and the
-"Take a Tour" chip is gone, along with the demo-tour fetch that only fed it. The rail's four
-names became the **picker**: pick one and the playhead glides there, then the journey carries on
-from it; the pointer still takes it over, touch still scrolls, reduced motion steps._
-_Three things fell out of it. The names are HTML, not the SVG labels they replaced — DriftStage
-is `aria-hidden`, so anything focusable inside it would be unreachable — and they are placed at
-their own stop's share of the stage width, so they stand under their dot at any size (down to
-440px, where they fall back to a centred row). The scene's viewBox was cropped to the art
-(`0 26 480 280`): empty box at either end is empty SCREEN once the stage is a full-width block.
-And the caption no longer hangs off a corner, which is what the iOS alignment complaint was —
-so the phone's 44px band could go._
+**E1. Rework the hero scene. `M–L`. SHIPPED 2026-09-26, corrected the same day.**
+_**The correction matters more than the build.** "The other text needs to be centralized over
+the animations" is the **variant chip** — the one naming the world on screen (Tour · Show Any
+Space · Available Now) — not the headline. Two things were pinned to the scene's corners: that
+chip on the left and "Take a Tour" on the right. One goes; the other takes the middle. I first
+read it as the headline and centred the whole hero over a full-width scene; the client's reply
+("for the drift.li landing **right side animation**…") settled it. The hero is two columns._
+_As built (19 browser checks + a screenshot matrix at 1440 / 1366×768 / 1024 / 700 / 412): the
+"Take a Tour" chip is gone, with the demo-tour fetch that only fed it; the variant chip is
+centred over the animation, on one line, in the band above the frame; and the rail's four names
+became the **picker** — pick one and the playhead glides there, then the journey carries on from
+it, while the pointer still takes it over, touch still scrolls and reduced motion steps._
+_The names are HTML, not the SVG labels they replaced — DriftStage is `aria-hidden`, so anything
+focusable inside it would be unreachable — placed at their own stop's share of the stage width so
+they stand under their dot at any size (down to 440px, where they fall back to a centred row).
+The viewBox is cropped to `0 8 480 298`: it keeps the band the chip sits in and ends just under
+the rail, where the picker takes over. Nothing hangs off a corner any more, which is what the
+iOS alignment complaint was._
 
 **E1 (original note). `M–L`**
 _Notes: "that 'Take a Tour' on the right side animation can be removed and the other text needs to be centralized over the animations. Animations can come one by one, with a picker if the user wants to see one by one."_
@@ -207,10 +215,16 @@ _So one drift costs **16–19 CPU-seconds** — only ~2.5s of it ffmpeg; the res
 a time. **One conversion keeps about three cores busy and never idles on the network**, so on 2
 vCPU a second worker adds no throughput whatever: the same CPU-seconds interleave, both drifts
 take twice as long to appear, and peak memory doubles beside Postgres and the API._
-_What shipped instead is **visibility**, which is what the question was really after: the status
-strip in Admin → drift.li → Tour shows "N Converting · M Waiting" (polled every 10s). A queue
-that is never empty is the evidence for G2 — and the rule for that box is one worker per ~3 free
-cores, memory permitting._
+_What shipped alongside is **visibility**: the status strip in Admin → drift.li → Tour shows
+"N Converting · M Waiting" (polled every 10s). A queue that is never empty is the evidence for a
+bigger box._
+_**Revised 2026-09-26** (a 4-vCPU box arrived): the gate now reads the box instead of being a
+flat 1 — one conversion per 2 cores, capped at 2, so 2 vCPU → 1 (exactly what it did before) and
+4 vCPU → 2, with `ROT3D_PROCESS_CONCURRENCY` still overriding and a warning at boot when the
+number is too high for the cores. Note what the second worker actually buys: **not throughput**
+— the work is CPU-bound, so the same CPU-seconds interleave — but **fairness**, which is the
+point when there are many creators: the second person to upload stops waiting out the first
+person's whole drift. Verified by stubbing the core count: 2 → 1, 4 → 2, 8 → 2, env 3 → 3 + warning._
 
 **G1 (original note). `M`**
 **G2. Second VPS. `L`, blocked on Keith** — the real fix is moving processing off the web box: a worker that pulls from the queue over the network. Design once the second box exists; do not build speculatively.
@@ -269,7 +283,8 @@ second box._
 
 **Still open — none of them block Pass 1 or Pass 2**
 1. **F2 — uppercase what, exactly?** The kicker is already uppercase; does he mean the tour name?
-2. **B3 — the exact "Captured by" wording** he wants in place of the contact labels.
+2. ~~B3 — the exact "Captured by" wording.~~ **Answered 2026-09-26**: it is the featured-tour
+   credit — "Captured by {creator}" in place of "Tour by {creator}". Shipped.
 3. ~~B6 — a screenshot of the gradient bug.~~ **Answered 2026-09-24**: it is the page wash, too
    small and too faint to register at phone width. Fixed in Pass 1.
 
