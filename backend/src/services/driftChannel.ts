@@ -1,16 +1,30 @@
-import crypto from "node:crypto";
 import { prisma } from "./database";
-import { FlowError, flowPublicPath, pagePublicPath, relinkFlow, uniqueFlowSlug, type TourCredit } from "./driftFlows";
-import { slugify } from "../routes/drift";
+import {
+  FlowError,
+  driftPublicPath,
+  flowInclude,
+  flowPublicPath,
+  pagePublicPath,
+  uniqueFlowSlug,
+  type TourCredit,
+} from "./driftFlows";
 
 /**
  * The Drift channel (drift.li/tour/drift): drift.li's own tour page, where the team shows demos
  * and features tours made by creators. A superadmin saves a creator's tour to the channel's
- * library — a COPY (its own tour, drifts, pins and cover, reusing the same stored frames, so
- * nothing is re-built and the creator can edit or delete theirs freely) that lands in the
- * channel's Hidden Tours. Featuring it = unhiding it; the page's Featured Tours can be put in
- * order. Every saved tour remembers who made it (`settings.credit`), and its pathway credits
- * them ("Tour by …", top right). No schema change: the channel is the TOUR page with the
+ * library, which lands in Hidden Tours; featuring it = unhiding it, and the page's Featured
+ * Tours can be put in order. Every entry remembers who made it (`settings.credit`) and its
+ * pathway credits them ("Tour by …", top right).
+ *
+ * An entry POINTS at the creator's tour (`settings.featureOf`) rather than copying it, so an
+ * edit to the original shows on the channel the moment it is made — copies went stale and
+ * nothing could tell you (client, 2026-09-25). A feature is presented by MERGING the two rows:
+ * the source's content wearing the channel's identity. The merged object is flow-shaped, and
+ * `serializeFlow` builds every path from the flow's own org and slug, so the existing
+ * serializers produce channel addresses over live content without knowing any of this.
+ *
+ * Entries saved BEFORE this are ordinary flows with a credit and no `featureOf`; they keep
+ * working as they are. No schema change either way: the channel is the TOUR page with the
  * reserved slug "drift" (no one can sign up with it), created once from Admin → Tour.
  */
 
@@ -55,23 +69,131 @@ export async function channelStatus() {
   return { channel: { ...channel, path: pagePublicPath(CHANNEL_SLUG) }, featured, library };
 }
 
-/** Drop nulls, so Prisma's create takes the column defaults (and Json columns don't need JsonNull). */
-const defined = <T extends Record<string, unknown>>(o: T) =>
-  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined)) as Partial<T>;
-
-/** Settings that belong to the original tour (its reels, unbranded link, owner report). */
-const ORIGINAL_ONLY = ["reel", "reelFull", "reelLandscape", "unbrandedCode", "reportCode", "credit"];
+/** The tour a channel entry points at, or null when it is a copy made before this. */
+export const featureSourceId = (settings: unknown): string | null => {
+  const id = settings && typeof settings === "object" ? (settings as any).featureOf : null;
+  return typeof id === "string" && id ? id : null;
+};
 
 /**
- * Copy a tour into the channel's library (Hidden Tours). Only finished drifts come along. Saving
- * the same tour again returns the copy already there.
+ * A feature as the channel should present it: the SOURCE's content — name, cover, description,
+ * drifts, always current — wearing the CHANNEL's identity. Which row wins each field is the
+ * whole design, so it is spelled out rather than spread blindly.
+ */
+export const mergeFeature = (entry: any, source: any) => ({
+  ...source,
+  // the channel's own: who it belongs to, where it lives, how it is ordered and credited
+  id: entry.id,
+  organizationId: entry.organizationId,
+  organization: entry.organization,
+  slug: entry.slug,
+  order: entry.order,
+  hidden: entry.hidden,
+  isDemo: entry.isDemo,
+  status: entry.status,
+  settings: entry.settings,
+  createdAt: entry.createdAt,
+  createdByUserId: entry.createdByUserId,
+  // as fresh as the tour it shows
+  updatedAt: source.updatedAt,
+});
+
+/**
+ * Resolve one flow for public display. A plain flow (or a pre-existing copy) comes back as it
+ * is. A feature comes back merged — or null when the tour behind it is gone or no longer
+ * published, which is how a feature disappears cleanly instead of erroring.
+ */
+export async function resolveFeature<T extends { settings?: unknown }>(entry: T | null): Promise<any | null> {
+  if (!entry) return null;
+  const sourceId = featureSourceId((entry as any).settings);
+  if (!sourceId) return entry;
+  const source = await prisma.driftFlow.findUnique({ where: { id: sourceId }, include: flowInclude });
+  if (!source || source.status !== "PUBLISHED") return null;
+  return mergeFeature(entry, source);
+}
+
+/** The same for a public list: features are merged, and any whose tour has gone is left out. */
+export async function resolveFeatures(entries: any[]): Promise<any[]> {
+  const out = await Promise.all(entries.map((e) => resolveFeature(e)));
+  return out.filter(Boolean);
+}
+
+/**
+ * The same for the channel's OWN tools. A broken feature — the tour behind it deleted or
+ * unpublished — comes back as the bare entry rather than disappearing: it is gone from the
+ * public page either way, and whoever runs the channel still needs to see the row to remove it.
+ */
+export async function resolveOwnFeature(entry: any): Promise<{ flow: any; missing: boolean }> {
+  const resolved = await resolveFeature(entry);
+  if (resolved) return { flow: resolved, missing: false };
+  return { flow: entry, missing: !!featureSourceId(entry?.settings) };
+}
+
+export async function resolveOwnFeatures(entries: any[]): Promise<any[]> {
+  return Promise.all(entries.map(async (e) => (await resolveFeature(e)) ?? e));
+}
+
+/**
+ * One drift of a featured tour, presented at the CHANNEL's address.
+ *
+ * The drift itself is the creator's — same frames, same pins, same captions. What changes is
+ * where the player will GO next: without this, a visitor who opened /tour/drift/{tour} would
+ * be handed over to the creator's own page at the first Next and never come back.
+ *
+ * The creator's audience tools do NOT come along: their Meta pixel must not fire on drift.li's
+ * channel, their stored CTAs point at their own pathway, and their enquiry button would post a
+ * lead to whichever page the URL names — the channel. Someone who wants to reach them has the
+ * "Tour by …" credit on the pathway, which links to their page.
+ */
+export const presentOnChannel = (
+  payload: any,
+  at: { flowId: string; flowSlug: string; pageSlug: string; pageName: string },
+) => {
+  const f = payload?.flow;
+  if (!f) return payload;
+  const kind = String(f.kind || "TOUR");
+  const stops = (f.stops || []).map((s: any) => ({
+    ...s,
+    playerPath: s.slug ? driftPublicPath(kind, at.pageSlug, at.flowSlug, s.slug) : s.playerPath,
+  }));
+  return {
+    ...payload,
+    metaPixelId: null,
+    ctaPrimary: null,
+    ctaSecondary: null,
+    forms: [],
+    brandName: at.pageName,
+    logoUrl: null,
+    flow: {
+      ...f,
+      id: at.flowId,
+      slug: at.flowSlug,
+      pageSlug: at.pageSlug,
+      pageName: at.pageName,
+      pagePath: pagePublicPath(at.pageSlug, kind),
+      publicPath: flowPublicPath(kind, at.pageSlug, at.flowSlug),
+      entryPath: stops[0]?.playerPath ?? null,
+      enquiry: null,
+      stops,
+    },
+  };
+};
+
+/**
+ * Put a tour in the channel's library (Hidden Tours) by pointing at it. Nothing is duplicated —
+ * no second flow's worth of drifts, no second set of rows — so the channel shows whatever the
+ * creator's tour says today. Saving the same tour again returns the entry already there.
  */
 export async function saveToChannel(flowId: string, userId: string | null) {
   const src = await prisma.driftFlow.findUnique({
     where: { id: flowId },
-    include: {
+    select: {
+      id: true,
+      kind: true,
+      name: true,
+      organizationId: true,
       organization: { select: { id: true, name: true, slug: true } },
-      steps: { orderBy: { order: "asc" }, include: { product: { include: { spin: true, pins: true } } } },
+      steps: { select: { product: { select: { status: true, spin: { select: { id: true } } } } } },
     },
   });
   if (!src) throw new FlowError(404, "Tour not found");
@@ -79,114 +201,42 @@ export async function saveToChannel(flowId: string, userId: string | null) {
   const channel = await ensureChannel();
   if (src.organizationId === channel.id) throw new FlowError(409, "This tour is already on the Drift channel");
 
+  // One entry per tour, whether it was pointed at or copied in the old way.
   const already = await prisma.driftFlow.findFirst({
     where: { organizationId: channel.id, settings: { path: ["credit", "flowId"], equals: src.id } },
     select: { id: true, slug: true, name: true, hidden: true },
   });
   if (already) return { flow: { ...already, publicPath: flowPublicPath("TOUR", CHANNEL_SLUG, already.slug) }, existing: true };
 
-  const viewable = src.steps.filter((s) => s.product && s.product.spin && (s.product.status === "READY" || s.product.status === "PUBLISHED"));
+  const viewable = src.steps.filter((s) => s.product?.spin && (s.product.status === "READY" || s.product.status === "PUBLISHED"));
   if (!viewable.length) throw new FlowError(409, "This tour has no finished drifts to save yet");
 
+  // The entry carries no steps of its own: it points, and the channel reads through it. The
+  // name is kept only so the back office has something to list it by before it resolves.
   const slug = await uniqueFlowSlug("TOUR", src.name);
-  // Drift links are unique per page: pick them up front (two drifts can share a name).
-  const taken = new Set(
-    (await prisma.driftProduct.findMany({ where: { organizationId: channel.id }, select: { slug: true } })).map((p) => p.slug),
-  );
-  const productSlug = (name: string) => {
-    const base = slugify(name);
-    let s = base;
-    while (taken.has(s) || ["tour", "view", "memory", "path"].includes(s)) s = `${base}-${crypto.randomBytes(2).toString("hex")}`;
-    taken.add(s);
-    return s;
-  };
-
-  const srcSettings = src.settings && typeof src.settings === "object" ? (src.settings as Record<string, unknown>) : {};
-  const settings = {
-    ...Object.fromEntries(Object.entries(srcSettings).filter(([k]) => !ORIGINAL_ONLY.includes(k))),
-    credit: {
-      flowId: src.id,
-      pageId: src.organization.id,
-      pageName: src.organization.name,
-      pageSlug: src.organization.slug,
-      savedAt: new Date().toISOString(),
-    } satisfies TourCredit,
-  };
-
-  const copy = await prisma.$transaction(async (tx) => {
-    const flow = await tx.driftFlow.create({
-      data: {
-        organizationId: channel.id,
-        kind: "TOUR",
-        slug,
-        name: src.name,
-        title: src.title,
-        description: src.description,
-        status: "PUBLISHED",
-        hidden: true, // the library; unhide to feature it
-        coverUrl: src.coverUrl,
-        ...(src.endCta ? { endCta: src.endCta } : {}),
-        settings,
-        createdByUserId: userId,
-        publishedAt: new Date(),
+  const entry = await prisma.driftFlow.create({
+    data: {
+      organizationId: channel.id,
+      kind: "TOUR",
+      slug,
+      name: src.name,
+      status: "PUBLISHED",
+      hidden: true, // the library; unhide to feature it
+      settings: {
+        featureOf: src.id,
+        credit: {
+          flowId: src.id,
+          pageId: src.organization.id,
+          pageName: src.organization.name,
+          pageSlug: src.organization.slug,
+          savedAt: new Date().toISOString(),
+        } satisfies TourCredit,
       },
-      select: { id: true, slug: true, name: true, hidden: true },
-    });
-    let order = 0;
-    for (const step of viewable) {
-      const p = step.product!;
-      const {
-        id: _id,
-        organizationId: _org,
-        slug: _slug,
-        createdAt: _c,
-        updatedAt: _u,
-        spin,
-        pins,
-        // the creator's own: pixel, billing and showcase flags stay with the original
-        metaPixelId: _pixel,
-        billingStatus: _billing,
-        pendingVideoUrl: _pv,
-        pendingFrameCount: _pf,
-        orderId: _order,
-        paidAt: _paid,
-        hostingExpiresAt: _host,
-        featured: _f,
-        heroFeatured: _hf,
-        featuredRank: _fr,
-        createdByUserId: _by,
-        ...rest
-      } = p;
-      const product = await tx.driftProduct.create({
-        data: {
-          ...defined(rest),
-          organizationId: channel.id,
-          slug: productSlug(p.name),
-          billingStatus: "COMP",
-          createdByUserId: userId,
-          spin: {
-            create: defined({
-              frameCount: spin!.frameCount,
-              manifest: spin!.manifest as any,
-              secondFrameCount: spin!.secondFrameCount,
-              secondManifest: spin!.secondManifest as any,
-              status: spin!.status,
-            }) as any,
-          },
-          pins: {
-            create: pins.map(({ id: _pid, productId: _pp, createdAt: _pc, updatedAt: _pu, ...pin }) => defined(pin) as any),
-          },
-        } as any,
-        select: { id: true },
-      });
-      await tx.driftFlowStep.create({
-        data: { flowId: flow.id, stepType: "DRIFT", order: order++, productId: product.id, ...(step.customCta ? { customCta: step.customCta } : {}) },
-      });
-    }
-    return flow;
+      createdByUserId: userId,
+      publishedAt: new Date(),
+    },
+    select: { id: true, slug: true, name: true, hidden: true },
   });
-  // Home + the next drift's name, pointing at the channel's copy.
-  await relinkFlow(prisma, copy.id);
-  console.log(`[${NS}] saved tour ${src.id} ("${src.name}", ${src.organization.name}) → channel tour ${copy.id} (${viewable.length} drifts)`);
-  return { flow: { ...copy, publicPath: flowPublicPath("TOUR", CHANNEL_SLUG, copy.slug) }, existing: false };
+  console.log(`[${NS}] featured tour ${src.id} ("${src.name}", ${src.organization.name}) as channel entry ${entry.id}`);
+  return { flow: { ...entry, publicPath: flowPublicPath("TOUR", CHANNEL_SLUG, entry.slug) }, existing: false };
 }

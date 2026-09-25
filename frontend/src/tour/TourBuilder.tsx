@@ -635,6 +635,10 @@ export default function TourBuilder({
   const [showGuide, setShowGuide] = useState(false);
   // The caller's page role (from the API): Viewers get the builder without its controls.
   const [role, setRole] = useState<PageRole | null>(null);
+  // Set when this tour is FEATURED here from another page (the Drift channel): it is shown,
+  // not edited. `missing` = the tour it points at has been deleted or unpublished, so the
+  // row is only here to be removed.
+  const [feature, setFeature] = useState<{ credit: { name: string; path: string | null } | null; missing: boolean } | null>(null);
   // The drift whose pins are being edited.
   const [pinStep, setPinStep] = useState<FlowStep | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -685,6 +689,7 @@ export default function TourBuilder({
       setQuota(r.data.quota);
       setBilling(r.data.billing || null);
       setRole((r.data.role as PageRole) || "ADMIN");
+      setFeature(r.data.feature || null);
     } catch (e: any) {
       if (e?.status === 404) setMissing(true);
       else notify.error(apiError(e));
@@ -894,8 +899,9 @@ export default function TourBuilder({
 
   const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0 && !flow.counts.awaiting;
   const maxClip = superAdmin ? null : quota.maxClipSeconds;
-  // Viewers see the whole tour but none of the controls (the API refuses their changes too).
-  const readOnly = !canEditPage(role);
+  // Viewers see the whole tour but none of the controls (the API refuses their changes too),
+  // and so does a featured tour — its drifts belong to the page that made it.
+  const readOnly = !canEditPage(role) || !!feature;
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
   // Anything that moves a pin re-inks the rail.
@@ -934,8 +940,26 @@ export default function TourBuilder({
           <div className="d-eyebrow" style={{ marginBottom: 6 }}>
             Tour · <StatusPill status={flow.status} flow />
             {flow.hidden && <span className="d-pill" style={{ marginLeft: 6 }}>Hidden</span>}
-            {readOnly && <span className="d-pill" style={{ marginLeft: 6 }}>View Only</span>}
+            {readOnly && !feature && <span className="d-pill" style={{ marginLeft: 6 }}>View Only</span>}
+            {feature && <span className="d-pill">{feature.missing ? "Original Gone" : "Featured"}</span>}
           </div>
+          {feature && (
+            <div className="d-sub" style={{ marginTop: 4, fontSize: 12.5 }}>
+              {feature.missing ? (
+                <>This tour is no longer available on the page that made it — remove it from the library.</>
+              ) : (
+                <>
+                  Featured from{" "}
+                  {feature.credit?.path ? (
+                    <Link to={feature.credit.path}>{feature.credit.name}</Link>
+                  ) : (
+                    feature.credit?.name || "another page"
+                  )}
+                  . It updates here as they edit it.
+                </>
+              )}
+            </div>
+          )}
           <div className="t-inline">
             <input
               className="d-input t-name-input"
@@ -1108,7 +1132,8 @@ export default function TourBuilder({
               {page.slug !== "drift" && (
                 <div className="t-settings-row">
                   <span className="d-sub" style={{ fontSize: 12.5 }}>
-                    Copy this tour into the Drift channel's library, credited to {page.name}. Changes here won't touch the copy.
+                    Feature this tour on the Drift channel, credited to {page.name}. It stays yours — the channel points at
+                    it, so the tour shown there is whatever this one says.
                   </span>
                   <button className="d-btn sm" onClick={() => void saveToLibrary()} disabled={librarySaving || flow.counts.ready === 0}>
                     {librarySaving ? "Saving…" : "Save to Drift Library"}

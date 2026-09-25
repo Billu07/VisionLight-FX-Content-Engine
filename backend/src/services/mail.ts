@@ -621,6 +621,25 @@ export async function sendTourProInviteEmail(params: {
   });
 }
 
+/** The team made a page for someone: here is the link to it. */
+export async function sendTourCreatorInviteEmail(params: {
+  to: string;
+  pageName: string;
+  url: string;
+  freeDrifts: number;
+  clipSeconds: number;
+}): Promise<void> {
+  await sendTemplated("tour.creator.invite", {
+    vars: {
+      pageName: params.pageName,
+      url: params.url,
+      freeDrifts: String(params.freeDrifts),
+      clipSeconds: String(params.clipSeconds),
+    },
+    defaultTo: [params.to],
+  });
+}
+
 /** An invite was accepted: tell the page's admins. */
 export async function sendTourProJoinedEmail(params: {
   to: string[];

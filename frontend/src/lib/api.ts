@@ -439,6 +439,11 @@ export const apiEndpoints = {
   driftTourAdminPages: (q?: string) => api.get("/api/drift/admin/tour/pages", { params: q ? { q } : undefined }),
   driftTourAdminPage: (id: string) => api.get(`/api/drift/admin/tour/pages/${id}`),
   driftTourAdminUpdatePage: (id: string, data: Record<string, unknown>) => api.patch(`/api/drift/admin/tour/pages/${id}`, data),
+  // Make a tour page with its limits and invite its owner, in one action.
+  driftTourAdminInviteCreator: (data: Record<string, unknown>) => api.post("/api/drift/admin/tour/invite", data),
+  driftTourAdminInviteToPage: (id: string, data: Record<string, unknown>) => api.post(`/api/drift/admin/tour/pages/${id}/invites`, data),
+  driftTourAdminRevokeInvite: (id: string, inviteId: string) =>
+    api.delete(`/api/drift/admin/tour/pages/${id}/invites/${inviteId}`),
   driftTourAdminDemo: () => api.get("/api/drift/admin/tour/demo"),
   driftTourAdminSetDemo: (flowId: string | null) => api.put("/api/drift/admin/tour/demo", { flowId }),
   // The Drift channel (drift.li/tour/drift) and its library of saved tours

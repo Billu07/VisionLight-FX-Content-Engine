@@ -54,6 +54,18 @@ type PageDetail = {
   }[];
   orders: { id: string; status: string; quantity: number; amount: string; tour: string | null; createdAt: string; paidAt: string | null }[];
   clientPages: { id: string; name: string; path: string | null }[];
+  invites: InviteRow[];
+};
+
+/** A one-time link asking someone onto a page. `url` is null once it has been used. */
+type InviteRow = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  url: string | null;
 };
 
 type DemoRow = { id: string; name: string; isDemo: boolean; page: string | null; publicPath: string; drifts: number };
@@ -83,6 +95,28 @@ const onDrift = (path: string) =>
   typeof window !== "undefined" && isDriftHost(window.location.hostname) ? path : `${DRIFT_ORIGIN}${path}`;
 const errText = (e: any, fallback: string) => e?.message || fallback;
 
+/** An invite link, and a button that puts it on the clipboard. */
+function CopyLink({ url, label = "Copy link" }: { url: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      className="d-btn ghost sm"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          setDone(true);
+          setTimeout(() => setDone(false), 1600);
+        } catch {
+          window.prompt("Copy this invite link:", url);
+        }
+      }}
+      title={url}
+    >
+      {done ? "Copied" : label}
+    </button>
+  );
+}
+
 function Banner({ msg, onClose }: { msg: Msg; onClose: () => void }) {
   if (!msg) return null;
   return (
@@ -91,6 +125,101 @@ function Banner({ msg, onClose }: { msg: Msg; onClose: () => void }) {
       <button className="d-x" onClick={onClose} aria-label="Dismiss">
         ×
       </button>
+    </div>
+  );
+}
+
+/**
+ * Who has been asked onto this page and hasn't arrived yet. The link is shown beside each one:
+ * an invite that never turns up in an inbox shouldn't be the end of it — the superadmin can
+ * send it by hand.
+ */
+function InvitesCard({ detail, onChanged }: { detail: PageDetail; onChanged: (d: PageDetail) => void }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("ADMIN");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  const invites = detail.invites || [];
+
+  const send = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await apiEndpoints.driftTourAdminInviteToPage(detail.page.id, { email: email.trim(), role });
+      onChanged(r.data);
+      setEmail("");
+      setMsg({ kind: "ok", text: `Invite sent to ${r.data.invite.email}.` });
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "Couldn't send that invite") });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async (id: string) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await apiEndpoints.driftTourAdminRevokeInvite(detail.page.id, id);
+      onChanged(r.data);
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "Couldn't withdraw that invite") });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="d-card d-card-pad">
+      <div className="d-eyebrow" style={{ marginBottom: 10 }}>
+        Invites
+      </div>
+      <Banner msg={msg} onClose={() => setMsg(null)} />
+      {invites.length > 0 && (
+        <div className="d-list" style={{ marginBottom: 12 }}>
+          {invites.map((i) => (
+            <div key={i.id} className="d-row">
+              <div className="d-row-main">
+                <div className="d-name">{i.email}</div>
+                <div className="d-meta">
+                  <span className={`d-pill ${pill(i.status)}`}>{i.status === "ACCEPTED" ? "Joined" : i.status}</span>
+                  <span>{i.role === "ADMIN" ? "Admin" : i.role === "EDITOR" ? "Editor" : "Viewer"}</span>
+                  <span>{i.status === "ACCEPTED" ? `Joined ${when(i.acceptedAt)}` : `Sent ${when(i.createdAt)}`}</span>
+                </div>
+              </div>
+              <div className="d-actions">
+                {i.url && <CopyLink url={i.url} />}
+                {i.status === "PENDING" && (
+                  <button className="d-btn ghost sm" onClick={() => void revoke(i.id)} disabled={busy}>
+                    Withdraw
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="d-actions">
+        <input
+          className="d-input"
+          style={{ flex: "1 1 220px", minWidth: 0 }}
+          type="email"
+          placeholder="someone@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <select className="d-select" style={{ flex: "0 1 140px" }} value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="ADMIN">Admin</option>
+          <option value="EDITOR">Editor</option>
+          <option value="VIEWER">Viewer</option>
+        </select>
+        <button className="d-btn" onClick={() => void send()} disabled={busy || !email.trim()}>
+          {busy ? "Sending…" : "Send Invite"}
+        </button>
+      </div>
+      <span className="d-note" style={{ marginTop: 6, display: "block" }}>
+        A one-time link, good for 14 days.
+      </span>
     </div>
   );
 }
@@ -260,6 +389,8 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
         </div>
       </div>
 
+      <InvitesCard detail={detail} onChanged={onSaved} />
+
       {detail.clientPages.length > 0 && (
         <div className="d-card d-card-pad">
           <div className="d-eyebrow" style={{ marginBottom: 10 }}>
@@ -311,6 +442,124 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
   );
 }
 
+/**
+ * Make a page for someone and send them the way in. The page is real from the moment this is
+ * submitted — with the limits set here — so it can be opened, edited and filled in before they
+ * ever sign in; the invite is the same one-time link a page admin sends.
+ */
+function InviteCreator({ onCreated }: { onCreated: (d: PageDetail) => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pageName, setPageName] = useState("");
+  const [accountType, setAccountType] = useState("GENERAL");
+  const [freeDrifts, setFreeDrifts] = useState("3");
+  const [maxClip, setMaxClip] = useState("5");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  const [link, setLink] = useState<string | null>(null);
+
+  const submit = async () => {
+    setBusy(true);
+    setMsg(null);
+    setLink(null);
+    try {
+      const r = await apiEndpoints.driftTourAdminInviteCreator({
+        email: email.trim(),
+        pageName: pageName.trim() || undefined,
+        accountType,
+        freeDrifts: Number(freeDrifts),
+        maxClipSeconds: Number(maxClip),
+      });
+      onCreated(r.data);
+      setLink(r.data.invite?.url || null);
+      setMsg({ kind: "ok", text: `"${r.data.page.name}" is ready — the invite is on its way to ${r.data.invite.email}.` });
+      setEmail("");
+      setPageName("");
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "Couldn't create that page") });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="d-card d-card-pad">
+        <div className="d-head">
+          <div style={{ minWidth: 0 }}>
+            <div className="d-h2">Invite a creator</div>
+            <p className="d-sub" style={{ fontSize: 12.5, margin: "4px 0 0" }}>
+              Make their page, set its limits and send them the link.
+            </p>
+          </div>
+          <button className="d-btn primary sm" onClick={() => setOpen(true)}>
+            + Invite
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="d-card d-card-pad">
+      <div className="d-head" style={{ marginBottom: 10 }}>
+        <div className="d-h2">Invite a creator</div>
+        <button className="d-btn ghost sm" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      <Banner msg={msg} onClose={() => setMsg(null)} />
+      {link && (
+        <div className="d-actions" style={{ marginBottom: 10 }}>
+          <span className="d-note" style={{ flex: "1 1 160px", minWidth: 0 }}>
+            Their link, if you'd rather pass it on yourself:
+          </span>
+          <CopyLink url={link} label="Copy invite link" />
+        </div>
+      )}
+      <div className="d-field">
+        <label className="d-label">Their email</label>
+        <input className="d-input" type="email" placeholder="someone@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <div className="d-field" style={{ marginTop: 10 }}>
+        <label className="d-label">Page name</label>
+        <input className="d-input" placeholder="Harbour Homes" value={pageName} onChange={(e) => setPageName(e.target.value)} />
+        <span className="d-note" style={{ marginTop: 5 }}>
+          What visitors see, and the page's link. Left empty, it's taken from their email.
+        </span>
+      </div>
+      <div className="d-grid-2" style={{ marginTop: 10 }}>
+        <div className="d-field">
+          <label className="d-label">Free drifts</label>
+          <input className="d-input" type="number" min={0} max={1000} value={freeDrifts} onChange={(e) => setFreeDrifts(e.target.value)} />
+          <span className="d-note" style={{ marginTop: 5 }}>
+            Before they check out (default 3).
+          </span>
+        </div>
+        <div className="d-field">
+          <label className="d-label">Longest clip (seconds)</label>
+          <input className="d-input" type="number" min={1} max={600} value={maxClip} onChange={(e) => setMaxClip(e.target.value)} />
+          <span className="d-note" style={{ marginTop: 5 }}>
+            Default 5.
+          </span>
+        </div>
+        <div className="d-field">
+          <label className="d-label">Account type</label>
+          <select className="d-select" value={accountType} onChange={(e) => setAccountType(e.target.value)}>
+            <option value="GENERAL">General — realtors, brands, venues</option>
+            <option value="PRO">Pro — photographers, videographers</option>
+          </select>
+        </div>
+      </div>
+      <div className="d-actions" style={{ marginTop: 12 }}>
+        <button className="d-btn primary" onClick={() => void submit()} disabled={busy || !email.trim()}>
+          {busy ? "Creating…" : "Create the Page & Send the Invite"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Pages() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<PageRow[] | null>(null);
@@ -346,6 +595,13 @@ function Pages() {
   return (
     <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
       <Banner msg={msg} onClose={() => setMsg(null)} />
+      <InviteCreator
+        onCreated={(d) => {
+          setSelected(d.page.id);
+          setDetail(d);
+          void load(q);
+        }}
+      />
       <div className={`d-split ${selected ? "has-detail" : ""}`}>
         <aside className="d-split-side">
           <div className="d-card d-card-pad">

@@ -317,6 +317,29 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
     }),
   },
   {
+    key: "tour.creator.invite",
+    essential: true,
+    name: "Creator invite (from the drift.li team)",
+    description: "Sent when the team sets a page up for someone from the back office and invites them to it.",
+    trigger: "A superadmin invites a creator from Admin → drift.li → Tour",
+    audience: "The invited email",
+    vars: [
+      { name: "pageName", description: "The page made for them", sample: "Harbour Homes" },
+      { name: "url", description: "The one-time invite link", sample: "https://drift.li/tour/invite/abc123" },
+      { name: "freeDrifts", description: "Drifts they can build before paying", sample: "5" },
+      { name: "clipSeconds", description: "How long a clip may be", sample: "8" },
+    ],
+    defaults: f({
+      subject: "Your drift.li page is ready — {{pageName}}",
+      heading: "Your page on drift.li is ready",
+      intro:
+        'We\'ve set up "{{pageName}}" for you. Open it with the link below and it\'s yours: film a short pan of a space on your phone, and it becomes a Drift a visitor moves through with a finger. String a few together and you have a tour. Your first {{freeDrifts}} drifts are on us, and clips can run up to {{clipSeconds}} seconds.',
+      ctaLabel: "Open your page",
+      ctaUrl: "{{url}}",
+      footnote: "The link works once and expires in 14 days. If you weren't expecting this, you can ignore it.",
+    }),
+  },
+  {
     key: "tour.pro.joined",
     name: "Someone joined your page",
     description: "Tells a page's admins that someone they invited accepted.",

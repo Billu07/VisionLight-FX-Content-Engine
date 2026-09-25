@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma, dbService } from "./database";
 import { uniqueOrgSlug } from "../routes/drift";
 import { FlowError, pagePublicPath } from "./driftFlows";
-import { sendTourProInviteEmail, sendTourProJoinedEmail } from "./mail";
+import { sendTourCreatorInviteEmail, sendTourProInviteEmail, sendTourProJoinedEmail } from "./mail";
 import { untouchedProfile } from "./driftCreator";
 
 // drift.li Tour v2 accounts (TOUR_V2_PLAN.md P4). Two layers of page:
@@ -170,19 +170,27 @@ const serializeInvite = (i: {
   acceptedAt: i.acceptedAt,
 });
 
-/** "Invite a Pro": email a one-time link that makes its holder an admin of this page. */
+/**
+ * "Invite a Pro": email a one-time link that makes its holder an admin of this page.
+ *
+ * `flavour` only chooses the letter. "page" is someone being asked onto a page that already
+ * has people on it; "creator" is the team handing over a page made for them, which reads
+ * nothing like an invitation from a colleague. The link, the token and accepting it are
+ * identical either way.
+ */
 export async function createProInvite(args: {
   orgId: string;
   email: string;
   role?: unknown;
   inviter: { id: string | null; email?: string | null; name?: string | null };
+  flavour?: "page" | "creator";
 }) {
   const email = args.email.trim().toLowerCase();
   if (!isEmail(email)) throw new FlowError(400, "Enter a valid email address");
   const role = parsePageRole(args.role) ?? "EDITOR";
   const org = await prisma.organization.findUnique({
     where: { id: args.orgId },
-    select: { id: true, name: true, slug: true, productLine: true },
+    select: { id: true, name: true, slug: true, productLine: true, freeDrifts: true, maxClipSeconds: true },
   });
   if (!org || org.productLine !== "TOUR") throw new FlowError(404, "This account has no tour page");
   const member = await prisma.user.findFirst({
@@ -200,19 +208,31 @@ export async function createProInvite(args: {
   const invite = await prisma.driftTourInvite.create({
     data: { organizationId: org.id, email, token, invitedByUserId: args.inviter.id, role },
   });
+  const url = `${APP_URL}/tour/invite/${token}`;
   const inviterLabel = args.inviter.name
     ? `${args.inviter.name}${args.inviter.email ? ` (${args.inviter.email})` : ""}`
     : args.inviter.email || org.name;
-  void sendTourProInviteEmail({
-    to: email,
-    pageName: org.name,
-    inviterLabel,
-    url: `${APP_URL}/tour/invite/${token}`,
-    roleLabel: ROLE_COPY[role].label,
-    roleSummary: ROLE_COPY[role].summary,
-  }).catch((err) => console.error(`[${NS}] invite email failed:`, err));
+  const letter =
+    args.flavour === "creator"
+      ? sendTourCreatorInviteEmail({
+          to: email,
+          pageName: org.name,
+          url,
+          freeDrifts: org.freeDrifts,
+          clipSeconds: org.maxClipSeconds,
+        })
+      : sendTourProInviteEmail({
+          to: email,
+          pageName: org.name,
+          inviterLabel,
+          url,
+          roleLabel: ROLE_COPY[role].label,
+          roleSummary: ROLE_COPY[role].summary,
+        });
+  void letter.catch((err) => console.error(`[${NS}] invite email failed:`, err));
   console.log(`[${NS}] page ${org.id} invited ${email} as ${role}`);
-  return serializeInvite(invite);
+  // The link comes back too: whoever sent it can pass it on by hand if the email goes astray.
+  return { ...serializeInvite(invite), url };
 }
 
 export async function listProInvites(orgId: string) {
@@ -220,9 +240,9 @@ export async function listProInvites(orgId: string) {
     where: { organizationId: orgId, status: { in: ["PENDING", "ACCEPTED"] } },
     orderBy: { createdAt: "desc" },
     take: 20,
-    select: { id: true, email: true, status: true, createdAt: true, acceptedAt: true, role: true },
+    select: { id: true, email: true, status: true, createdAt: true, acceptedAt: true, role: true, token: true },
   });
-  return rows.map(serializeInvite);
+  return rows.map((r) => ({ ...serializeInvite(r), url: r.status === "PENDING" ? `${APP_URL}/tour/invite/${r.token}` : null }));
 }
 
 export async function revokeProInvite(orgId: string, id: string) {

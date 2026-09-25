@@ -22,6 +22,13 @@ import {
   submitEnquiry,
 } from "../services/driftEnquiries";
 import { enquirySettingsOf, parseEnquirySettings } from "../services/tourEnquirySettings";
+import {
+  featureSourceId,
+  resolveFeature,
+  resolveFeatures,
+  resolveOwnFeature,
+  resolveOwnFeatures,
+} from "../services/driftChannel";
 import { ensureReportLink, ownerReport, recordAttention, removeReportLink, tourInsights } from "../services/driftInsights";
 import { parseReelLayout, startTourReel, streamTourReel, tourReel } from "../services/driftReel";
 import {
@@ -57,6 +64,7 @@ import {
   pagePublicPath,
   flowPublicPath,
   parseFlowKind,
+  publicCredit,
   relinkFlow,
   reorderSteps,
   serializeFlow,
@@ -167,6 +175,24 @@ const loadFlow = (orgId: string, id: string) =>
   prisma.driftFlow.findFirst({ where: { id, organizationId: orgId }, include: flowInclude });
 
 // Translate a FlowError into a response; anything else goes to Express' handler.
+/**
+ * A tour featured on the Drift channel is a POINTER at the creator's tour, not a copy of it
+ * (services/driftChannel.ts), so there is nothing of its own to change: its drifts, its name
+ * and its cover all belong to the page that made it. Every write below addresses a flow as
+ * /api/drift/my/flows/:id, so one guard on that prefix covers all of them — including the
+ * step, pin and reel routes underneath. Reads pass (they resolve through the pointer), and so
+ * does DELETE, which removes the entry and simply un-features the tour.
+ */
+router.use("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") return next();
+  const flow = await prisma.driftFlow.findUnique({ where: { id: req.params.id }, select: { settings: true } });
+  if (!flow || !featureSourceId(flow.settings)) return next();
+  return res.status(409).json({
+    error: "This tour is featured from another page — open it there to make changes.",
+    feature: true,
+  });
+});
+
 const handle = (res: Response, err: unknown) => {
   if (err instanceof FlowError) {
     res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
@@ -236,20 +262,29 @@ const isContactUrl = (u: string) => {
 /** "View Demo": the page's own demo tour when it set one, else the site's demo. */
 async function resolveDemo(org: { id: string; tourSettings?: unknown }, kind: FlowKind) {
   const s = pageSettingsOf(org);
-  const pick = { kind: true, slug: true, name: true, organization: { select: { slug: true } } } as const;
+  const pick = { kind: true, slug: true, name: true, settings: true, organization: { select: { slug: true } } } as const;
+  // A featured tour is named by the tour it points at, not by the label stored beside it.
+  const liveName = async (f: { name: string; settings: unknown }) => {
+    const sourceId = featureSourceId(f.settings);
+    if (!sourceId) return f.name;
+    const src = await prisma.driftFlow.findUnique({ where: { id: sourceId }, select: { name: true } });
+    return src?.name ?? f.name;
+  };
   if (typeof s.demoFlowId === "string" && s.demoFlowId) {
     const own = await prisma.driftFlow.findFirst({
       where: { id: s.demoFlowId, organizationId: org.id, status: "PUBLISHED" },
       select: pick,
     });
-    if (own) return { name: own.name, path: flowPublicPath(own.kind, own.organization?.slug, own.slug), own: true };
+    if (own) return { name: await liveName(own), path: flowPublicPath(own.kind, own.organization?.slug, own.slug), own: true };
   }
   const site = await prisma.driftFlow.findFirst({
     where: { kind, status: "PUBLISHED", isDemo: true },
     orderBy: { updatedAt: "desc" },
     select: pick,
   });
-  return site ? { name: site.name, path: flowPublicPath(site.kind, site.organization?.slug, site.slug), own: false } : null;
+  return site
+    ? { name: await liveName(site), path: flowPublicPath(site.kind, site.organization?.slug, site.slug), own: false }
+    : null;
 }
 
 const findPublicPage = (slug: string) =>
@@ -311,7 +346,7 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
     prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT }),
   ]);
   res.json({
-    flows: flows.map(serializeFlow),
+    flows: (await resolveOwnFeatures(flows)).map(serializeFlow),
     quota,
     billing: await billingSummary(orgId, isSuperAdmin(req)),
     role: pageRoleOf(req),
@@ -380,8 +415,11 @@ router.get("/api/drift/my/flows/:id", authenticateToken, async (req: Authenticat
   if (!orgId) return;
   const flow = await loadFlow(orgId, req.params.id);
   if (!flow) return res.status(404).json({ error: "Flow not found" });
+  const { flow: shown, missing } = await resolveOwnFeature(flow);
   res.json({
-    flow: serializeFlow(flow),
+    flow: serializeFlow(shown),
+    // A featured tour is shown, never edited: it belongs to the page that made it.
+    feature: featureSourceId(flow.settings) ? { credit: publicCredit(flow.settings), missing } : null,
     quota: await flowQuota(orgId),
     billing: await billingSummary(orgId, isSuperAdmin(req)),
     role: pageRoleOf(req),
@@ -989,7 +1027,8 @@ router.get("/api/drift/public/pages/:page", async (req: AuthenticatedRequest, re
   res.json({
     page: serializePage(org),
     demo: await resolveDemo(org, kind),
-    flows: flows.map(serializePublicFlow).filter((f) => f.steps.length > 0),
+    // Featured tours read through their pointer; one whose tour has gone quietly drops out.
+    flows: (await resolveFeatures(flows)).map(serializePublicFlow).filter((f) => f.steps.length > 0),
   });
 });
 
@@ -1002,9 +1041,11 @@ router.get("/api/drift/public/pages/:page/flows/:slug", async (req: Authenticate
     include: flowInclude,
   });
   if (!flow) return res.status(404).json({ error: "Not found", page: serializePage(org) });
+  const shown = await resolveFeature(flow);
+  if (!shown) return res.status(404).json({ error: "Not found", page: serializePage(org) });
   // A demo (the site's, or this page's own "View Demo") is shown without the page's back link.
   const isDemo = flow.isDemo || pageSettingsOf(org).demoFlowId === flow.id;
-  res.json({ page: serializePage(org), flow: { ...serializePublicFlow(flow), isDemo } });
+  res.json({ page: serializePage(org), flow: { ...serializePublicFlow(shown), isDemo } });
 });
 
 // ───────────────────────────── steps ─────────────────────────────

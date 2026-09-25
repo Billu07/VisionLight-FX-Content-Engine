@@ -17,6 +17,7 @@ import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { publicPins } from "../services/driftPins";
 import { publicEnquiry } from "../services/tourEnquirySettings";
+import { featureSourceId, presentOnChannel } from "../services/driftChannel";
 import { rateLimiter, visitorIp } from "../services/driftVisitors";
 import { buildShareCard } from "../services/rotation3d/shareCard";
 import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
@@ -1022,6 +1023,13 @@ async function resolveCtaForms(p: any): Promise<Record<string, any>> {
 // Tour/flow context for the player (stop strip + closing card): the flow's
 // viewable stops in order and where this drift sits among them. null for brand
 // drifts, or when the include didn't load the flow (other public routes).
+// A tour featured on the Drift channel: its drifts are the creator's, shown at the channel's
+// address (services/driftChannel.ts).
+const featureSteps = {
+  orderBy: { order: "asc" as const },
+  select: { id: true, productId: true, product: { select: { name: true } } },
+};
+
 const flowNavPayload = (p: any) => {
   const f = p?.flowStep?.flow;
   if (!f) return null;
@@ -1381,24 +1389,35 @@ router.get(
     const driftSlug = String(req.params.drift || "").trim().toLowerCase();
     const org = await prisma.organization.findFirst({
       where: { slug: pageSlug, productLine: "TOUR" },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!org) return res.status(404).json({ error: "Not found" });
-    const flow = await prisma.driftFlow.findFirst({
+    const entry = await prisma.driftFlow.findFirst({
       where: { organizationId: org.id, slug: flowSlug },
-      select: {
-        id: true,
-        kind: true,
-        steps: { orderBy: { order: "asc" }, select: { id: true, productId: true, product: { select: { name: true } } } },
-      },
+      select: { id: true, kind: true, settings: true, steps: featureSteps },
     });
-    if (!flow) return res.status(404).json({ error: "Not found" });
+    if (!entry) return res.status(404).json({ error: "Not found" });
+    // A featured tour has no drifts of its own: the drift, and which drift the segment names,
+    // both come from the tour it points at.
+    const sourceId = featureSourceId(entry.settings);
+    const source = sourceId
+      ? await prisma.driftFlow.findFirst({
+          where: { id: sourceId, status: "PUBLISHED" },
+          select: { id: true, kind: true, steps: featureSteps },
+        })
+      : null;
+    if (sourceId && !source) return res.status(404).json({ error: "Not found" });
+    const flow = source ?? entry;
     const slugs = stepDriftSlugs(flow.steps, stepNoun(parseFlowKind(flow.kind) ?? "TOUR"));
     const step = flow.steps.find((s) => slugs.get(s.id) === driftSlug);
     if (!step?.productId) return res.status(404).json({ error: "Not found" });
     const payload = await loadPublicDrift(step.productId);
     if (!payload) return res.status(404).json({ error: "Not found" });
-    res.json({ product: payload });
+    res.json({
+      product: source
+        ? presentOnChannel(payload, { flowId: entry.id, flowSlug, pageSlug, pageName: org.name })
+        : payload,
+    });
   },
 );
 

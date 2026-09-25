@@ -73,7 +73,21 @@ Agreed behaviour: **whichever way the finger first moves becomes the scrub axis 
 
 ## C. Drift channel + admin
 
-**C1. A featured tour follows its original — by REFERENCE. `L`. DECIDED 2026-09-25.**
+**C1. A featured tour follows its original — by REFERENCE. `L`. SHIPPED 2026-09-26.**
+_As built (43 checks against a throwaway Postgres): as designed below, with two notes._
+_**No schema change** — the pointer lives in `DriftFlow.settings.featureOf`, beside the credit
+that was already there. `resolveFeature` merges the source's content onto the channel entry's
+identity and every existing serializer produces channel addresses over live content without
+knowing about any of it. A drift of a featured tour goes through `presentOnChannel`, which
+rewrites the stops and drops the creator's pixel, buttons, forms and enquiry button._
+_**A broken feature stays visible to the channel**, and only to it: gone from the public page,
+still in `/my/flows` and the back office so it can be removed (`resolveOwnFeature`). One
+guard on `/api/drift/my/flows/:id` refuses every write to a feature — a pointer has nothing of
+its own to change — and the builder shows it read-only with "Featured from {page}"._
+_**Migration:** tours copied into the library BEFORE this are ordinary flows and stay as they
+are. To make one live, remove it from the library and save it again._
+
+
 Copying is dropped. A channel entry becomes a pointer at the source flow, so it is current by
 construction: nothing to sync, no duplicate rows, no duplicate frames.
 
@@ -98,7 +112,23 @@ source deleted → channel page still loads.
 
 **C2. Library / Featured counts become links. `S`** — the counts exist; make them navigate to the channel page filtered to that set.
 
-**C3. Invite a creator, with limits, from the admin panel. `L`**
+**C3. Invite a creator, with limits, from the admin panel. `L`. SHIPPED 2026-09-26.**
+_As built (27 checks over real HTTP against a throwaway Postgres): **no schema change after
+all.** The page is created at the moment of inviting — with its limits — and the invite is the
+ordinary one-time `DriftTourInvite` (role ADMIN) that has been carrying page invites since
+2026-09-15, so accepting goes down a path already in production and nothing new has to be
+trusted. Carrying limits inside the invite would have meant a new column and a second place
+that decides what a page may do._
+_`POST /api/drift/admin/tour/invite` {email, pageName?, accountType?, freeDrifts?,
+maxClipSeconds?} → page + invite + the `tour.creator.invite` email (a new template: the team
+handing over a page reads nothing like a colleague's invitation). Also
+`POST|DELETE /api/drift/admin/tour/pages/:id/invites[/:inviteId]`, and `pageDetail` now
+carries the page's invites. Every invite comes back **with its link**, so a superadmin can pass
+it on by hand when an email goes astray. Someone who already has a page is refused with a
+pointer to it. The limits are read by one `readLimits` used by both the edit and the invite
+route, so they cannot drift apart._
+
+
 _Notes: "from admin panel, we should be able to create a profile with limits and things and send a direct invitation."_
 Pieces that already exist: `DriftTourInvite` (one-time links with a role), creator provisioning (`ensureCreatorProfile`), per-org quotas (`maxFlows`, `maxStepsPerFlow`, `maxClipSeconds`, `freeDrifts`), and the `tour.pro.invite` email.
 Missing: an admin screen that creates the page + sets the limits + sends the invite in one action, and an invite that carries those limits.
@@ -152,10 +182,10 @@ _Both live in SpinViewer; doing them together means one verification pass, not t
 **Pass 3 — polish and copy (half a day)**
 B3 captured-by · B4 declutter · B6 gradient (once I have the screenshot) · F1/F2 previews
 
-**Pass 4 — the channel (two days)**
+**Pass 4 — DONE 2026-09-26** _(the channel)_
 C1 feature-by-reference · C3 invite-with-limits
-_Both touch the schema, so they deploy together with ONE `db push` — which runs after the pull and
-BEFORE the backend restart, as always._
+_In the event **neither needed a schema change**, so this deploys with no `db push`: pull,
+build, restart. Both are covered by throwaway-Postgres suites (43 + 27 checks)._
 
 **Pass 5 — payments, landing, infra**
 D2 receipts · E1 hero rework · G1 concurrency measurement
@@ -163,6 +193,13 @@ D2 receipts · E1 hero rework · G1 concurrency measurement
 ---
 
 ## Decisions
+
+**Settled 2026-09-26**
+- **C1 keeps no copy at all.** An entry that points has nothing to go stale, but it also means a
+  tour deleted by its creator takes the feature with it — that is the right trade (the channel
+  should not outlive the thing it credits), and the row stays for the superadmin to clear.
+- **C3 creates the page up front** rather than at accept time. It puts an unclaimed page in the
+  list, which is a feature: the superadmin can set it up, or delete it, before anyone arrives.
 
 **Settled 2026-09-25**
 - **C1 — feature by REFERENCE**, not a copy: a channel entry points at the source tour, so it is

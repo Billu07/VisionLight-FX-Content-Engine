@@ -310,7 +310,7 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   auto "Next" CTA → relative `/p/{id}`, quotas, serializers, link validation), `routes/driftFlows.ts`
   (`/api/drift/my/flows/*` CRUD + clip upload/replace + reorder + publish; `GET
   /api/drift/public/flows/:kind/:slug`), `services/driftCreator.ts` + `routes/driftCreator.ts`
-  (`POST /api/drift/creator/signup` — idempotent provisioning; the auth middleware allow-lists
+  (`POST /api/drift/creator/signup` → `provisionCreator()` — idempotent provisioning; the auth middleware allow-lists
   `/api/drift/creator/*` before workspace selection), `pipeline.probeClipInfo` (duration + fps),
   creator email templates at the end of `services/mail.ts`.
 - **Frontend** `src/tour/`: `TourAuth` (/tour/start), `AuthCallback` (/auth/callback), `CreatorRoute`
@@ -503,18 +503,37 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   drift.li's own TOUR page "Drift" (slug `drift`, already in RESERVED_SLUGS, so only `ensureChannel` can create it —
   Admin → drift.li → Tour → **Drift Channel** tab → "Set Up the Drift Channel"). A superadmin **saves** any creator's tour
   to its library (back office: Pages → a page → a tour → Save to Library; or the builder's Tour Settings) → `saveToChannel`
-  makes a **copy** in one transaction: a new DriftFlow on the channel (hidden = the library, PUBLISHED, its own slug —
-  tour slugs are site-wide unique), only READY/PUBLISHED drifts, each a new DriftProduct (+ spin manifest, pins, pinTrack,
-  cover/thumbnail — the SAME R2 frames; drift deletes never purge R2, so the copy survives the original), billing COMP,
-  the creator's pixel/billing/showcase flags dropped, reel/unbranded/report settings dropped, then `relinkFlow`. Saving the
-  same tour again returns the existing copy (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
+  makes a **pointer**, not a copy (2026-09-26): a new DriftFlow on the channel (hidden = the library, PUBLISHED, its
+  own slug — tour slugs are site-wide unique) with **no steps of its own** and `settings.featureOf` = the source flow's
+  id. `resolveFeature`/`resolveFeatures` (public) and `resolveOwnFeature(s)` (the channel's own tools) merge the
+  SOURCE's content onto the CHANNEL's identity — id, slug, organization, order, hidden, settings — and because
+  `serializeFlow` derives every path from the flow's own org + slug, the existing serializers produce channel addresses
+  over live content unchanged. An edit by the creator is therefore on the channel at once, and nothing is duplicated.
+  One drift of a featured tour goes through `presentOnChannel` in the drift-by-slug route: the stops are rewritten to
+  `/tour/drift/{tour}/{drift}` and the creator's pixel, stored CTAs, forms and enquiry button are dropped (an enquiry
+  would otherwise reach the channel instead of them). A source deleted or unpublished drops out of the public page and
+  404s its pathway, but the row stays in the channel's OWN lists so it can be removed. One guard —
+  `router.use("/api/drift/my/flows/:id")` — refuses every write to a feature (GET and DELETE pass), and the builder
+  shows it read-only as "Featured from {page}". Entries copied BEFORE this are ordinary flows with a credit and no
+  `featureOf`: they keep working; remove and re-save one to make it live. Saving the same tour again returns the entry
+  already there (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
   pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Tour by {creator}"** top right (always) linking to their
   page; back link = "← Drift Tours". On the channel page, Hidden Tours read **Library** and Unhide/Hide read
   **Feature / Move to Library**. Any page's Featured Tours can be ordered (↑ ↓, `PUT /api/drift/my/page/tour-order`,
   EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link.
-  Verified against a throwaway Docker Postgres (schema from `prisma migrate diff`, never `db push`): 27 checks.
+  Verified against a throwaway Docker Postgres (schema from `prisma migrate diff`, never `db push`): 43 checks.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
+- **Invite a creator** (2026-09-26, no schema change): Pages → "Invite a creator" makes the page WITH its limits and
+  sends the way in, in one action — `POST /api/drift/admin/tour/invite` {email, pageName?, accountType?, freeDrifts?,
+  maxClipSeconds?} creates the Organization (TOUR, MANUAL, drift.li, PAID) and then the ordinary one-time
+  `DriftTourInvite` (role ADMIN) through `createProInvite({ flavour: "creator" })`, which only picks a different
+  letter — `tour.creator.invite` instead of `tour.pro.invite`. Accepting is the existing path, untouched. Also
+  `POST|DELETE /api/drift/admin/tour/pages/:id/invites[/:inviteId]`; `pageDetail` carries `invites`, and every
+  invite carries **its link** so it can be passed on by hand. Someone who already has a page is refused with its id.
+  `readLimits` in the route file is the ONE reading of freeDrifts / maxClipSeconds / accountType, shared with the
+  page PATCH — of the four quota columns only those two still bite a tour page (tours are unlimited, per-tour drifts
+  are capped by `TOUR_MAX_DRIFTS_PER_TOUR`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on
   two lines on desktop, four product cards). The hero's right side is **`rotation3d/DriftHomeScene.tsx`**
   (2026-09-17): this is the parent page, so one Drift frame stands on the shared `DriftStage` floor with all

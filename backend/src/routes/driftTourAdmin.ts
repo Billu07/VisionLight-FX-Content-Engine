@@ -2,9 +2,10 @@ import { Router, Response } from "express";
 import { prisma } from "../services/database";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { FlowError, flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
-import { channelStatus, ensureChannel, saveToChannel } from "../services/driftChannel";
+import { channelStatus, ensureChannel, resolveOwnFeatures, saveToChannel } from "../services/driftChannel";
 import { DRIFT_PRICE_CENTS, formatMoney, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
-import { memberRole, parseAccountType } from "../services/driftTourAccounts";
+import { createProInvite, listProInvites, memberRole, parseAccountType, revokeProInvite } from "../services/driftTourAccounts";
+import { uniqueOrgSlug } from "./drift";
 import { sendWaitlistNoticeEmail } from "../services/mail";
 
 // drift.li Tour v2 back office (TOUR_V2_PLAN.md P5): the superadmin's view of every
@@ -18,6 +19,32 @@ const NS = "drift-tour-admin";
 const WAITLIST_PRODUCTS = ["VIEW", "MEMORY", "PATH"] as const;
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
 const guard = [authenticateToken, requireSuperAdmin];
+
+/**
+ * The page limits a superadmin sets, read once for both the edit and the invite routes so the
+ * two can never drift apart. Returns the fields present in `body`, or a message to refuse with.
+ * Of the four quota columns only these two still bite a tour page: tours are unlimited (drifts
+ * are paid for one at a time) and the per-tour step cap is TOUR_MAX_DRIFTS_PER_TOUR.
+ */
+const readLimits = (body: any): { data: Record<string, unknown> } | { error: string } => {
+  const data: Record<string, unknown> = {};
+  if ("freeDrifts" in body) {
+    const n = Math.floor(Number(body.freeDrifts));
+    if (!Number.isFinite(n) || n < 0 || n > 1000) return { error: "Free drifts must be between 0 and 1000" };
+    data.freeDrifts = n;
+  }
+  if ("maxClipSeconds" in body) {
+    const n = Math.floor(Number(body.maxClipSeconds));
+    if (!Number.isFinite(n) || n < 1 || n > 600) return { error: "Longest clip must be between 1 and 600 seconds" };
+    data.maxClipSeconds = n;
+  }
+  if ("accountType" in body) {
+    const t = parseAccountType(body.accountType);
+    if (!t) return { error: "Account type must be General or Pro" };
+    data.tourAccountType = t;
+  }
+  return { data };
+};
 
 router.get("/api/drift/admin/tour/status", ...guard, (_req: AuthenticatedRequest, res: Response) => {
   res.json({ payments: stripeConfigured(), webhook: stripeWebhookConfigured(), price: formatMoney(DRIFT_PRICE_CENTS) });
@@ -103,7 +130,7 @@ async function pageDetail(id: string) {
     },
   });
   if (!org) return null;
-  const [flows, orders, clientPages, manager, paid] = await Promise.all([
+  const [flows, orders, clientPages, manager, paid, invites] = await Promise.all([
     prisma.driftFlow.findMany({
       where: { organizationId: org.id },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
@@ -115,8 +142,11 @@ async function pageDetail(id: string) {
       ? prisma.organization.findUnique({ where: { id: org.managedByOrgId }, select: { id: true, name: true, slug: true } })
       : null,
     prisma.driftTourOrder.aggregate({ where: { organizationId: org.id, status: "PAID" }, _sum: { amountCents: true } }),
+    listProInvites(org.id),
   ]);
   const flowName = new Map(flows.map((f) => [f.id, f.name]));
+  // On the Drift channel a tour is a pointer at a creator's: show what it actually holds.
+  const shown = await resolveOwnFeatures(flows);
   return {
     page: {
       id: org.id,
@@ -131,7 +161,7 @@ async function pageDetail(id: string) {
       paid: formatMoney(paid._sum.amountCents || 0),
     },
     users: org.users.map(({ tourRole, ...u }) => ({ ...u, pageRole: memberRole({ tourRole }) })),
-    flows: flows.map(serializeFlow).map((f) => ({
+    flows: shown.map(serializeFlow).map((f) => ({
       id: f.id,
       name: f.name,
       status: f.status,
@@ -152,6 +182,7 @@ async function pageDetail(id: string) {
       paidAt: o.paidAt,
     })),
     clientPages: clientPages.map((c) => ({ id: c.id, name: c.name, path: c.slug ? pagePublicPath(c.slug) : null })),
+    invites,
   };
 }
 
@@ -165,28 +196,101 @@ router.get("/api/drift/admin/tour/pages/:id", ...guard, async (req: Authenticate
 router.patch("/api/drift/admin/tour/pages/:id", ...guard, async (req: AuthenticatedRequest, res: Response) => {
   const org = await prisma.organization.findFirst({ where: { id: req.params.id, productLine: "TOUR" }, select: { id: true } });
   if (!org) return res.status(404).json({ error: "Page not found" });
-  const body = req.body || {};
-  const data: Record<string, unknown> = {};
-  if ("freeDrifts" in body) {
-    const n = Math.floor(Number(body.freeDrifts));
-    if (!Number.isFinite(n) || n < 0 || n > 1000) return res.status(400).json({ error: "Free drifts must be between 0 and 1000" });
-    data.freeDrifts = n;
-  }
-  if ("maxClipSeconds" in body) {
-    const n = Math.floor(Number(body.maxClipSeconds));
-    if (!Number.isFinite(n) || n < 1 || n > 600) return res.status(400).json({ error: "Longest clip must be between 1 and 600 seconds" });
-    data.maxClipSeconds = n;
-  }
-  if ("accountType" in body) {
-    const t = parseAccountType(body.accountType);
-    if (!t) return res.status(400).json({ error: "Account type must be General or Pro" });
-    data.tourAccountType = t;
-  }
+  const read = readLimits(req.body || {});
+  if ("error" in read) return res.status(400).json({ error: read.error });
+  const { data } = read;
   if (Object.keys(data).length) {
     await prisma.organization.update({ where: { id: org.id }, data });
     console.log(`[${NS}] ${req.user?.email} updated page ${org.id}: ${JSON.stringify(data)}`);
   }
   res.json(await pageDetail(org.id));
+});
+
+/**
+ * Make a page for someone and invite them to it: { email, pageName?, accountType?, freeDrifts?,
+ * maxClipSeconds? }. The page exists from this moment — with its limits, in the list, editable
+ * — and the invite is the ordinary one-time link that makes its holder the page's Admin. If
+ * they never accept, what is left behind is an empty page the superadmin can delete.
+ */
+router.post("/api/drift/admin/tour/invite", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  const body = req.body || {};
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!isEmail(email)) return res.status(400).json({ error: "Enter a valid email address" });
+  const read = readLimits(body);
+  if ("error" in read) return res.status(400).json({ error: read.error });
+  const name = String(body.pageName || "").trim().slice(0, 80) || email.split("@")[0];
+
+  // Someone with a page already: inviting them to a second one is almost never what was meant.
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, organization: { productLine: "TOUR" } },
+    select: { organization: { select: { id: true, name: true } } },
+  });
+  if (existing?.organization) {
+    return res.status(409).json({
+      error: `${email} already has a page ("${existing.organization.name}"). Open it to change their limits, or invite them to a page from there.`,
+      pageId: existing.organization.id,
+    });
+  }
+
+  const org = await prisma.organization.create({
+    data: {
+      name,
+      productLine: "TOUR",
+      provisioningSource: "MANUAL", // made by hand from the back office, not self-serve
+      routingDomain: "drift.li",
+      slug: await uniqueOrgSlug(name),
+      tenantPlan: "PAID", // as self-serve signup does: demo semantics are studio-only
+      tourAccountType: "GENERAL",
+      ...read.data,
+    },
+    select: { id: true, name: true },
+  });
+  try {
+    const invite = await createProInvite({
+      orgId: org.id,
+      email,
+      role: "ADMIN",
+      inviter: { id: req.user?.id ?? null, email: req.user?.email, name: req.user?.name },
+      flavour: "creator",
+    });
+    console.log(`[${NS}] ${req.user?.email} made page ${org.id} ("${org.name}") and invited ${email}`);
+    res.status(201).json({ invite, ...(await pageDetail(org.id)) });
+  } catch (err) {
+    // The page was made a moment ago and has nothing in it: don't leave it behind.
+    await prisma.organization.delete({ where: { id: org.id } }).catch(() => {});
+    if (err instanceof FlowError) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+});
+
+// Invite someone else to an existing page: { email, role? }.
+router.post("/api/drift/admin/tour/pages/:id/invites", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  const org = await prisma.organization.findFirst({ where: { id: req.params.id, productLine: "TOUR" }, select: { id: true } });
+  if (!org) return res.status(404).json({ error: "Page not found" });
+  try {
+    const invite = await createProInvite({
+      orgId: org.id,
+      email: String(req.body?.email || ""),
+      role: req.body?.role ?? "ADMIN",
+      inviter: { id: req.user?.id ?? null, email: req.user?.email, name: req.user?.name },
+      flavour: req.body?.role && String(req.body.role).toUpperCase() !== "ADMIN" ? "page" : "creator",
+    });
+    res.status(201).json({ invite, ...(await pageDetail(org.id)) });
+  } catch (err) {
+    if (err instanceof FlowError) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+});
+
+// Withdraw an invite that hasn't been accepted.
+router.delete("/api/drift/admin/tour/pages/:id/invites/:inviteId", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await revokeProInvite(req.params.id, req.params.inviteId);
+    res.json(await pageDetail(req.params.id));
+  } catch (err) {
+    if (err instanceof FlowError) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
 });
 
 // The public demo tour: "Take a Tour" and every page's default "View Demo".
