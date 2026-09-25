@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DriftStage, ICONS, useReducedMotion } from "./driftSite";
 
 /**
@@ -11,8 +11,12 @@ import { DriftStage, ICONS, useReducedMotion } from "./driftSite";
  * Touch is left alone (the page must still scroll), reduced motion holds the first world,
  * and the loop stops while the tab is hidden or the hero is off screen.
  *
- * Drawn, not photographed: it matches the product landings and needs no demo tour. The
- * "Take a Tour" link over the scene is passed in by the page (`action`).
+ * Drawn, not photographed: it matches the product landings and needs no demo tour.
+ *
+ * Under the rail the four names are a PICKER (2026-09-26, client: "animations can come one by
+ * one, with a picker if the user wants to see one by one") — pick one and the playhead glides
+ * there, then the journey carries on from it. They are HTML, not the SVG labels they replaced:
+ * DriftStage is aria-hidden, so anything focusable inside it would be unreachable.
  */
 
 type Tone = "cyan" | "violet" | "emerald";
@@ -26,12 +30,19 @@ export const HOME_WORLDS: HomeWorld[] = [
   { key: "PATH", name: "Path", title: "Connect the Experience", tone: "emerald" },
 ];
 
-// ── geometry (view box 480 × 330; the floor's horizon is at 70%) ──
+// ── geometry (view box 480 × 280, starting 26 down; the floor's horizon is at 73%) ──
+// The box is cropped to the scene: it starts just above the frame and ends just under the rail.
+// Empty box at either end is empty SCREEN once the stage is a full-width block — above it as a
+// gap under the headline, below it as a gap before the picker. The stage's aspect-ratio is
+// overridden to match (see the styles).
+const BOX = { x: 0, y: 26, w: 480, h: 280 };
 const CELL = 340; // one world, the width of the window
 const WIN = { x: 70, y: 48, w: CELL, h: 210 };
-const RAIL = { x: 92, y: 294, w: 296 };
+const RAIL = { x: 92, y: 288, w: 296 };
 const LAST = HOME_WORLDS.length - 1;
 const railX = (at: number) => RAIL.x + (RAIL.w * at) / LAST;
+/** Where a world's stop sits across the stage — the picker's names line up with these. */
+const stopPct = (i: number) => (railX(i) / BOX.w) * 100;
 
 // ── the journey (auto): hold on a world, glide to the next, turn around at the ends ──
 const HOLD_MS = 2600;
@@ -39,9 +50,18 @@ const GLIDE_MS = 1150;
 const ease = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
 export const HOME_SCENE_STYLES = `
-.dh-visual{position:relative;min-width:0;isolation:isolate}
-.dh-svg{--w-cyan:var(--accent);--w-violet:#7c3aed;--w-emerald:#047857;overflow:visible}
-.drift-ui[data-theme="dark"] .dh-svg{--w-violet:#a78bfa;--w-emerald:#34d399}
+/* The world colours belong to the whole scene, not just the drawing: the picker and the
+   caption sit outside the SVG and wear them too. A world's own class remaps --accent, so
+   anything inside it (text, tint, border) follows without knowing which world it is. Cyan is
+   already --accent, so it is left alone — remapping it to itself would be a cycle. */
+.dh-visual{position:relative;min-width:0;isolation:isolate;--w-cyan:var(--accent);--w-violet:#7c3aed;--w-emerald:#047857}
+.drift-ui[data-theme="dark"] .dh-visual{--w-violet:#a78bfa;--w-emerald:#34d399}
+.dh-visual .violet{--accent:var(--w-violet)}
+.dh-visual .emerald{--accent:var(--w-emerald)}
+/* The scene's own box ends just below the rail (see BOX), so the stage has to as well —
+   otherwise the picker under it starts a stage-height's worth of empty floor away. */
+.dh-stagewrap .ds-stage{aspect-ratio:480/280}
+.dh-svg{overflow:visible}
 .w-cyan{color:var(--w-cyan)}
 .w-violet{color:var(--w-violet)}
 .w-emerald{color:var(--w-emerald)}
@@ -89,28 +109,36 @@ export const HOME_SCENE_STYLES = `
 .dh-head .halo{fill:currentColor;opacity:.2}
 .dh-head .core{fill:currentColor}
 .drift-ui[data-theme="dark"] .dh-head{filter:drop-shadow(0 0 7px color-mix(in srgb,currentColor 75%,transparent))}
-.dh-name{fill:var(--faint);font-size:12px;font-weight:700;letter-spacing:.06em;transition:fill .35s}
-.dh-name.on{fill:var(--text)}
-@media(max-width:560px){.dh-name{font-size:14px}.dh-svg .nlabel{display:none}}
+@media(max-width:560px){.dh-svg .nlabel{display:none}}
+
+/* ── The picker: the rail's four stops, named and choosable ──
+   Each name is placed at its own stop's share of the stage width, so it stands under the dot it
+   belongs to at any size. That holds while the stops are further apart than a name is wide —
+   they are 20.5% of the stage apart, and "Memory" is the widest at about 72px, so it stops
+   holding around 440px. Below that they fall back to a plain centred row. */
+.dh-pick{position:relative;height:40px;margin-top:2px}
+.dh-pick button{position:absolute;top:0;transform:translateX(-50%);display:inline-flex;align-items:center;
+  padding:7px 13px;border-radius:999px;border:1px solid transparent;background:transparent;cursor:pointer;
+  font:inherit;font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--faint);white-space:nowrap;
+  transition:color .2s,background .2s,border-color .2s}
+.dh-pick button:hover{color:var(--text)}
+.dh-pick button[aria-selected="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);border-color:color-mix(in srgb,var(--accent) 38%,transparent)}
+.dh-pick button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:440px){
+  .dh-pick{height:auto;display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  .dh-pick button{position:static;transform:none}
+}
 
 /* What is on screen right now (the card copy, so the hero says what the products are). */
-.dh-now{position:absolute;left:0;top:0;z-index:4;padding:9px 14px;border-radius:14px;max-width:100%;
-  background:color-mix(in srgb,var(--surface) 82%,transparent);border:1px solid var(--border);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.dh-now{display:flex;justify-content:center;margin-top:10px}
 .dh-now b{font-size:13px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
 .dh-now span{font-size:13.5px;font-weight:650;color:var(--text)}
 .dh-now em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;
   padding:5px 9px;border-radius:999px;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border)}
 .dh-now em.on{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-border)}
-.dh-now.violet{--accent:var(--w-violet)}
-.dh-now.emerald{--accent:var(--w-emerald)}
-.dh-now-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap;animation:dh-fade .5s ease}
+.dh-now-in{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;animation:dh-fade .5s ease}
 @keyframes dh-fade{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){.dh-now-t{display:none}}
-/* Phones: the caption and "Take a Tour" get a band of their own above the scene. They are
-   pinned to the top corners, and on a narrow screen that put them on the drift frame's own
-   top-left corner — which read as broken alignment (client, 2026-09-23). */
-@media(max-width:700px){.dh-visual{padding-top:44px}.dh-now,.dh-chip-explore{top:0}}
 
 @media(prefers-reduced-motion:reduce){
   .dh-rove,.dh-ping,.dh-sweep,.dh-lift,.dh-beat,.dh-draw,.dh-now-in{animation:none}
@@ -251,8 +279,8 @@ const PathWorld = () => (
 
 const WORLD_ART = [TourWorld, ViewWorld, MemoryWorld, PathWorld];
 
-/** The hero scene. `action` (the page's "Take a Tour" link) sits in the top-right corner. */
-export function HomeScene({ action }: { action?: ReactNode }) {
+/** The hero scene: the four worlds, the playhead that travels them, and the picker. */
+export function HomeScene() {
   const reduce = useReducedMotion();
   const [at, setAt] = useState(0);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -362,12 +390,27 @@ export function HomeScene({ action }: { action?: ReactNode }) {
     trip.current = { ...trip.current, from, to: from, since: performance.now(), holding: true };
   };
 
+  /** The picker: travel to a world, and leave the journey running onward from there. */
+  const pick = (i: number) => {
+    aim.current = null;
+    if (reduce) {
+      pos.current = i;
+      paintRef.current(i);
+      setAt(i);
+      return;
+    }
+    const from = pos.current;
+    // Keep going the way we were sent, so the journey doesn't double back the instant it resumes.
+    trip.current = { from, to: i, since: performance.now(), holding: false, dir: i >= from ? 1 : -1 };
+  };
+
   const world = HOME_WORLDS[at];
 
   return (
-    <div className="dh-visual" ref={hostRef} onPointerMove={follow} onPointerLeave={release} onPointerCancel={release}>
-      <DriftStage horizon="70%">
-        <svg className="dh-svg" viewBox="0 0 480 330">
+    <div className="dh-visual" ref={hostRef}>
+      <div className="dh-stagewrap" onPointerMove={follow} onPointerLeave={release} onPointerCancel={release}>
+      <DriftStage horizon="73%">
+        <svg className="dh-svg" viewBox={`${BOX.x} ${BOX.y} ${BOX.w} ${BOX.h}`}>
           <defs>
             <clipPath id="dh-window">
               <rect x={WIN.x} y={WIN.y} width={WIN.w} height={WIN.h} rx={13} />
@@ -382,7 +425,7 @@ export function HomeScene({ action }: { action?: ReactNode }) {
             </linearGradient>
           </defs>
 
-          <ellipse className="dh-cast" cx={240} cy={264} rx={158} ry={14} />
+          <ellipse className="dh-cast" cx={240} cy={262} rx={158} ry={13} />
 
           <g clipPath="url(#dh-window)">
             <rect className="dh-pane" x={WIN.x} y={WIN.y} width={WIN.w} height={WIN.h} rx={13} />
@@ -403,9 +446,6 @@ export function HomeScene({ action }: { action?: ReactNode }) {
             {HOME_WORLDS.map((w, i) => (
               <g key={w.key} className={i === at ? `w-${w.tone}` : ""}>
                 <circle className={`dh-stop ${i === at ? "on" : ""}`} cx={railX(i)} cy={RAIL.y} r={6} />
-                <text className={`dh-name ${i === at ? "on" : ""}`} x={railX(i)} y={RAIL.y + 24} textAnchor="middle">
-                  {w.name}
-                </text>
               </g>
             ))}
             <g className="dh-head" ref={headRef} transform={`translate(${RAIL.x} ${RAIL.y})`}>
@@ -415,15 +455,33 @@ export function HomeScene({ action }: { action?: ReactNode }) {
           </g>
         </svg>
       </DriftStage>
+      </div>
 
-      <div className={`dh-now ${world.tone}`} aria-hidden>
+      {/* The picker. Not a tablist: nothing is revealed or hidden — it moves the same playhead
+          the journey moves, so it is four buttons that say where you are. */}
+      <div className="dh-pick" role="group" aria-label="Choose a world to see">
+        {HOME_WORLDS.map((w, i) => (
+          <button
+            key={w.key}
+            type="button"
+            className={w.tone}
+            style={{ left: `${stopPct(i)}%` }}
+            aria-selected={i === at}
+            aria-label={`${w.name} — ${w.title}`}
+            onClick={() => pick(i)}
+          >
+            {w.name}
+          </button>
+        ))}
+      </div>
+
+      <div className={`dh-now ${world.tone}`} aria-live="polite">
         <span className="dh-now-in" key={world.key}>
           <b>{world.name}</b>
           <span className="dh-now-t">{world.title}</span>
           <em className={world.live ? "on" : ""}>{world.live ? "Available Now" : "Coming Soon"}</em>
         </span>
       </div>
-      {action}
     </div>
   );
 }

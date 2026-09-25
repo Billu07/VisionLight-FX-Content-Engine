@@ -140,13 +140,41 @@ Risk: medium — touches provisioning and quota defaults. Schema change likely (
 
 **D1. Email branding. `S`** — put the real logo in the header (we generated it: `brand/drift-li/png/drift-lockup-on-dark/…`), served from `frontend/public/drift/`, and align the header gradient to the brand ink. Check it renders in Gmail, Outlook and Apple Mail (no background images, fixed pixel width, alt text).
 
-**D2. Stripe receipts. `S–M`, partly Keith's** — Keith saw a successful test payment with **no official receipt**. Two halves: Stripe Dashboard must have "Successful payments" emails on, with the business name and address filled in (Keith's Update Stripe Branding item); our half is setting `invoice_creation` / receipt email on the Checkout session so Stripe has an address to send to. Verify with one test payment end to end.
+**D2. Stripe receipts. `S–M`. OUR HALF SHIPPED 2026-09-26; Keith's half still owed.**
+_As built (21 checks against a stubbed Stripe client + a throwaway Postgres): the Checkout
+session now sets `customer_creation: "always"` and `invoice_creation`, so Stripe raises a real
+numbered invoice — a document with the business name and address on it — instead of a bare
+payment. `fulfillSession` reads its `hosted_invoice_url` back and the "payment received" email
+carries it, which is what makes this work **in test mode**: Stripe's automatic receipt is a
+live-mode Dashboard setting, so Keith's test payment was never going to produce one whatever we
+did. A missing or not-yet-finalized invoice simply means no link — never a dead one._
+_`sendTemplated` gained `appendHtml` for that: a block that only sometimes exists cannot live in
+an editable template field. The back office's Orders (both the tab and a page's own) now link
+straight to the payment in Stripe — test or live, matching the key — for when someone asks._
+_**Still Keith's**: Dashboard → Settings → Emails, "Successful payments" ON, with the business
+name and address filled in. Then one live-mode payment end to end._
+
+**D2 (original note). `S–M`, partly Keith's** — Keith saw a successful test payment with **no official receipt**. Two halves: Stripe Dashboard must have "Successful payments" emails on, with the business name and address filled in (Keith's Update Stripe Branding item); our half is setting `invoice_creation` / receipt email on the Checkout session so Stripe has an address to send to. Verify with one test payment end to end.
 
 ---
 
 ## E. drift.li landing
 
-**E1. Rework the hero scene. `M–L`**
+**E1. Rework the hero scene. `M–L`. SHIPPED 2026-09-26.**
+_As built (16 browser checks + a screenshot matrix at 1440 / 1366×768 / 1024 / 700 / 412): the
+hero is one centred column — copy over the scene, which runs full width beneath it — and the
+"Take a Tour" chip is gone, along with the demo-tour fetch that only fed it. The rail's four
+names became the **picker**: pick one and the playhead glides there, then the journey carries on
+from it; the pointer still takes it over, touch still scrolls, reduced motion steps._
+_Three things fell out of it. The names are HTML, not the SVG labels they replaced — DriftStage
+is `aria-hidden`, so anything focusable inside it would be unreachable — and they are placed at
+their own stop's share of the stage width, so they stand under their dot at any size (down to
+440px, where they fall back to a centred row). The scene's viewBox was cropped to the art
+(`0 26 480 280`): empty box at either end is empty SCREEN once the stage is a full-width block.
+And the caption no longer hangs off a corner, which is what the iOS alignment complaint was —
+so the phone's 44px band could go._
+
+**E1 (original note). `M–L`**
 _Notes: "that 'Take a Tour' on the right side animation can be removed and the other text needs to be centralized over the animations. Animations can come one by one, with a picker if the user wants to see one by one."_
 Plan: drop the `TakeATour` chip from the scene; centre the hero copy over the animation rather than beside it; keep the world-by-world journey but add an explicit **picker** (Tour · View · Memory · Path) so a visitor can choose, with the auto-advance continuing when untouched.
 Note: the client's own copy and CTAs stay exactly as written — restyle only.
@@ -162,7 +190,29 @@ Note: the client's own copy and CTAs stay exactly as written — restyle only.
 
 ## G. Infrastructure
 
-**G1. Concurrency. `M`** — `ROT3D_PROCESS_CONCURRENCY` is 1. Raising it to 2–3 on the current box is an env change and a restart; the ceiling is ffmpeg running in-process on the same VPS as the API and Postgres. Measure a clip's CPU and memory first, then pick the number — over-raising it will starve the API.
+**G1. Concurrency. `M`. MEASURED 2026-09-26 → the number stays 1.**
+_Three real client clips, 180 frames each (scratchpad `queue-measure.ts`, uploads stubbed):_
+
+| | clip 1 (20.2s) | clip 2 (18.2s) | clip 3 (9.6s) |
+|---|---|---|---|
+| ffmpeg extract, all cores | 0.97s | 0.93s | 0.80s |
+| ffmpeg extract, one core | 2.98s | 2.67s | 2.54s |
+| whole pipeline, wall | 5.00s | 4.28s | 4.11s |
+| node's own CPU | 16.8s | 13.4s | 13.4s |
+| peak memory over baseline | +93 MB | +83 MB | +65 MB |
+| frames out (full + mobile) | 360 files, 8.5 MB | 360, 7.2 MB | 360, 6.4 MB |
+
+_So one drift costs **16–19 CPU-seconds** — only ~2.5s of it ffmpeg; the rest is sharp encoding
+360 WebPs — and ffmpeg is already ~3× parallel, sharp likewise, and the uploads already run 8 at
+a time. **One conversion keeps about three cores busy and never idles on the network**, so on 2
+vCPU a second worker adds no throughput whatever: the same CPU-seconds interleave, both drifts
+take twice as long to appear, and peak memory doubles beside Postgres and the API._
+_What shipped instead is **visibility**, which is what the question was really after: the status
+strip in Admin → drift.li → Tour shows "N Converting · M Waiting" (polled every 10s). A queue
+that is never empty is the evidence for G2 — and the rule for that box is one worker per ~3 free
+cores, memory permitting._
+
+**G1 (original note). `M`**
 **G2. Second VPS. `L`, blocked on Keith** — the real fix is moving processing off the web box: a worker that pulls from the queue over the network. Design once the second box exists; do not build speculatively.
 **G3. iOS fullscreen research. `S`** — largely answered above (impossible for canvas; PWA is the route). Write it up for Keith rather than spending more time.
 
@@ -187,12 +237,23 @@ C1 feature-by-reference · C3 invite-with-limits
 _In the event **neither needed a schema change**, so this deploys with no `db push`: pull,
 build, restart. Both are covered by throwaway-Postgres suites (43 + 27 checks)._
 
-**Pass 5 — payments, landing, infra**
+**Pass 5 — DONE 2026-09-26** _(payments, landing, infra)_
 D2 receipts · E1 hero rework · G1 concurrency measurement
+_No schema change. D2's other half is Keith's Stripe Dashboard branding; G1's answer was "leave
+it at 1 and show the queue", so the only infrastructure work left is G2, still blocked on the
+second box._
 
 ---
 
 ## Decisions
+
+**Settled 2026-09-26 (pass 5)**
+- **E1 reads "over" as centred above and in front of, not lying on top of.** Text over the
+  drawing would have needed a scrim and would still have fought the rail; the plan's own wording
+  ("centre the hero copy over the animation rather than beside it") is satisfied by one centred
+  column, and it survives a phone.
+- **G1: more workers is the wrong lever on this box.** Numbers in G1 above. The lever is a
+  second box (G2); until then the queue is at least visible.
 
 **Settled 2026-09-26**
 - **C1 keeps no copy at all.** An entry that points has nothing to go stale, but it also means a

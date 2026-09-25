@@ -248,7 +248,8 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
     key: "tour.order.paid.creator",
     essential: true,
     name: "Drifts paid (to the buyer)",
-    description: "Confirms a tour checkout and says the drifts are converting. Stripe sends its own receipt when receipts are on.",
+    description:
+      "Confirms a tour checkout and says the drifts are converting. A link to Stripe's hosted invoice — the buyer's receipt — is added under the body whenever one is ready.",
     trigger: "A tour checkout is paid",
     audience: "The person who checked out",
     vars: [

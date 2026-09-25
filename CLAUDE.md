@@ -29,8 +29,14 @@ One codebase, multiple product lines (scoped by host + `Organization.productLine
 - **DB**: PostgreSQL, **local on the VPS** (single box).
 - **Storage**: managed media (Cloudflare R2) via `backend/src/utils/managedStorage.ts`,
   namespaced (`drift/…`).
-- **Media processing**: ffmpeg in-process on the VPS (frame extraction). This is the
-  scaling ceiling (uncapped in-process work).
+- **Media processing**: ffmpeg in-process on the VPS (frame extraction), gated by
+  `services/rotation3d/processingQueue.ts` (`ROT3D_PROCESS_CONCURRENCY`, default 1). This is the
+  scaling ceiling. **Measured 2026-09-26**: one 180-frame drift costs 16–19 CPU-seconds (only
+  ~2.5s of it ffmpeg; the rest is sharp encoding 360 WebPs) and 65–95 MB at its peak, and both
+  ffmpeg and sharp already run ~3× parallel while the uploads run 8-wide — so one conversion
+  keeps ~3 cores busy and never idles. On 2 vCPU a second worker adds NO throughput; leave the
+  number at 1 until processing has its own box. Admin → drift.li → Tour shows the queue
+  ("N Converting · M Waiting", polled every 10s) so congestion is visible.
 - **Infra**: `cloudflare/` (gitignored — use `git add -f`) holds the OG worker + setup docs.
 
 ## Deploy flow (important)
@@ -359,7 +365,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `relinkAllFlows()` at boot, re-run when a drift turns READY) — the player ignores them for tour
   drifts, but they remain the stored truth for anything that reads a product's CTAs.
 - **Pay per drift** (`services/driftBilling.ts`): free while `Organization.freeDrifts` last, then
-  `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour) → webhook
+  `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour, with
+  `customer_creation: "always"` + `invoice_creation` since 2026-09-26, so Stripe raises a real
+  numbered invoice — the buyer's receipt, carrying the business name and address; `fulfillSession`
+  reads its `hosted_invoice_url` back and `sendTourOrderPaidEmails` puts it in the "payment
+  received" email via `sendTemplated`'s `appendHtml`, which is what makes a receipt exist in TEST
+  mode at all — Stripe's automatic one is a live-mode Dashboard setting, still owed by the client.
+  `stripePaymentUrl()` gives the back office a link straight to the payment) → webhook
   `/api/drift/billing/webhook` (raw body, mounted BEFORE express.json; events `checkout.session.completed` / `.async_payment_succeeded` /
   `.async_payment_failed` → order FAILED, drifts due again / `.expired`) or return-page confirm → PAID,
   `hostingExpiresAt` +1y (not enforced yet) → processed. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
@@ -535,7 +547,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   page PATCH — of the four quota columns only those two still bite a tour page (tours are unlimited, per-tour drifts
   are capped by `TOUR_MAX_DRIFTS_PER_TOUR`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on
-  two lines on desktop, four product cards). The hero's right side is **`rotation3d/DriftHomeScene.tsx`**
+  two lines on desktop, four product cards). **Reworked 2026-09-26 (client)**: the hero is ONE CENTRED
+  COLUMN — the copy over the scene, which runs full width beneath it — and the "Take a Tour" chip over the
+  scene is gone (with the demo-tour fetch that only fed it; `TakeATour` deleted). The rail's four names are
+  now a **picker** (`.dh-pick` in DriftHomeScene): pick one and the playhead glides there, then the journey
+  carries on from it. They are HTML, not SVG labels — `DriftStage` is `aria-hidden`, so anything focusable
+  inside it is unreachable — and each is placed at `stopPct(i)` (its stop's share of the stage width) so it
+  stands under its own dot at any size; below 440px they fall back to a centred row. The scene's viewBox is
+  cropped to the art (`BOX = 0 26 480 280`, stage `aspect-ratio:480/280`, horizon 73%): empty box at either
+  end becomes empty screen once the stage is a full-width block. The world colours (`--w-cyan/violet/emerald`)
+  live on `.dh-visual`, not the SVG, so the picker and caption wear them too — a world's class remaps
+  `--accent`, and cyan is left alone (remapping it to itself is a cycle). Nothing hangs off a corner any
+  more, which is what the iOS alignment complaint was. A short screen (`min-width:1024px and
+  max-height:900px`) scales the hero down so the picker is in the first view on a 768px laptop.
+  The hero's scene is **`rotation3d/DriftHomeScene.tsx`**
   (2026-09-17): this is the parent page, so one Drift frame stands on the shared `DriftStage` floor with all
   four worlds drawn side by side inside it (Tour room + stops · View horizon + sightline · Memory frames +
   Private badge · Path route + nodes), each in its product colour (cyan / cyan / violet / emerald), while a

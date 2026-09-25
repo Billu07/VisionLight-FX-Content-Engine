@@ -51,6 +51,29 @@ export const formatMoney = (cents: number, currency = DRIFT_CURRENCY) => {
 
 const longDate = (d: Date) => d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
+/** The Stripe Dashboard page for a payment — test or live, matching the key in use. */
+export const stripePaymentUrl = (paymentIntentId: string | null | undefined): string | null =>
+  paymentIntentId ? `https://dashboard.stripe.com/${STRIPE_SECRET_KEY.startsWith("sk_test") ? "test/" : ""}payments/${paymentIntentId}` : null;
+
+/**
+ * The hosted invoice for a paid session — the buyer's receipt.
+ *
+ * Stripe raises it right after the payment, so at `checkout.session.completed` it may be a
+ * moment from being finalized and have no hosted URL yet. That is not worth holding anything up
+ * for: no link simply means the email goes without one.
+ */
+async function receiptUrlFor(session: Stripe.Checkout.Session): Promise<string | null> {
+  const id = typeof session.invoice === "string" ? session.invoice : session.invoice?.id;
+  if (!id) return null;
+  try {
+    const invoice = await stripe().invoices.retrieve(id);
+    return invoice.hosted_invoice_url || invoice.invoice_pdf || null;
+  } catch (err: any) {
+    console.warn(`[${NS}] invoice ${id} unreadable: ${err?.message || err}`);
+    return null;
+  }
+}
+
 /** What the builder shows: free drifts left, the price, whether checkout is on. */
 export async function billingSummary(orgId: string, unlimited: boolean) {
   const [org, usedFreeDrifts] = await Promise.all([
@@ -246,6 +269,18 @@ async function openFlowCheckout(args: CheckoutArgs) {
       success_url: `${back}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${back}?checkout=cancel`,
       customer_email: args.email || undefined,
+      // A Customer, and an invoice raised against it: that is what makes a numbered document
+      // with our business name and address on it, which a bare payment never produces. Stripe
+      // finalizes and hosts it; `fulfillSession` then puts the link in the email we send.
+      customer_creation: "always",
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: `${quantity} drift${quantity === 1 ? "" : "s"} in "${flow.name}" — conversion + 1 year of hosting`,
+          footer: "Conversion and one year of hosting are included with every drift.",
+          metadata: { orderId: order.id, flowId: flow.id },
+        },
+      },
       client_reference_id: order.id,
       metadata: { orderId: order.id, organizationId: args.orgId, flowId: flow.id },
       payment_intent_data: { metadata: { orderId: order.id, flowId: flow.id } },
@@ -367,13 +402,18 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
 
   for (const p of result.products) void startPaidProcessing(p);
   console.log(`[${NS}] order ${orderId} PAID — converting ${result.products.length} drift(s)`);
-  void notifyPaid(result.order, result.products.length, expires).catch((err) =>
+  void notifyPaid(result.order, result.products.length, expires, await receiptUrlFor(session)).catch((err) =>
     console.error(`[${NS}] paid emails failed for ${orderId}:`, err),
   );
   return { status: "paid" as const, orderId, started: result.products.length };
 }
 
-async function notifyPaid(order: { userId: string | null; flowId: string | null; amountCents: number; currency: string }, quantity: number, expires: Date) {
+async function notifyPaid(
+  order: { userId: string | null; flowId: string | null; amountCents: number; currency: string },
+  quantity: number,
+  expires: Date,
+  receiptUrl: string | null,
+) {
   const [user, flow] = await Promise.all([
     order.userId ? prisma.user.findUnique({ where: { id: order.userId }, select: { email: true, name: true } }) : null,
     order.flowId
@@ -391,6 +431,7 @@ async function notifyPaid(order: { userId: string | null; flowId: string | null;
     amount: formatMoney(order.amountCents, order.currency),
     url: flow ? `${APP_URL}${flowPublicPath(flow.kind, flow.organization?.slug, flow.slug)}` : APP_URL,
     hostedUntil: longDate(expires),
+    receiptUrl,
   });
 }
 

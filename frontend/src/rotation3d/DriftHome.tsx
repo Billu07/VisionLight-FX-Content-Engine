@@ -1,20 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { apiEndpoints } from "../lib/api";
-import { prefetchDriftPath } from "./driftNav";
-import { loadDriftPlayer } from "../routeChunks";
 import { Arrow, DriftSiteShell, WaitlistDialog } from "./driftSite";
 import { HomeScene, HOME_SCENE_STYLES } from "./DriftHomeScene";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
- * Movement": beside the headline stands one Drift on the shared grid floor, with all four
- * worlds passing through it as the playhead travels (DriftHomeScene — this is the parent
- * page, so the hero carries Tour · View · Memory · Path, and "Take a Tour" starts the demo
- * tour). Below: Tour (available now) and View · Memory · Path (coming soon, each with a
- * wait list), then one closing call. On the drift design tokens — the glow is dark-theme
- * only, light stays flat. Header, footer and the wait-list dialog come from driftSite
- * (shared with the /view, /memory and /path landings).
+ * Movement": the headline stands centred over one Drift on the shared grid floor, with all
+ * four worlds passing through it as the playhead travels, and a picker under the rail for
+ * anyone who would rather choose (DriftHomeScene; reworked 2026-09-26 from two columns, and
+ * the "Take a Tour" chip over the scene went with it — the client asked for it gone, and the
+ * page's own CTAs already lead into Tour). Below: Tour (available now) and View · Memory ·
+ * Path (coming soon, each with a wait list), then one closing call. On the drift design
+ * tokens — the glow is dark-theme only, light stays flat. Header, footer and the wait-list
+ * dialog come from driftSite (shared with the /view, /memory and /path landings).
  */
 
 type Product = {
@@ -73,9 +71,16 @@ const PRODUCTS: Product[] = [
 ];
 
 const STYLES = `
-/* ── Hero ── */
-.dh-hero{display:grid;gap:clamp(34px,6vw,56px);align-items:center;padding:clamp(34px,6vw,80px) 0 clamp(28px,4vw,52px)}
-@media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px}}
+/* ── Hero ──
+   One centred column: the copy over the scene, which now runs the full width beneath it
+   (client, 2026-09-26). The scene is pulled up under the CTA so the two read as one block
+   rather than a headline with a picture below it. */
+.dh-hero{display:grid;justify-items:center;text-align:center;gap:0;padding:clamp(22px,3.4vw,44px) 0 clamp(18px,2.6vw,30px)}
+.dh-copy{position:relative;z-index:2;max-width:min(100%,940px)}
+/* Capped, and pulled up under the CTA: at full width the Drift dwarfs the words it belongs to,
+   and the picker ends up a screen further down than the headline. */
+.dh-hero .dh-visual{width:100%;max-width:min(100%,720px);margin-top:clamp(-16px,-1.1vw,-4px)}
+@media(min-width:1440px){.dh-hero .dh-visual{max-width:780px}}
 .dh-kicker{display:inline-flex;align-items:center;gap:14px;font-size:12.5px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
 .dh-kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .dh-h1{margin:22px 0 0;font-size:clamp(44px,7.4vw,106px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}
@@ -84,20 +89,23 @@ const STYLES = `
 @media(min-width:1024px){.dh-h1{font-size:clamp(52px,5.1vw,80px)}.dh-h1 .ln{white-space:nowrap}}
 .dh-h1 em{font-style:normal;color:var(--accent)}
 .drift-ui[data-theme="dark"] .dh-h1 em{background:linear-gradient(90deg,#22d3ee 0%,#38bdf8 48%,#a78bfa 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.dh-lead{margin:24px 0 0;font-size:clamp(18px,2.1vw,24px);line-height:1.45;color:var(--muted);max-width:30ch}
+.dh-lead{margin:24px auto 0;font-size:clamp(18px,2.1vw,24px);line-height:1.45;color:var(--muted);max-width:34ch}
 .dh-kinds{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:26px;font-size:15.5px;font-weight:650;letter-spacing:.05em;color:var(--muted)}
+.dh-copy .dh-kinds{justify-content:center}
 .dh-kinds i{font-style:normal;color:var(--faint)}
 .dh-go{display:inline-flex;align-items:center;gap:12px;margin-top:32px;padding:17px 30px;border-radius:999px;font-size:16px;font-weight:700;text-decoration:none}
+/* A short screen (a 768px laptop, a phone turned sideways): the hero gives back the room the
+   copy was taking, so the scene AND its picker are in the first view rather than below it. */
+@media(min-width:1024px) and (max-height:900px){
+  .dh-hero{padding-top:18px}
+  .dh-h1{font-size:clamp(42px,3.9vw,60px);margin-top:16px}
+  .dh-lead{margin-top:16px;font-size:clamp(17px,1.5vw,20px)}
+  .dh-copy .dh-kinds{margin-top:16px}
+  .dh-go{margin-top:20px;padding:14px 26px;font-size:15px}
+  .dh-hero .dh-visual{max-width:min(100%,600px)}
+}
 .dh-go svg,.dh-pill svg{transition:transform .2s}
 .dh-go:hover svg,.dh-pill:hover svg{transform:translateX(3px)}
-
-/* ── Hero scene (the four worlds on the grid — DriftHomeScene) ── */
-.dh-chip{position:absolute;z-index:6;display:inline-flex;align-items:center;gap:9px;padding:8px 14px;border-radius:12px;
-  font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;line-height:1;color:var(--text);
-  background:color-mix(in srgb,var(--surface) 80%,transparent);border:1px solid var(--border);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.dh-chip-explore{top:0;right:0;border-radius:999px;color:var(--accent);border-color:var(--accent-border);text-decoration:none;transition:background .16s}
-a.dh-chip-explore:hover{background:var(--accent-soft)}
-@media(max-width:560px){.dh-chip{font-size:9.5px;letter-spacing:.12em;padding:6px 10px}}
 
 /* ── Products ── */
 .dh-section{margin-top:clamp(28px,5vw,56px)}
@@ -153,40 +161,8 @@ const Kinds = () => (
   </div>
 );
 
-/** "Take a Tour" over the scene — the client's CTA, which starts drift.li's demo tour.
- *  Opening it should be instant, so drift #1 and the player's code are fetched on intent. */
-function TakeATour({ tour }: { tour: any }) {
-  const startPath: string | null = tour?.entryPath || tour?.publicPath || null;
-  if (!startPath) return null;
-  const warm = () => {
-    prefetchDriftPath(startPath);
-    loadDriftPlayer().catch(() => undefined);
-  };
-  return (
-    <Link className="dh-chip dh-chip-explore" to={startPath} onPointerEnter={warm} onTouchStart={warm} onFocus={warm}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" />
-      </svg>
-      Take a Tour
-    </Link>
-  );
-}
-
 export default function DriftHome() {
   const [waitFor, setWaitFor] = useState<Product | null>(null);
-  const [tour, setTour] = useState<any>(null);
-
-  useEffect(() => {
-    let alive = true;
-    // drift.li's demo tour (Admin → drift.li → Tour → Demo tour) fills the live view.
-    apiEndpoints
-      .driftPublicFlow("tour", "demo")
-      .then((r) => alive && setTour(r.data?.flow || null))
-      .catch(() => alive && setTour(null));
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   return (
     <DriftSiteShell className="dh">
@@ -194,7 +170,7 @@ export default function DriftHome() {
       <style>{STYLES}</style>
 
         <section className="dh-hero t-rise">
-          <div style={{ minWidth: 0 }}>
+          <div className="dh-copy">
             <div className="dh-kicker">Drift Live Interactive</div>
             <h1 className="dh-h1">
               <span className="ln">You Control</span>{" "}
@@ -209,7 +185,7 @@ export default function DriftHome() {
               <Arrow />
             </Link>
           </div>
-          <HomeScene action={<TakeATour tour={tour} />} />
+          <HomeScene />
         </section>
 
         <section className="dh-section" aria-label="Tour, View, Memory and Path">

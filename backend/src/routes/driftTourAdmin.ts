@@ -3,10 +3,11 @@ import { prisma } from "../services/database";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { FlowError, flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
 import { channelStatus, ensureChannel, resolveOwnFeatures, saveToChannel } from "../services/driftChannel";
-import { DRIFT_PRICE_CENTS, formatMoney, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
+import { DRIFT_PRICE_CENTS, formatMoney, stripePaymentUrl, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
 import { createProInvite, listProInvites, memberRole, parseAccountType, revokeProInvite } from "../services/driftTourAccounts";
 import { uniqueOrgSlug } from "./drift";
 import { sendWaitlistNoticeEmail } from "../services/mail";
+import { processingQueueDepth } from "../services/rotation3d/processingQueue";
 
 // drift.li Tour v2 back office (TOUR_V2_PLAN.md P5): the superadmin's view of every
 // tour page — owners, General / Pro, managing Pro, tours, drifts, payments — plus
@@ -47,7 +48,15 @@ const readLimits = (body: any): { data: Record<string, unknown> } | { error: str
 };
 
 router.get("/api/drift/admin/tour/status", ...guard, (_req: AuthenticatedRequest, res: Response) => {
-  res.json({ payments: stripeConfigured(), webhook: stripeWebhookConfigured(), price: formatMoney(DRIFT_PRICE_CENTS) });
+  res.json({
+    payments: stripeConfigured(),
+    webhook: stripeWebhookConfigured(),
+    price: formatMoney(DRIFT_PRICE_CENTS),
+    // Conversions in flight on this box. A drift takes 16-19 CPU-seconds to build
+    // (services/rotation3d/processingQueue.ts), so a queue that is never empty is the
+    // signal that processing needs a box of its own — not that anything is broken.
+    queue: processingQueueDepth(),
+  });
 });
 
 // Every tour page (search by name, link or an admin's email).
@@ -180,6 +189,7 @@ async function pageDetail(id: string) {
       tour: o.flowId ? flowName.get(o.flowId) || null : null,
       createdAt: o.createdAt,
       paidAt: o.paidAt,
+      stripeUrl: stripePaymentUrl(o.stripePaymentIntentId),
     })),
     clientPages: clientPages.map((c) => ({ id: c.id, name: c.name, path: c.slug ? pagePublicPath(c.slug) : null })),
     invites,
@@ -398,6 +408,8 @@ router.get("/api/drift/admin/tour/orders", ...guard, async (_req: AuthenticatedR
         pagePath: o.organization?.slug ? pagePublicPath(o.organization.slug) : null,
         tour: f?.name || null,
         tourPath: f ? flowPublicPath(f.kind, f.organization?.slug, f.slug) : null,
+        // Straight to the payment in Stripe — the receipt, the refund button, the card used.
+        stripeUrl: stripePaymentUrl(o.stripePaymentIntentId),
       };
     }),
   });

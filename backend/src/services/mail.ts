@@ -227,6 +227,18 @@ const esc = (v: unknown) =>
     .replace(/"/g, "&quot;");
 
 /** A small, email-safe branded HTML shell so platform emails look consistent. */
+/**
+ * Marks the end of a message's own body, so a sender can append a block after it (see
+ * `TemplatedSend.appendHtml`). It is an HTML comment: invisible in every mail client, and
+ * unique enough that a template's own copy cannot collide with it.
+ */
+export const BODY_SLOT = "<!--body-end-->";
+
+/** A quiet line with a link, for a block appended to a templated email. */
+export const linkBlock = (label: string, url: string) =>
+  `<p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#3a4150">` +
+  `<a href="${esc(url)}" style="color:#0b7f96;font-weight:600">${esc(label)}</a></p>`;
+
 export function renderEmail(opts: {
   heading: string;
   intro?: string;
@@ -262,7 +274,7 @@ export function renderEmail(opts: {
           <h1 style="margin:0 0 10px;font-size:20px;color:#0b0f19">${esc(opts.heading)}</h1>
           ${opts.intro ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3a4150">${esc(opts.intro)}</p>` : ""}
           ${rows ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0">${rows}</table>` : ""}
-          ${opts.bodyHtml || ""}
+          ${opts.bodyHtml || ""}${BODY_SLOT}
           ${cta ? `<table role="presentation" cellpadding="0" cellspacing="0">${cta}</table>` : ""}
           ${opts.footnote ? `<p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#8a93a3">${esc(opts.footnote)}</p>` : ""}
         </td></tr>
@@ -358,6 +370,12 @@ export async function renderTemplated(
 }
 
 export type TemplatedSend = TemplatedRender & {
+  /**
+   * HTML appended to the template's own body. For a block that only sometimes exists — a
+   * receipt link, say — which a template field cannot express: left in the copy it would
+   * render as a dead link on every send that has nothing to put in it.
+   */
+  appendHtml?: string;
   /** the audience when recipients are left on "default" */
   defaultTo: string[];
   replyTo?: string;
@@ -386,7 +404,7 @@ export async function sendTemplated(key: string, opts: TemplatedSend): Promise<v
     to,
     bcc: opts.forceTo ? undefined : parseEmailList(r.override.bcc),
     subject: r.subject,
-    html: r.html,
+    html: opts.appendHtml ? r.html.replace(BODY_SLOT, `${BODY_SLOT}${opts.appendHtml}`) : r.html,
     replyTo: opts.replyTo,
     essential: !!templateByKey(key)?.essential,
     category: key,
@@ -577,6 +595,8 @@ export async function sendTourOrderPaidEmails(params: {
   amount: string;
   url: string;
   hostedUntil: string;
+  /** Stripe's hosted invoice for this payment — the buyer's receipt, when it is ready. */
+  receiptUrl?: string | null;
 }): Promise<void> {
   const vars = {
     name: params.buyerName || "",
@@ -595,9 +615,19 @@ export async function sendTourOrderPaidEmails(params: {
     ["Hosted until", params.hostedUntil],
   ];
   if (params.buyerEmail) {
-    await sendTemplated("tour.order.paid.creator", { vars, defaultTo: [params.buyerEmail], rows });
+    await sendTemplated("tour.order.paid.creator", {
+      vars,
+      defaultTo: [params.buyerEmail],
+      rows,
+      appendHtml: params.receiptUrl ? linkBlock("View or download your receipt", params.receiptUrl) : undefined,
+    });
   }
-  await sendTemplated("tour.order.paid.notice", { vars, defaultTo: ADMIN_EMAILS, rows });
+  await sendTemplated("tour.order.paid.notice", {
+    vars,
+    defaultTo: ADMIN_EMAILS,
+    rows,
+    appendHtml: params.receiptUrl ? linkBlock("The buyer's receipt", params.receiptUrl) : undefined,
+  });
 }
 
 /** "Invite a Pro": the one-time link to the invited photographer / videographer. */

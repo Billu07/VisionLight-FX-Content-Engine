@@ -52,7 +52,17 @@ type PageDetail = {
     counts: { steps: number; ready: number; processing: number; failed: number; awaiting: number };
     updatedAt: string;
   }[];
-  orders: { id: string; status: string; quantity: number; amount: string; tour: string | null; createdAt: string; paidAt: string | null }[];
+  orders: {
+    id: string;
+    status: string;
+    quantity: number;
+    amount: string;
+    tour: string | null;
+    createdAt: string;
+    paidAt: string | null;
+    /** The payment in Stripe — its invoice, its card, its refund button. Null until it's paid. */
+    stripeUrl: string | null;
+  }[];
   clientPages: { id: string; name: string; path: string | null }[];
   invites: InviteRow[];
 };
@@ -80,6 +90,7 @@ type OrderRow = {
   pagePath: string | null;
   tour: string | null;
   tourPath: string | null;
+  stripeUrl: string | null;
 };
 type WaitRow = { id: string; email: string; product: string; source: string | null; createdAt: string };
 type Msg = { kind: "ok" | "err"; text: string } | null;
@@ -432,6 +443,11 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
                     {o.tour || "—"} · {when(o.paidAt || o.createdAt)}
                   </span>
                 </span>
+                {o.stripeUrl && (
+                  <a className="d-btn ghost sm" href={o.stripeUrl} target="_blank" rel="noopener noreferrer" title="The payment in Stripe — receipt, card, refund">
+                    Stripe ↗
+                  </a>
+                )}
                 <span className={`d-pill ${pill(o.status)}`}>{o.status}</span>
               </div>
             ))}
@@ -803,6 +819,12 @@ function Orders() {
                 </div>
               </div>
               <div className="d-actions">
+                {/* Straight to the payment: its invoice (the buyer's receipt), card and refund. */}
+                {o.stripeUrl && (
+                  <a className="d-btn ghost sm" href={o.stripeUrl} target="_blank" rel="noopener noreferrer" title="The payment in Stripe — receipt, card, refund">
+                    Stripe ↗
+                  </a>
+                )}
                 {o.tourPath && (
                   <a className="d-btn sm" href={onDrift(o.tourPath)} target="_blank" rel="noopener noreferrer">
                     Tour ↗
@@ -978,12 +1000,27 @@ function DriftChannel() {
 
 export default function DriftTourAdmin() {
   const [tab, setTab] = useState<"pages" | "channel" | "demo" | "orders" | "waitlist">("pages");
-  const [status, setStatus] = useState<{ payments: boolean; webhook: boolean; price: string } | null>(null);
+  const [status, setStatus] = useState<{
+    payments: boolean;
+    webhook: boolean;
+    price: string;
+    queue?: { active: number; waiting: number; concurrency: number };
+  } | null>(null);
+  // Conversions are the one thing here that a creator waits on, so the strip keeps up with
+  // them: every 10s while this panel is open.
   useEffect(() => {
-    apiEndpoints
-      .driftTourAdminStatus()
-      .then((r) => setStatus(r.data))
-      .catch(() => undefined);
+    let alive = true;
+    const read = () =>
+      apiEndpoints
+        .driftTourAdminStatus()
+        .then((r) => alive && setStatus(r.data))
+        .catch(() => undefined);
+    void read();
+    const t = setInterval(read, 10000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, []);
   const tabs = [
     ["pages", "Pages"],
@@ -1002,6 +1039,15 @@ export default function DriftTourAdmin() {
             </button>
           ))}
         </div>
+        {status?.queue && (status.queue.active > 0 || status.queue.waiting > 0) && (
+          <span
+            className={`d-pill ${status.queue.waiting > 0 ? "warn" : ""}`}
+            title={`This server converts ${status.queue.concurrency} drift${status.queue.concurrency === 1 ? "" : "s"} at a time. A drift takes about 16-19 CPU-seconds to build.`}
+          >
+            {status.queue.active} Converting
+            {status.queue.waiting > 0 ? ` · ${status.queue.waiting} Waiting` : ""}
+          </span>
+        )}
         {status && (
           <span
             className={`d-pill ${status.payments && status.webhook ? "ok" : "warn"}`}
