@@ -183,8 +183,12 @@ const loadFlow = (orgId: string, id: string) =>
  * step, pin and reel routes underneath. Reads pass (they resolve through the pointer), and so
  * does DELETE, which removes the entry and simply un-features the tour.
  */
-router.use("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+router.use("/api/drift/my/flows/:id", async (req: AuthenticatedRequest, res, next) => {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") return next();
+  // Deliberately NOT behind authenticateToken: every route below already runs it, and running
+  // it twice would validate the session twice on every write. A caller with no token falls
+  // straight through to the route's own 401, so nothing is looked up for a stranger either.
+  if (!req.headers.authorization) return next();
   const flow = await prisma.driftFlow.findUnique({ where: { id: req.params.id }, select: { settings: true } });
   if (!flow || !featureSourceId(flow.settings)) return next();
   return res.status(409).json({
