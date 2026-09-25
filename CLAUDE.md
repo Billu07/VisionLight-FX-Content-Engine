@@ -203,8 +203,11 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     player, so `r3d-auto-fs` hides the fullscreen button while that takeover is in charge — it
     appearing "instead" was the complaint, and it appears because a phone in landscape is ~844px
     wide, past the `max-width:560px` rule that hides reset+fullscreen on a drift. Rotating back is
-    the way out (and clears the class). A phone's player also drops the Terms · Privacy line and the
-    credit badge (`@media(max-width:560px)`, tour drifts only) — the pages around it carry both.
+    the way out (and clears the class). A TOUCH screen's player also drops the Terms · Privacy
+    line and the credit badge — `@media (pointer: coarse), (max-width:560px)`, tour drifts only.
+    Keyed to the pointer, NOT to width: a phone turned sideways is ~844px wide, so a width rule
+    stopped matching exactly where the client wanted them gone (the fullscreen landscape player).
+    A desktop keeps both, either way up — asserted in fs-probe so it cannot drift.
     **The chrome in full screen** (2026-09-24, client): the +/- zoom column is hidden in REAL
     fullscreen (`:fullscreen`, `:-webkit-full-screen`, `.r3d-pseudo-fs` — three separate rules, since
     one selector an old browser cannot parse would drop the whole list); wheel and pinch still zoom. The

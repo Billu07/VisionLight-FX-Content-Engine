@@ -2494,7 +2494,11 @@ const R3D_CSS = `
    the same thing only gets in the way. And on a phone the room is the point: the legal
    line and the credit belong to the pages around the drift, which still carry both. */
 .r3d-auto-fs .r3d-iconbtn[data-fs]{display:none}
-@media(max-width:560px){
+/* Any TOUCH screen, either way up — not a width. A phone turned sideways is ~844px wide, so
+   a width rule stopped matching exactly where it mattered most: the fullscreen landscape
+   player, which is the one place the client wanted them gone (2026-09-26). A desktop keeps
+   both, and so does every non-tour drift. */
+@media (pointer: coarse), (max-width: 560px) {
   .r3d-tour .r3d-legal,.r3d-tour .r3d-powered-badge{display:none}
 }
 /* A desktop in fullscreen keeps its band, so the ground below the drift is visible again —
