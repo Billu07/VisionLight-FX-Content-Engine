@@ -58,20 +58,28 @@ export const stripePaymentUrl = (paymentIntentId: string | null | undefined): st
 /**
  * The hosted invoice for a paid session — the buyer's receipt.
  *
- * Stripe raises it right after the payment, so at `checkout.session.completed` it may be a
- * moment from being finalized and have no hosted URL yet. That is not worth holding anything up
- * for: no link simply means the email goes without one.
+ * Stripe raises it right after the payment, so the first look can land while it is still being
+ * finalized and carry no hosted URL. Hence the second and third look: this runs off the critical
+ * path (see `notifyPaid`), so waiting a few seconds for a link costs nothing, and a receipt the
+ * buyer can open is the whole point of the exercise. If it never appears the email simply goes
+ * without one — never with a dead link.
  */
-async function receiptUrlFor(session: Stripe.Checkout.Session): Promise<string | null> {
+async function receiptUrlFor(session: Stripe.Checkout.Session, tries = 3): Promise<string | null> {
   const id = typeof session.invoice === "string" ? session.invoice : session.invoice?.id;
   if (!id) return null;
-  try {
-    const invoice = await stripe().invoices.retrieve(id);
-    return invoice.hosted_invoice_url || invoice.invoice_pdf || null;
-  } catch (err: any) {
-    console.warn(`[${NS}] invoice ${id} unreadable: ${err?.message || err}`);
-    return null;
+  for (let i = 0; i < tries; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const invoice = await stripe().invoices.retrieve(id);
+      const url = invoice.hosted_invoice_url || invoice.invoice_pdf || null;
+      if (url) return url;
+    } catch (err: any) {
+      console.warn(`[${NS}] invoice ${id} unreadable: ${err?.message || err}`);
+      return null;
+    }
   }
+  console.warn(`[${NS}] invoice ${id} had no hosted link yet — the paid email goes without it`);
+  return null;
 }
 
 /** What the builder shows: free drifts left, the price, whether checkout is on. */
@@ -402,7 +410,8 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
 
   for (const p of result.products) void startPaidProcessing(p);
   console.log(`[${NS}] order ${orderId} PAID — converting ${result.products.length} drift(s)`);
-  void notifyPaid(result.order, result.products.length, expires, await receiptUrlFor(session)).catch((err) =>
+  // Not awaited: Stripe is waiting on this webhook's 200, and the receipt can take a moment.
+  void notifyPaid(result.order, result.products.length, expires, session).catch((err) =>
     console.error(`[${NS}] paid emails failed for ${orderId}:`, err),
   );
   return { status: "paid" as const, orderId, started: result.products.length };
@@ -412,9 +421,10 @@ async function notifyPaid(
   order: { userId: string | null; flowId: string | null; amountCents: number; currency: string },
   quantity: number,
   expires: Date,
-  receiptUrl: string | null,
+  session: Stripe.Checkout.Session,
 ) {
-  const [user, flow] = await Promise.all([
+  const [receiptUrl, user, flow] = await Promise.all([
+    receiptUrlFor(session),
     order.userId ? prisma.user.findUnique({ where: { id: order.userId }, select: { email: true, name: true } }) : null,
     order.flowId
       ? prisma.driftFlow.findUnique({
