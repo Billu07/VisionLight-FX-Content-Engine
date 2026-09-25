@@ -83,7 +83,9 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
           </Link>
         </>
       )}
-      <div className="d-eyebrow">Tour</div>
+      {/* The header already reads "drift.li TOUR"; on a phone this second one directly
+          under it just crowds the corner (client, 2026-09-24). Desktop has the room. */}
+      <div className="d-eyebrow tpw-kind">Tour</div>
       <h1 className="tpw-title">{flow.title || flow.name}</h1>
       {flow.description && <p className="tpw-desc">{flow.description}</p>}
 

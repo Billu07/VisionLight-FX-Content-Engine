@@ -175,6 +175,8 @@ const TOUR_DESKTOP_ZOOM = 1.25;
 // platform surface uses. A brand that set its own colours overrides both.
 const PLATFORM_GROUND = "#0d1119";
 const PLATFORM_ACCENT = "#22d3ee";
+// Where the credit's kind word ("Tour") points: what that product is.
+const CREATOR_LANDING_URL = "/tour";
 // How far the screen's shape may differ from the footage's before we stop covering it.
 // Covering crops whatever overflows, and at 1.35 that was up to a quarter of the room —
 // a vertical clip on a phone lost ~18% of its height. The client's footage is the point
@@ -311,7 +313,7 @@ export default function SpinViewer({
   const handRef = useRef<HTMLDivElement>(null);
   const cueRef = useRef<HTMLDivElement>(null);
   const ctasRef = useRef<HTMLDivElement>(null);
-  const poweredRef = useRef<HTMLAnchorElement>(null);
+  const poweredRef = useRef<HTMLElement>(null);
   const legalRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -1611,7 +1613,9 @@ export default function SpinViewer({
         } else {
           loaderRef.current?.classList.add("r3d-gone");
           if (!hero) stage.focus({ preventScroll: true });
-          window.setTimeout(startIntro, 550); // one-time first-visit drag demo
+          // Sooner: the loader now lifts on the coarse ring rather than the last frame, so
+          // half a second of stillness after it read as nothing happening (client, 2026-09-24).
+          window.setTimeout(startIntro, 200); // one-time first-visit drag demo
         }
       };
       requestAnimationFrame(sweep);
@@ -2140,17 +2144,40 @@ export default function SpinViewer({
         </div>
       )}
 
-      <a
-        ref={poweredRef}
-        className="r3d-powered-badge"
-        href={playerBrand.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`Powered by ${playerBrand.name}`}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>{driftMode ? <>{poweredKind}Powered by <b>Drift Live Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
-      </a>
+      {/* On drift.li BOTH names are links in the accent — the kind ("Tour") to what that is,
+          and the platform to its home (client, 2026-09-24). Two links cannot nest inside one
+          anchor, so the badge is a plain element there and each name carries its own. Every
+          other player keeps the single-anchor badge it has always had. */}
+      {driftMode ? (
+        <div ref={poweredRef as React.RefObject<HTMLDivElement>} className="r3d-powered-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+          <span>
+            {poweredKind ? (
+              <>
+                <a className="r3d-powered-link" href={CREATOR_LANDING_URL}>
+                  {poweredKind.trim()}
+                </a>{" "}
+              </>
+            ) : null}
+            Powered by{" "}
+            <a className="r3d-powered-link" href={playerBrand.url} target="_blank" rel="noopener noreferrer">
+              Drift Live Interactive
+            </a>
+          </span>
+        </div>
+      ) : (
+        <a
+          ref={poweredRef as React.RefObject<HTMLAnchorElement>}
+          className="r3d-powered-badge"
+          href={playerBrand.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Powered by ${playerBrand.name}`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+          <span>Powered by <b>{playerBrand.name}</b></span>
+        </a>
+      )}
 
       {driftMode && termsUrl ? (
         <div className="r3d-legal" ref={legalRef}>
@@ -2562,6 +2589,11 @@ const R3D_CSS = `
 .r3d-powered-badge b{font-weight:700}
 /* Drift: match the "Drift Live Interactive" wordmark accent (cyan) used in the landing header. */
 .r3d-drift .r3d-powered-badge b{color:#22d3ee}
+/* Both names in the credit are links, and they look like it: the accent, and a target big
+   enough to hit on a phone without the badge growing (client, 2026-09-24). */
+.r3d-powered-link{color:#22d3ee;font-weight:700;text-decoration:none;pointer-events:auto;padding:4px 1px;margin:-4px 0}
+.r3d-powered-link:hover{text-decoration:underline}
+.r3d-light .r3d-powered-link{color:#0b7f96}
 .r3d-hero .r3d-powered-badge{display:none!important}
 .r3d-light .r3d-powered-badge{color:#5b6472;text-shadow:none}
 

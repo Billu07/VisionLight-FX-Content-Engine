@@ -340,6 +340,27 @@ const AppBootGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+/**
+ * Every in-app navigation starts at the top of the page it opens.
+ *
+ * React Router keeps the window's scroll offset across a route change, so a link followed
+ * from halfway down a page landed halfway down the next one — which is what made "Learn
+ * More" look like it pointed into the middle of the Tour landing (client, 2026-09-24). It
+ * was never an anchor problem, and it affected every link in the app, not just that one.
+ * A hash link is left alone so #section anchors still do their job.
+ */
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash) return;
+    // "instant", not "auto": App.css sets scroll-behavior:smooth globally, and "auto" defers
+    // to it — which would ANIMATE the jump to the top on every navigation. A route change
+    // should simply start at the top.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname, hash]);
+  return null;
+}
+
 function App() {
   useAutoAppRefresh();
 
@@ -381,6 +402,7 @@ function App() {
         />
         <AppBootGate>
         <Router>
+          <ScrollToTop />
           <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
           <Routes>

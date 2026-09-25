@@ -213,6 +213,12 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     true fullscreen beyond the browser, the same API a video uses. The CSS `r3d-pseudo-fs` is ONLY the
     fallback for iPhone Safari, which grants element fullscreen to `<video>` alone. drift.li pages link
     `/drift.webmanifest` (`display: standalone`), so Add to Home Screen is the chrome-less route there.
+  - **The bottom credit is two links** (2026-09-24, client): on drift.li the badge reads
+    "*Tour* Powered by *Drift Live Interactive*" with BOTH names in the accent and both clickable —
+    the kind word to `/tour`, the platform to its home. Two anchors cannot nest, so in drift mode the
+    badge is a plain element carrying two links (`.r3d-powered-link`); every other player keeps the
+    single-anchor badge, and `poweredRef` is typed `HTMLElement` for both. `isControl` already
+    excludes `.r3d-powered-badge`, so a tap on it never starts a drag.
   - **The player wears drift.li's skin** (2026-09-23, client): the old indigo/purple defaults put a
     purple badge, loading ring and CTA pill on every drift.li drift, so the player looked like a
     different product from the pages around it. `.r3d-drift` now sets `--r3d-primary:#22d3ee` /
@@ -449,6 +455,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (2026-09-23, client): cover + name + drift count, and for a visitor a `.tpg-go` arrow on the right —
   the strip of clickable drift previews and the "Start Tour" button are gone (`TourPathList`), and the row
   opens the tour's PATHWAY, not the tour. Admins keep their tools on the right instead of the arrow.
+  **Client pass 2026-09-24 (Pass 1)**: the Admin/Public icons stay on phones (hiding them left the
+  switch as two bare words); a menu shows ONE "Tour" — the pathway's eyebrow is `.tpw-kind`, hidden
+  under 620px because the header already says it; the page wash gets wider, stronger pools under
+  820px (the desktop percentages cover a few hundred pixels on a phone and fade to flat dark); the
+  channel's Featured / Library counts in Admin → drift.li → Tour are links to the channel.
   New-tour card = `.tpg-new` (accent, big input, scrolls into
   view). Builder toolbar: Start Tour · Insights · Tour Settings · Share|Publish (Unpublish lives in Tour Settings,
   Capture Guide in the meta row). A tour drift's background defaults to drift.li's dark ground
@@ -534,6 +545,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   addresses are left out of every email except `essential` templates (`drift.brand.invite`, `tour.pro.invite`,
   `tour.order.paid.creator`). Supabase's own auth emails (confirm, reset) are set in the Supabase dashboard — the
   address goes there by hand (the project is shared with the studio).
+- **Branded header (2026-09-24)**: `renderEmail` puts the real lockup in the header —
+  `frontend/public/drift/email-logo.png` (from the kit in `brand/drift-li/`), referenced absolutely
+  off `PUBLIC_URL` at a fixed 121×32 with alt text. The header cell sets `background-color` AND
+  `background-image`: Outlook renders it through Word, drops the gradient, and the white logo would
+  otherwise land on white.
 - **Ops owed by user**: VPS env `SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`
   (`pm2 restart --update-env`); drift.li DNS (Namecheap): MX + SPF (via Mail Settings →
   Private Email), DKIM (`default._domainkey`, value from client), DMARC (`_dmarc`).
@@ -553,6 +569,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 - `prisma db push` is manual on the VPS (no migrations). New Prisma fields break queries
   until pushed → run it right after `git pull`, BEFORE build/restart (see VPS operations).
 - Git pushes time out → background + verify.
+- **Navigation starts at the top**: `ScrollToTop` in `App.tsx` (2026-09-24). React Router keeps the
+  window's scroll offset across a route change, so a link followed from halfway down a page landed
+  halfway down the next — read as "the Learn More anchor is wrong", but it affected every in-app
+  link. It scrolls with `behavior:"instant"` on purpose: `App.css` sets `scroll-behavior:smooth`
+  globally and `"auto"` defers to it, which would animate the jump. A hash link is left alone.
 - **Legal pages are per host**: on drift.li (and brand custom domains) `/terms` and `/privacy`
   render `rotation3d/DriftLegal.tsx` — the published Drift Link agreement (Visionlight
   Productions Inc., verbatim from picdrift.com/terms + /privacy, contact picdrift@picdrift.com);

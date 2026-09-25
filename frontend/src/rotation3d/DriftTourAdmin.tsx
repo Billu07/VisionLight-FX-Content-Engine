@@ -694,9 +694,14 @@ function DriftChannel() {
         </div>
       ) : data.channel ? (
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+          {/* The counts are the quickest way to the thing they count (client, 2026-09-24). */}
           <div className="d-meta">
-            <span className="d-pill ok">{data.featured} Featured</span>
-            <span className="d-pill">{data.library} in the Library</span>
+            <a className="d-pill ok" href={onDrift(data.channel.path)} target="_blank" rel="noopener noreferrer" title="Open the channel's Featured Tours">
+              {data.featured} Featured ↗
+            </a>
+            <a className="d-pill" href={onDrift(data.channel.path)} target="_blank" rel="noopener noreferrer" title="Open the channel — the Library is its Hidden Tours, in Admin View">
+              {data.library} in the Library ↗
+            </a>
           </div>
           <ol className="d-sub" style={{ fontSize: 12.5, margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
             <li>Save a tour: Pages → a page → its tours → Save to Library (or in the tour's Tour Settings).</li>

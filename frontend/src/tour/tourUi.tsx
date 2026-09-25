@@ -87,6 +87,18 @@ export const TOUR_STYLES = `
   radial-gradient(52% 44% at 10% 0%, rgba(34,211,238,.13), transparent 70%),
   radial-gradient(48% 40% at 100% 6%, rgba(59,130,246,.15), transparent 70%),
   radial-gradient(60% 50% at 50% 112%, rgba(37,99,235,.10), transparent 70%)}
+/* A phone is too narrow for the wash above to read: the same percentages cover a few
+   hundred pixels instead of a few thousand, so it fades to flat dark and the page looks
+   unlit next to the desktop (client, 2026-09-24). Wider pools, a little more of them. */
+@media(max-width:820px){
+  .t-page::before{background:
+    radial-gradient(120% 38% at 0% 0%, rgba(34,211,238,.20), transparent 72%),
+    radial-gradient(110% 34% at 100% 10%, rgba(59,130,246,.22), transparent 72%),
+    radial-gradient(150% 40% at 50% 104%, rgba(37,99,235,.16), transparent 74%)}
+  .drift-ui[data-theme="light"].t-page::before{background:
+    radial-gradient(120% 38% at 0% 0%, rgba(8,145,178,.14), transparent 72%),
+    radial-gradient(110% 34% at 100% 10%, rgba(59,130,246,.14), transparent 72%)}
+}
 .drift-ui[data-theme="light"].t-page::before{background:
   radial-gradient(52% 44% at 10% 0%, rgba(8,145,178,.10), transparent 70%),
   radial-gradient(48% 40% at 100% 6%, rgba(59,130,246,.10), transparent 70%)}
@@ -365,8 +377,10 @@ export const TOUR_STYLES = `
 }
 @media(max-width:460px){
   .t-brandrow{gap:8px}
-  .t-view .d-tab{padding:7px 10px}
-  .t-view svg{display:none}
+  /* The icons stay: they are how you tell the two views apart at a glance, and dropping
+     them left the switch as two bare words (client, 2026-09-24). The label shortens
+     instead — "Admin View" is already just "Admin" here (see .t-view-x). */
+  .t-view .d-tab{padding:7px 9px;gap:5px}
   .t-page .d-topbar{padding:10px 12px}
   .d-wordmark.t-wordmark{font-size:17px}
   .t-topactions .d-btn.sm{padding:6px 9px;font-size:11px}

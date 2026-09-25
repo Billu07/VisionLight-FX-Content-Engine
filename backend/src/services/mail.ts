@@ -247,13 +247,16 @@ export function renderEmail(opts: {
     opts.ctaLabel && opts.ctaUrl
       ? `<tr><td style="padding-top:22px"><a href="${esc(opts.ctaUrl)}" style="display:inline-block;background:#22d3ee;color:#04121a;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:10px">${esc(opts.ctaLabel)}</a></td></tr>`
       : "";
+  // background-color AND background-image on the header: Outlook renders the table cell
+  // through Word, which drops the gradient — without the flat colour behind it the white
+  // logo would land on white. Fixed pixel width + alt text for the same reason.
   return `<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:28px 12px">
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e9ef">
-        <tr><td style="background:linear-gradient(135deg,#0d1324,#0a0e19);padding:20px 28px">
-          <span style="color:#fff;font-size:18px;font-weight:800;letter-spacing:-.01em">Drift Live</span>
-          <span style="color:#22d3ee;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-left:8px">Interactive</span>
+        <tr><td style="background-color:#0b0f19;background-image:linear-gradient(135deg,#0d1324,#0a0e19);padding:18px 28px">
+          <img src="${PUBLIC_URL}/drift/email-logo.png" width="121" height="32" alt="drift.li — Drift Live Interactive"
+               style="display:block;border:0;outline:none;text-decoration:none;height:32px;width:121px">
         </td></tr>
         <tr><td style="padding:26px 28px 30px">
           <h1 style="margin:0 0 10px;font-size:20px;color:#0b0f19">${esc(opts.heading)}</h1>
