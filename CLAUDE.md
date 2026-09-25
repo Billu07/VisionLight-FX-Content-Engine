@@ -189,6 +189,22 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `--r3d-side` custom property — better than lying over the footage, and the drift keeps its full
     height. Brand drifts, the hero takeover and Rotation3D keep the framed layout — do NOT widen the
     scope without re-checking them.
+    **A desktop in fullscreen keeps its BAND** (`r3d-band`, 2026-09-25, client: "it doesn't have to
+    go all the way… the bottom part can be our dark gradient bg for button placement… bigger than the
+    default screen"). Immersive is still on — tap to hide, the fade while dragging, the scrims — but
+    the GEOMETRY reverts to the framed computation against the fullscreen viewport, so the drift grows
+    (measured 602px → 669px tall at 1440×900, and more on a real screen once the browser's own chrome
+    is reclaimed) and keeps ground under it for the buttons (26px clear). `bandMode` is
+    `immersive && !touchLike`, and everywhere the immersive branch changes geometry it defers to the
+    framed one: the sizing, the centre, the progress rail, the drag helper, and no side rail (the band
+    already holds the buttons). The ground's wash shows again there, hence the `:not(.r3d-band)` on
+    the rule that hides it.
+    **A rotated phone** (2026-09-25, client): turning the device already hands the screen to the
+    player, so `r3d-auto-fs` hides the fullscreen button while that takeover is in charge — it
+    appearing "instead" was the complaint, and it appears because a phone in landscape is ~844px
+    wide, past the `max-width:560px` rule that hides reset+fullscreen on a drift. Rotating back is
+    the way out (and clears the class). A phone's player also drops the Terms · Privacy line and the
+    credit badge (`@media(max-width:560px)`, tour drifts only) — the pages around it carry both.
     **The chrome in full screen** (2026-09-24, client): the +/- zoom column is hidden in REAL
     fullscreen (`:fullscreen`, `:-webkit-full-screen`, `.r3d-pseudo-fs` — three separate rules, since
     one selector an old browser cannot parse would drop the whole list); wheel and pinch still zoom. The
@@ -213,6 +229,10 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     true fullscreen beyond the browser, the same API a video uses. The CSS `r3d-pseudo-fs` is ONLY the
     fallback for iPhone Safari, which grants element fullscreen to `<video>` alone. drift.li pages link
     `/drift.webmanifest` (`display: standalone`), so Add to Home Screen is the chrome-less route there.
+  - **The page footer's credit matches the player's** (2026-09-25): `TourShell`'s "Tour · Powered by
+    Drift Live Interactive" is two accent links (`.t-foot-link`) — the kind to `/tour`, the platform
+    to drift.li. The pathway carries NO "Tour" eyebrow any more: the header, the way back and the
+    tour's own name already say it, and a fourth in one corner is what the client flagged.
   - **The bottom credit is two links** (2026-09-24, client): on drift.li the badge reads
     "*Tour* Powered by *Drift Live Interactive*" with BOTH names in the accent and both clickable —
     the kind word to `/tour`, the platform to its home. Two anchors cannot nest, so in drift mode the

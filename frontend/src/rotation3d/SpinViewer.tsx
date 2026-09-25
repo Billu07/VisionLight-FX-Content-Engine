@@ -442,6 +442,11 @@ export default function SpinViewer({
     // it is a local that applyImmersive() keeps current, not a render-time constant.
     let immersive = false;
     let sideRail = false;
+    // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
+    // keeps the dark ground beneath it for the buttons, rather than going edge to edge
+    // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
+    // scrims — stays; only the sizing reverts.
+    let bandMode = false;
     const touchLike = window.matchMedia?.("(max-width: 820px), (pointer: coarse)");
     const fullscreenNow = () =>
       !!(document.fullscreenElement || (document as any).webkitFullscreenElement) ||
@@ -773,7 +778,20 @@ export default function SpinViewer({
       const bandBottom = (W / DPR <= 560 ? 150 : 162) * DPR;
       const bandH = Math.max(H * 0.6, H - bandTop - bandBottom);
       const bandCy = bandTop + bandH / 2;
-      if (immersive) {
+      // A touch screen fills; a desktop in fullscreen keeps its band.
+      const wantBand = immersive && !touchLike?.matches;
+      if (wantBand !== bandMode) {
+        bandMode = wantBand;
+        stage.classList.toggle("r3d-band", wantBand);
+      }
+      if (immersive && bandMode) {
+        // The framed computation, against the fullscreen viewport — so it is bigger than the
+        // same drift in the page, without cropping anything or filling to the edges.
+        const img0 = realMode ? nearestLoaded(frame) : null;
+        const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
+        const availW = W * 0.96;
+        base = (ar0 >= 1 ? Math.min(availW, bandH * ar0) : Math.min(bandH, availW / ar0)) / 4.2;
+      } else if (immersive) {
         // Full bleed. `box` is the frame's longest side (drawFrameImage divides by the
         // aspect), so COVER needs the box big enough that BOTH sides reach the screen,
         // and CONTAIN is the same comparison the other way round. Which one we use is
@@ -818,8 +836,10 @@ export default function SpinViewer({
       const cx = W / 2 + panX * DPR;
       // Centre drift frames in the band (a hair above the old 0.46H) so a tall frame
       // sits between the top bar and the controls instead of straddling them.
-      // Filling the screen means the middle of the screen, not the middle of a band.
-      const cy = (immersive ? H / 2 : capFit ? Math.min(H * cyFactor, bandCy) : H * cyFactor) + panY * DPR;
+      // Filling the screen means the middle of the screen; a band means the middle of the band.
+      const cy =
+        (immersive && !bandMode ? H / 2 : capFit || bandMode ? Math.min(H * cyFactor, bandCy) : H * cyFactor) +
+        panY * DPR;
 
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
@@ -833,7 +853,8 @@ export default function SpinViewer({
 
       // Pillarboxed — a tall clip on a wide screen. The ground either side is room enough
       // for the buttons, which beats laying them over the footage (client, 2026-09-23).
-      const sideGap = immersive && frameRect.w > 0 ? (W - frameRect.w) / 2 / DPR : 0;
+      // Only when the drift fills the screen: a band already gives the buttons somewhere to be.
+      const sideGap = immersive && !bandMode && frameRect.w > 0 ? (W - frameRect.w) / 2 / DPR : 0;
       const wantSide = sideGap >= 132;
       if (wantSide) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
       if (wantSide !== sideRail) {
@@ -869,7 +890,7 @@ export default function SpinViewer({
       // bottom (the real frame rect when drawn; the box half-height otherwise —
       // the old code used `scale`, i.e. half the true height, so the arrow landed
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
-      if (immersive && driftMode && hintRef.current) {
+      if (immersive && !bandMode && driftMode && hintRef.current) {
         // No visible bottom edge to hang from: the helper sits where a player's controls
         // sit — just above the buttons — and the cue keeps its natural place under the hand.
         const handH = handRef.current?.offsetHeight || 28;
@@ -1044,9 +1065,10 @@ export default function SpinViewer({
         // screen's edge instead — the way a video player's progress bar does. It is drawn
         // on the canvas, so it survives a tap that puts the rest of the chrome away.
         const inset = 10 * DPR;
-        const rail = immersive
-          ? { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }
-          : frameRect;
+        const rail =
+          immersive && !bandMode
+            ? { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }
+            : frameRect; // banded: the frame's own edge is visible again, so the rail rides it
         const fx0 = rail.x, fy0 = rail.y, fw0 = rail.w, fh0 = rail.h;
         let sx: number, sy: number, ex: number, ey: number;
         if (vertical) {
@@ -1458,6 +1480,9 @@ export default function SpinViewer({
     const setPseudo = (on: boolean) => {
       pseudoFs = on;
       stage.classList.toggle("r3d-pseudo-fs", on);
+      // Turning the phone already did what the button offers; leaving it on screen was what
+      // read as "it wants me to press this" (client, 2026-09-24).
+      stage.classList.toggle("r3d-auto-fs", on && autoPseudo);
       document.documentElement.classList.toggle("r3d-fs-lock", on);
       applyImmersive(); // the iPhone/fallback path never fires fullscreenchange
       syncFsIcon();
@@ -1477,9 +1502,11 @@ export default function SpinViewer({
         if (!pseudoFs && !nativeFsActive() && !userExitedLandscape) {
           autoPseudo = true;
           setPseudo(true);
+          stage.classList.add("r3d-auto-fs"); // setPseudo read autoPseudo before it was set
         }
       } else {
-        userExitedLandscape = false;
+        userExitedLandscape = false; // upright again: the next turn takes over afresh
+        stage.classList.remove("r3d-auto-fs");
         if (pseudoFs && autoPseudo) {
           autoPseudo = false;
           setPseudo(false);
@@ -2462,6 +2489,17 @@ const R3D_CSS = `
   .r3d-immersive .r3d-hint span{font-size:clamp(15px,1.9vmin,19px)}
   .r3d-immersive .r3d-drift-cue{gap:12px}
 }
+/* ── A rotated phone (2026-09-24, client) ────────────────────────────────────────
+   Turning the device already took the player over the screen, so the button that offers
+   the same thing only gets in the way. And on a phone the room is the point: the legal
+   line and the credit belong to the pages around the drift, which still carry both. */
+.r3d-auto-fs .r3d-iconbtn[data-fs]{display:none}
+@media(max-width:560px){
+  .r3d-tour .r3d-legal,.r3d-tour .r3d-powered-badge{display:none}
+}
+/* A desktop in fullscreen keeps its band, so the ground below the drift is visible again —
+   and it is the ground the buttons sit on, so the wash belongs there. */
+.r3d-immersive.r3d-band.r3d-ground::before{display:block}
 /* In REAL fullscreen the screen is the player — the zoom buttons are page furniture, and
    they sat exactly where the drag cue ends up (client, 2026-09-24). Wheel and pinch still
    zoom. Kept as separate rules: one selector an older browser cannot parse would drop the
@@ -2471,7 +2509,7 @@ const R3D_CSS = `
 .r3d-pseudo-fs .r3d-zoomcol{display:none}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
-.r3d-immersive:not(.r3d-siderail).r3d-ground::before{display:none}
+.r3d-immersive:not(.r3d-siderail):not(.r3d-band).r3d-ground::before{display:none}
 /* ── The ground beside a tall clip is where the buttons go ──────────────────────────
    A portrait room on a wide screen keeps its full height, so there is nothing below it
    to put the buttons on — but there is a column either side. --r3d-side is how wide that

@@ -329,6 +329,8 @@ export const TOUR_STYLES = `
 .t-foot b{color:var(--muted);font-weight:700}
 .t-foot a{color:var(--muted);text-decoration:none}
 .t-foot a:hover{color:var(--accent)}
+.t-foot .t-foot-link{color:var(--accent);font-weight:700;text-decoration:none}
+.t-foot .t-foot-link:hover{text-decoration:underline}
 /* ── Page switcher (header) ── */
 .t-switch{position:relative;min-width:0}
 .t-switch-btn{max-width:220px}
@@ -527,8 +529,23 @@ export function TourShell({ children, view }: { children: React.ReactNode; view?
       </header>
       <main className="d-main">{children}</main>
       <footer className="t-foot">
+        {/* Both names are links in the accent, the same as the player's bottom credit
+            (client, 2026-09-24): the kind word to what that product is, the platform to
+            its home. */}
         <span>
-          <b>Tour</b> · Powered by <b>Drift Live Interactive</b>
+          <Link className="t-foot-link" to={CREATOR_LANDING}>
+            Tour
+          </Link>{" "}
+          · Powered by{" "}
+          {onDrift ? (
+            <Link className="t-foot-link" to="/">
+              Drift Live Interactive
+            </Link>
+          ) : (
+            <a className="t-foot-link" href="https://drift.li/">
+              Drift Live Interactive
+            </a>
+          )}
         </span>
         <span>
           <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>

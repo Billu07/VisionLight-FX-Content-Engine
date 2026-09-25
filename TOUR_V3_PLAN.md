@@ -145,7 +145,7 @@ Ship in passes, each independently deployable and verifiable:
 **Pass 1 — DONE 2026-09-25** _(the cheap wins the client will see immediately)_
 B1 icons · B5 scroll-to-top · B2 second "tour" · C2 count links · A3 hand timing · D1 email logo
 
-**Pass 2 — the player (one day)**
+**Pass 2 — DONE 2026-09-26** _(the player)_ · still wants a real iPhone + Android
 A1 rotate-to-fullscreen + hide mobile furniture · A2 desktop fullscreen keeps its band
 _Both live in SpinViewer; doing them together means one verification pass, not two._
 

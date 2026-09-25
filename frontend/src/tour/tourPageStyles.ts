@@ -86,7 +86,6 @@ export const TOUR_PAGE_STYLES = `
 
 /* ── Pathway: one tour's menu (public view) ── */
 .tpw{max-width:720px;margin:0 auto}
-@media(max-width:620px){.tpw-kind{display:none}}
 .tpw-brand{display:flex;align-items:center;gap:10px;margin:14px 0 6px;min-width:0;text-decoration:none;color:var(--muted);font-weight:700;font-size:14px}
 .tpw-brand img{width:34px;height:34px;border-radius:10px;object-fit:contain;background:var(--surface);border:1px solid var(--border);padding:4px}
 .tpw-title{margin:4px 0 0;font-size:clamp(28px,5.4vw,44px);line-height:1.04;letter-spacing:-.03em;font-weight:800;color:var(--text);overflow-wrap:anywhere}

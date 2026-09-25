@@ -83,9 +83,9 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
           </Link>
         </>
       )}
-      {/* The header already reads "drift.li TOUR"; on a phone this second one directly
-          under it just crowds the corner (client, 2026-09-24). Desktop has the room. */}
-      <div className="d-eyebrow tpw-kind">Tour</div>
+      {/* No kind line here: the header already reads "drift.li TOUR", the way back reads
+          "Drift Tours", and the tour's own name is the next thing on the page. A fourth
+          "tour" in the same corner is what the client saw (issue33, 2026-09-26). */}
       <h1 className="tpw-title">{flow.title || flow.name}</h1>
       {flow.description && <p className="tpw-desc">{flow.description}</p>}
 
