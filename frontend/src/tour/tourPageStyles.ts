@@ -105,6 +105,10 @@ export const TOUR_PAGE_STYLES = `
 .tpw-go{color:var(--faint);font-size:22px;line-height:1}
 .tpw-strip:hover .tpw-go{color:var(--accent)}
 .tpw-foot{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+/* The closing row belongs to the tour, not to either margin of the page (client, 2026-09-26). */
+.tpw-foot-end{justify-content:center}
+/* Featured: no brand block under the top row, so the title takes the air it used to give. */
+.tpw-featured .tpw-title{margin-top:20px}
 /* The closing row (Learn More · Share Tour) sits a little apart from the page's own buttons. */
 .tpw-foot-end{margin-top:14px;padding-top:18px;border-top:1px solid var(--border)}
 @media(max-width:560px){

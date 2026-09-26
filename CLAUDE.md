@@ -537,7 +537,12 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   already there (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
   pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Captured by {creator}"** top right (always, client
   2026-09-26 — it credits whoever filmed it) linking to their
-  page; back link = "← Drift Tours". On the channel page, Hidden Tours read **Library** and Unhide/Hide read
+  page; back link = "← Drift Tours". **A featured tour's menu carries nothing else** (client, 2026-09-26): `featured`
+  in TourPathway is `!!flow.credit`, and it drops the page's name + logo (`.tpw-brand`) and BOTH "Contact {page}"
+  buttons, top and bottom — the tour is someone else's, so the channel's own name just repeats the header and
+  "Contact Drift" isn't who the visitor wants. `.tpw-featured .tpw-title` takes back the air the brand block gave it.
+  A creator's own pathway is untouched: that page IS theirs. The closing Learn More · Share Tour row
+  (`.tpw-foot-end`) is centred on every tour. On the channel page, Hidden Tours read **Library** and Unhide/Hide read
   **Feature / Move to Library**. Any page's Featured Tours can be ordered (↑ ↓, `PUT /api/drift/my/page/tour-order`,
   EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link — and the demo BELONGS on the channel: Admin →
   drift.li → Tour → **Demo tour** now opens on the channel's tours ("On the Drift Channel" / "Every Published Tour",

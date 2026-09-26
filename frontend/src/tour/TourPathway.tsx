@@ -47,8 +47,11 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   useEffect(() => {
     captureShareLink();
   }, []);
+  // Featured on the Drift channel: the tour is someone else's, and the credit says whose. The
+  // page's own name, logo and contact belong to a page that owns its tours, not to this one.
+  const featured = !!flow.credit;
   return (
-    <div className="tpw t-rise">
+    <div className={`tpw t-rise ${featured ? "tpw-featured" : ""}`}>
       {/* A demo tour carries no page branding or messages — it stands on its own — but it still
           needs a way out, and that way is drift.li's own page of tours (client, 2026-09-23). */}
       {flow.isDemo && page.slug !== CHANNEL_SLUG && (
@@ -74,13 +77,15 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
                   <span className="d-pill tpw-credit">Captured by {flow.credit.name}</span>
                 ))}
               <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
-              <ContactButton page={page} flowId={flow.id} className="d-btn sm" />
+              {!featured && <ContactButton page={page} flowId={flow.id} className="d-btn sm" />}
             </span>
           </div>
-          <Link to={home} className="tpw-brand">
-            {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
-            <span>{page.name}</span>
-          </Link>
+          {!featured && (
+            <Link to={home} className="tpw-brand">
+              {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
+              <span>{page.name}</span>
+            </Link>
+          )}
         </>
       )}
       {/* No kind line here: the header already reads "drift.li TOUR", the way back reads
@@ -121,7 +126,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
         ))}
       </ol>
 
-      {(!flow.isDemo || page.slug === CHANNEL_SLUG) && (
+      {!featured && (!flow.isDemo || page.slug === CHANNEL_SLUG) && (
         <div className="tpw-foot">
           <EnquiryButton page={page} flowId={flow.id} />
           <ContactButton page={page} flowId={flow.id} />
