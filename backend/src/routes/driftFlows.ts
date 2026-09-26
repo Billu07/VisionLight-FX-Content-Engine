@@ -1459,7 +1459,10 @@ router.get("/api/drift/public/flows/:kind/:slug", async (req: AuthenticatedReque
     include: flowInclude,
   });
   if (!flow) return res.status(404).json({ error: "Not found" });
-  res.json({ flow: serializePublicFlow(flow) });
+  // A featured tour is a pointer: read through it, or this answers with a tour that has no drifts.
+  const shown = await resolveFeature(flow);
+  if (!shown) return res.status(404).json({ error: "Not found" });
+  res.json({ flow: serializePublicFlow(shown) });
 });
 
 export default router;

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { prisma } from "./database";
+import { resolveFeature, resolveFeatures } from "./driftChannel";
 import {
   driftPublicPath,
   flowInclude,
@@ -379,6 +380,9 @@ const logoOf = (tourSettings: unknown) => {
   return typeof s.logoUrl === "string" && s.logoUrl ? s.logoUrl : null;
 };
 const viewable = (status: string) => status === "READY" || status === "PUBLISHED";
+// A tour featured on the Drift channel points at the creator's; its own row has no drifts on it,
+// so a card built straight from it would have no picture (services/driftChannel.ts).
+const through = async (flow: any) => (flow ? await resolveFeature(flow) : null);
 const CODE = /^[a-z0-9]{6,20}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
 const tourInclude = { ...flowInclude, organization: { select: { slug: true, name: true, tourSettings: true } } };
@@ -460,8 +464,9 @@ export function createDbShareLookup(): ShareLookup {
         orderBy: { updatedAt: "desc" },
         include: tourInclude,
       });
-      if (!flow) return [];
-      const pub = serializePublicFlow(flow);
+      const shown = await through(flow);
+      if (!shown) return [];
+      const pub = serializePublicFlow(shown);
       return [...new Set([pub.thumb, ...pub.steps.map((s) => s.thumb)].filter((t): t is string => !!t))].slice(0, 3);
     },
     async page(slug) {
@@ -478,7 +483,7 @@ export function createDbShareLookup(): ShareLookup {
         path: pagePublicPath(org.slug),
         name: org.name,
         logoUrl: logoOf(org.tourSettings),
-        tours: flows.map((f) => {
+        tours: (await resolveFeatures(flows)).map((f) => {
           const pub = serializePublicFlow(f);
           return { title: pub.title || pub.name, path: pub.publicPath, cover: pub.thumb };
         }),
@@ -488,12 +493,14 @@ export function createDbShareLookup(): ShareLookup {
       const org = await findPage(pageSlug);
       if (!org) return null;
       const flow = await prisma.driftFlow.findFirst({ where: { organizationId: org.id, slug: tourSlug, status: "PUBLISHED" }, include: tourInclude });
-      return flow ? tourShareOf(flow, null) : null;
+      const shown = await through(flow);
+      return shown ? tourShareOf(shown, null) : null;
     },
     async tourById(id) {
       if (!UUID.test(id)) return null;
       const flow = await prisma.driftFlow.findFirst({ where: { id, status: "PUBLISHED", organization: { productLine: "TOUR" } }, include: tourInclude });
-      return flow ? tourShareOf(flow, null) : null;
+      const shown = await through(flow);
+      return shown ? tourShareOf(shown, null) : null;
     },
     async unbranded(code) {
       if (!CODE.test(code)) return null;
