@@ -1,8 +1,8 @@
 import { Router, Response } from "express";
 import { prisma } from "../services/database";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
-import { FlowError, flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
-import { channelStatus, ensureChannel, resolveOwnFeatures, saveToChannel } from "../services/driftChannel";
+import { FlowError, flowInclude, flowPublicPath, pagePublicPath, publicCredit, serializeFlow } from "../services/driftFlows";
+import { channelStatus, ensureChannel, featureSourceId, findChannel, resolveOwnFeatures, saveToChannel } from "../services/driftChannel";
 import { DRIFT_PRICE_CENTS, formatMoney, stripePaymentUrl, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
 import { createProInvite, listProInvites, memberRole, parseAccountType, revokeProInvite } from "../services/driftTourAccounts";
 import { uniqueOrgSlug } from "./drift";
@@ -305,30 +305,52 @@ router.delete("/api/drift/admin/tour/pages/:id/invites/:inviteId", ...guard, asy
 
 // The public demo tour: "Take a Tour" and every page's default "View Demo".
 router.get("/api/drift/admin/tour/demo", ...guard, async (_req: AuthenticatedRequest, res: Response) => {
-  const flows = await prisma.driftFlow.findMany({
-    where: { kind: "TOUR", status: "PUBLISHED" },
-    orderBy: [{ isDemo: "desc" }, { updatedAt: "desc" }],
-    take: 200,
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      isDemo: true,
-      updatedAt: true,
-      organization: { select: { name: true, slug: true } },
-      _count: { select: { steps: true } },
-    },
-  });
+  const [flows, channel] = await Promise.all([
+    prisma.driftFlow.findMany({
+      where: { kind: "TOUR", status: "PUBLISHED" },
+      orderBy: [{ isDemo: "desc" }, { updatedAt: "desc" }],
+      take: 200,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        isDemo: true,
+        hidden: true,
+        settings: true,
+        updatedAt: true,
+        organizationId: true,
+        organization: { select: { name: true, slug: true } },
+        _count: { select: { steps: true } },
+      },
+    }),
+    findChannel(),
+  ]);
+  // A featured tour has no drifts on its own row — it points at the creator's. Count theirs, or
+  // the picker offers what looks like an empty tour.
+  const sourceIds = [...new Set(flows.map((f) => featureSourceId(f.settings)).filter((id): id is string => !!id))];
+  const counts = sourceIds.length
+    ? await prisma.driftFlow.findMany({ where: { id: { in: sourceIds } }, select: { id: true, _count: { select: { steps: true } } } })
+    : [];
+  const sourceSteps = new Map(counts.map((s) => [s.id, s._count.steps]));
   res.json({
-    flows: flows.map((f) => ({
-      id: f.id,
-      name: f.name,
-      isDemo: f.isDemo,
-      page: f.organization?.name || null,
-      publicPath: flowPublicPath("TOUR", f.organization?.slug, f.slug),
-      drifts: f._count.steps,
-      updatedAt: f.updatedAt,
-    })),
+    flows: flows.map((f) => {
+      const source = featureSourceId(f.settings);
+      return {
+        id: f.id,
+        name: f.name,
+        isDemo: f.isDemo,
+        page: f.organization?.name || null,
+        publicPath: flowPublicPath("TOUR", f.organization?.slug, f.slug),
+        drifts: source ? (sourceSteps.get(source) ?? 0) : f._count.steps,
+        updatedAt: f.updatedAt,
+        /** on the Drift channel — what the demo should be picked from */
+        onChannel: !!channel && f.organizationId === channel.id,
+        /** featured (as opposed to sitting in the channel's library) */
+        featured: !!channel && f.organizationId === channel.id && !f.hidden,
+        /** who made it, when the channel is showing someone else's tour */
+        credit: publicCredit(f.settings)?.name ?? null,
+      };
+    }),
   });
 });
 

@@ -118,6 +118,15 @@ export const creditOf = (settings: unknown): TourCredit | null => {
   return c && typeof c === "object" && typeof c.pageName === "string" && c.pageName ? (c as TourCredit) : null;
 };
 
+/**
+ * The tour a Drift-channel entry points at, or null for anything else (services/driftChannel.ts
+ * builds these; it lives here so both sides can read it without importing each other).
+ */
+export const featureSourceId = (settings: unknown): string | null => {
+  const id = settings && typeof settings === "object" ? (settings as any).featureOf : null;
+  return typeof id === "string" && id ? id : null;
+};
+
 /** What a featured tour's pathway shows: "Captured by {creator}" → their page. */
 export const publicCredit = (settings: unknown): { name: string; path: string | null } | null => {
   const c = creditOf(settings);
@@ -730,21 +739,32 @@ export async function setFlowPublished(flowId: string, publish: boolean): Promis
       where: { id: flowId },
       select: {
         id: true,
+        settings: true,
         steps: { select: { productId: true, product: { select: { status: true } } } },
       },
     });
     if (!flow) throw new FlowError(404, "Flow not found");
-    const ids = flow.steps.map((s) => s.productId).filter((id): id is string => !!id);
+    // A featured tour has no drifts of its own: whether it is fit to publish is a question
+    // about the tour it points at, or it could never go back up once taken down.
+    const sourceId = featureSourceId(flow.settings);
+    const subject = sourceId
+      ? await tx.driftFlow.findUnique({
+          where: { id: sourceId },
+          select: { id: true, steps: { select: { productId: true, product: { select: { status: true } } } } },
+        })
+      : flow;
+    if (!subject) throw new FlowError(409, "The tour this one is featured from is no longer available");
+    const ids = subject.steps.map((s) => s.productId).filter((id): id is string => !!id);
     if (publish) {
       if (ids.length === 0) throw new FlowError(409, "Add at least one step before publishing");
-      const awaiting = flow.steps.filter((s) => s.product?.status === "AWAITING_PAYMENT");
+      const awaiting = subject.steps.filter((s) => s.product?.status === "AWAITING_PAYMENT");
       if (awaiting.length) {
         throw new FlowError(409, "Check out the new drifts (or remove them) before publishing", {
           code: "CHECKOUT_REQUIRED",
           pending: awaiting.length,
         });
       }
-      const pending = flow.steps.filter((s) => s.product && !isReady(s.product.status));
+      const pending = subject.steps.filter((s) => s.product && !isReady(s.product.status));
       if (pending.length) {
         throw new FlowError(409, "Every drift must finish building before you publish", {
           pending: pending.length,

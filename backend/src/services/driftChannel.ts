@@ -2,6 +2,7 @@ import { prisma } from "./database";
 import {
   FlowError,
   driftPublicPath,
+  featureSourceId,
   flowInclude,
   flowPublicPath,
   pagePublicPath,
@@ -70,10 +71,7 @@ export async function channelStatus() {
 }
 
 /** The tour a channel entry points at, or null when it is a copy made before this. */
-export const featureSourceId = (settings: unknown): string | null => {
-  const id = settings && typeof settings === "object" ? (settings as any).featureOf : null;
-  return typeof id === "string" && id ? id : null;
-};
+export { featureSourceId };
 
 /**
  * A feature as the channel should present it: the SOURCE's content — name, cover, description,

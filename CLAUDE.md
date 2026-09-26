@@ -539,7 +539,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   2026-09-26 — it credits whoever filmed it) linking to their
   page; back link = "← Drift Tours". On the channel page, Hidden Tours read **Library** and Unhide/Hide read
   **Feature / Move to Library**. Any page's Featured Tours can be ordered (↑ ↓, `PUT /api/drift/my/page/tour-order`,
-  EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link.
+  EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link — and the demo BELONGS on the channel: Admin →
+  drift.li → Tour → **Demo tour** now opens on the channel's tours ("On the Drift Channel" / "Every Published Tour",
+  2026-09-26), because a demo carries no page branding, so pointing it at a creator's own tour strips the branding
+  off their real tour too. That listing counts a feature's drifts from its SOURCE (its own row has none) and shows
+  "Captured by {creator}". Publishing reads the source as well (`setFlowPublished`): a pointer has no steps, so
+  "add at least one step before publishing" used to leave an unpublished feature stuck down. `featureSourceId`
+  lives in driftFlows (driftChannel re-exports it) so both can read it without a cycle.
   Verified against a throwaway Docker Postgres (schema from `prisma migrate diff`, never `db push`): 43 checks.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).

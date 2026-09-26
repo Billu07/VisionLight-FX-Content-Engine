@@ -78,7 +78,19 @@ type InviteRow = {
   url: string | null;
 };
 
-type DemoRow = { id: string; name: string; isDemo: boolean; page: string | null; publicPath: string; drifts: number };
+type DemoRow = {
+  id: string;
+  name: string;
+  isDemo: boolean;
+  page: string | null;
+  publicPath: string;
+  drifts: number;
+  /** lives on the Drift channel (featured, or in its library) */
+  onChannel: boolean;
+  featured: boolean;
+  /** the creator it is credited to, when the channel shows someone else's tour */
+  credit: string | null;
+};
 type OrderRow = {
   id: string;
   status: string;
@@ -693,6 +705,10 @@ function DemoTour() {
   const [rows, setRows] = useState<DemoRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
+  // The demo belongs on the channel: pointing it at a creator's own tour makes the demo rule
+  // strip that page's branding from their real tour (client, 2026-09-26). Everything else is
+  // still reachable, just not the first thing offered.
+  const [all, setAll] = useState(false);
   const load = async () => {
     try {
       const r = await apiEndpoints.driftTourAdminDemo();
@@ -719,6 +735,8 @@ function DemoTour() {
     }
   };
   const current = rows?.find((r) => r.isDemo) || null;
+  // The current demo always stays in view, whatever it is, so it can be seen and changed.
+  const shown = (rows || []).filter((r) => all || r.onChannel || r.isDemo);
   return (
     <div className="d-card d-card-pad">
       <div className="d-head">
@@ -726,7 +744,8 @@ function DemoTour() {
           <div className="d-h2">Demo tour</div>
           <p className="d-sub" style={{ fontSize: 12.5, maxWidth: "62ch" }}>
             "Take a Tour" on the Tour landing, and every page's "View Demo" (unless the page picks its own), open this tour.
-            Build and publish it on your own tour page, then choose it here.
+            Pick one the Drift Channel features — a demo carries no page branding, so pointing it at a creator's own tour
+            takes the branding off their real tour too.
           </p>
         </div>
         {current && (
@@ -736,26 +755,39 @@ function DemoTour() {
         )}
       </div>
       <Banner msg={msg} onClose={() => setMsg(null)} />
+      {rows !== null && rows.length > 0 && (
+        <div className="d-actions" style={{ marginTop: 12 }}>
+          <button className={`d-tab ${all ? "" : "active"}`} onClick={() => setAll(false)}>
+            On the Drift Channel
+          </button>
+          <button className={`d-tab ${all ? "active" : ""}`} onClick={() => setAll(true)}>
+            Every Published Tour
+          </button>
+        </div>
+      )}
       <div className="d-list" style={{ marginTop: 12 }}>
         {rows === null ? (
           <div className="py-6 text-center">
             <LoadingSpinner size="sm" />
           </div>
-        ) : rows.length === 0 ? (
+        ) : shown.length === 0 ? (
           <p className="d-faint" style={{ fontSize: 12.5 }}>
-            No published tours yet.
+            {rows.length === 0
+              ? "No published tours yet."
+              : "Nothing on the Drift Channel yet — feature a tour from the Drift Channel tab, or look at every published tour."}
           </p>
         ) : (
-          rows.map((r) => (
+          shown.map((r) => (
             <div key={r.id} className={`d-item static ${r.isDemo ? "active" : ""}`}>
               <span className="grow">
                 <span className="d-name" style={{ display: "block", fontSize: 13.5 }}>
                   {r.name}
                 </span>
                 <span className="sub">
-                  {r.page || "—"} · {plural(r.drifts, "drift")}
+                  {r.credit ? `Captured by ${r.credit}` : r.page || "—"} · {plural(r.drifts, "drift")}
                 </span>
               </span>
+              {r.onChannel && <span className={`d-pill ${r.featured ? "ok" : ""}`}>{r.featured ? "Featured" : "Library"}</span>}
               {r.isDemo ? (
                 <span className="d-pill ok">Demo</span>
               ) : (
