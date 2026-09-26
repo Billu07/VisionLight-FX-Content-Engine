@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Arrow, DriftSiteShell, WaitlistDialog } from "./driftSite";
+import { Arrow, DriftSiteShell } from "./driftSite";
 import { HomeScene, HOME_SCENE_STYLES } from "./DriftHomeScene";
 
 /**
@@ -23,6 +22,10 @@ type Product = {
   tags?: string;
   note?: string;
   live?: boolean;
+  /** its landing page — every card leads there, and the wait list lives on it */
+  path: string;
+  /** the landing's own palette, so the card matches the page it opens (cyan needs no class) */
+  tone?: "ds-violet" | "ds-emerald";
   icon: string[];
 };
 
@@ -34,6 +37,7 @@ const PRODUCTS: Product[] = [
     body: ["Turn a 3-second video into a Live Interactive Tour.", "No 360 equipment. No complicated software."],
     tags: "Real Estate · Venues · Any Location",
     live: true,
+    path: "/tour",
     icon: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M16.2 7.8l-6.1 2.4 2.6 1.1 1.1 2.6z"],
   },
   {
@@ -43,6 +47,7 @@ const PRODUCTS: Product[] = [
     body: ["Turn a few seconds of a real place or moment into an Interactive View."],
     tags: "Sunsets · Cities · Cafés · Nature · Events",
     note: "See the world through someone else's eyes.",
+    path: "/view",
     icon: ["M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z", "M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"],
   },
   {
@@ -52,6 +57,8 @@ const PRODUCTS: Product[] = [
     body: ["Turn a few seconds of life into something you can return to and explore."],
     tags: "Family · Friends · Places · Milestones · Everyday Life",
     note: "Private. Yours to remember.",
+    path: "/memory",
+    tone: "ds-violet",
     icon: ["M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"],
   },
   {
@@ -60,6 +67,8 @@ const PRODUCTS: Product[] = [
     title: "Connect the Experience",
     body: ["Connect Drifts, images, video, information and links into an Interactive Path."],
     note: "Tell a story. Explain a process. Guide someone step by step.",
+    path: "/path",
+    tone: "ds-emerald",
     icon: [
       "M6 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
       "M18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
@@ -104,24 +113,32 @@ const STYLES = `
 
 /* ── Products ── */
 .dh-section{margin-top:clamp(28px,5vw,56px)}
-.dh-products{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+/* One, then a balanced 2x2, then the row of four. auto-fit gave a 3+1 in the middle range,
+   which left the fourth product looking like an afterthought. */
+.dh-products{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:560px){.dh-products{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(min-width:1140px){.dh-products{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.dh-card{position:relative;display:flex;flex-direction:column;gap:10px;padding:26px 24px 24px;border-radius:22px;
+/* The card carries its product's palette (its tone), so its icon, name, border and glow match
+   the landing it opens. Cyan is the page's own accent and needs no class. */
+.dh-card{position:relative;display:flex;flex-direction:column;gap:14px;padding:30px 26px 28px;border-radius:22px;
   border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow-sm);transition:border-color .2s,transform .2s,box-shadow .2s}
 .dh-card:hover{border-color:var(--border-strong);transform:translateY(-2px)}
-.drift-ui[data-theme="dark"] .dh-card{background:color-mix(in srgb,var(--surface) 70%,transparent);border-color:rgba(56,189,248,.17)}
-.drift-ui[data-theme="dark"] .dh-card:hover{border-color:rgba(56,189,248,.36);box-shadow:0 0 44px -22px rgba(34,211,238,.45)}
-.dh-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.drift-ui[data-theme="dark"] .dh-card{background:color-mix(in srgb,var(--surface) 70%,transparent);border-color:color-mix(in srgb,var(--accent) 20%,transparent)}
+.drift-ui[data-theme="dark"] .dh-card:hover{border-color:color-mix(in srgb,var(--accent) 42%,transparent);box-shadow:0 0 44px -22px color-mix(in srgb,var(--accent) 55%,transparent)}
+.dh-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
 .dh-ico{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;flex:none;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border)}
-.dh-name{font-size:13px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:var(--accent)}
-.dh-card h3{margin:0;font-size:clamp(21px,1.9vw,25px);line-height:1.15;letter-spacing:-.015em;font-weight:750;color:var(--text)}
-.dh-card p{margin:0;font-size:14.5px;line-height:1.5;color:var(--muted)}
-.dh-card .dh-meta{font-size:12.5px;line-height:1.45;color:var(--faint)}
+/* The name IS the title: it was a 13px eyebrow over a 25px tagline, which made the one word the
+   card is about the smallest thing on it (client, 2026-09-26). The tagline supports it. */
+.dh-card-head{display:grid;gap:5px}
+.dh-name{font-size:clamp(26px,2.3vw,31px);font-weight:800;letter-spacing:-.022em;line-height:1.05;text-transform:none;color:var(--accent)}
+.dh-card h3{margin:0;font-size:16.5px;line-height:1.35;letter-spacing:0;font-weight:650;color:var(--text)}
+.dh-card p{margin:0;font-size:14.5px;line-height:1.55;color:var(--muted)}
+.dh-card .dh-meta{font-size:12.5px;line-height:1.5;color:var(--faint)}
 .dh-status{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;white-space:nowrap;
   font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border)}
 .dh-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .dh-status.on{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-border)}
-.dh-card-cta{margin-top:auto;padding-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+.dh-card-cta{margin-top:auto;padding-top:12px;display:flex;flex-wrap:wrap;gap:10px}
 .dh-pill{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:999px;font-size:14.5px;font-weight:700;text-decoration:none}
 .dh-pill.outline{background:transparent;border:1px solid var(--accent-border);color:var(--accent)}
 .dh-pill.outline:hover{background:var(--accent-soft);border-color:var(--accent-border)}
@@ -157,8 +174,6 @@ const Kinds = () => (
 );
 
 export default function DriftHome() {
-  const [waitFor, setWaitFor] = useState<Product | null>(null);
-
   return (
     <DriftSiteShell className="dh">
       <style>{HOME_SCENE_STYLES}</style>
@@ -186,37 +201,35 @@ export default function DriftHome() {
         <section className="dh-section" aria-label="Tour, View, Memory and Path">
           <div className="dh-products">
             {PRODUCTS.map((p) => (
-              <article key={p.key} className={`dh-card ${p.live ? "live" : ""}`}>
+              <article key={p.key} className={`dh-card ${p.tone || ""} ${p.live ? "live" : ""}`}>
                 <div className="dh-card-top">
                   <div className="dh-ico">
                     <Icon d={p.icon} />
                   </div>
                   <span className={`dh-status ${p.live ? "on" : ""}`}>{p.live ? "Available Now" : "Coming Soon"}</span>
                 </div>
-                <div className="dh-name">{p.name}</div>
-                <h3>{p.title}</h3>
+                <div className="dh-card-head">
+                  <div className="dh-name">{p.name}</div>
+                  <h3>{p.title}</h3>
+                </div>
                 {p.body.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
                 {p.tags && <p className="dh-meta">{p.tags}</p>}
                 {p.note && <p className="dh-meta">{p.note}</p>}
+{/* Every card leads to its own landing — the wait list lives there, on the page that
+                    explains what it is (client, 2026-09-26). */}
                 <div className="dh-card-cta">
-                  {p.live ? (
-                    <>
-                      <Link className="d-btn primary dh-pill" to="/tour/start">
-                        Try it Free
-                        <Arrow size={16} />
-                      </Link>
-                      <Link className="d-btn dh-pill outline" to="/tour">
-                        Learn More
-                      </Link>
-                    </>
-                  ) : (
-                    <button type="button" className="d-btn dh-pill outline" onClick={() => setWaitFor(p)}>
-                      Join Wait List
+                  {p.live && (
+                    <Link className="d-btn primary dh-pill" to="/tour/start">
+                      Try it Free
                       <Arrow size={16} />
-                    </button>
+                    </Link>
                   )}
+                  <Link className="d-btn dh-pill outline" to={p.path}>
+                    Learn More
+                    {!p.live && <Arrow size={16} />}
+                  </Link>
                 </div>
               </article>
             ))}
@@ -232,7 +245,6 @@ export default function DriftHome() {
           </Link>
         </section>
 
-      {waitFor && <WaitlistDialog product={waitFor} source="home" onClose={() => setWaitFor(null)} />}
     </DriftSiteShell>
   );
 }

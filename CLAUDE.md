@@ -578,9 +578,18 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   page scrolls; reduced motion holds a world and the pointer steps between them; the rAF loop stops when the
   tab is hidden or the hero scrolls off (IntersectionObserver). "Take a Tour" over the scene (the client's
   CTA, `TakeATour` in DriftHome) still starts the demo tour and warms its first drift + the player chunk; no
-  demo tour set → no chip, the scene is unaffected. The client's copy and CTAs stay exactly as written (Tour:
-  Try it Free + Learn More; the rest: Join Wait List →
-  `DriftWaitlist`) — restyle freely, don't reword. It no longer loads the player. Brand custom
+  demo tour set → no chip, the scene is unaffected. The client's copy stays exactly as written — restyle freely, don't reword.
+  **The cards, 2026-09-26 (client)**: the product NAME is the card's title (`.dh-name`, ~26–31px in
+  the product's accent) with the tagline under it — it used to be a 13px uppercase eyebrow over a
+  25px tagline, so the one word the card is about was the smallest thing on it — and the card is
+  roomier ("looks congested"). Every card now ends in **Learn More → its own landing** (`Product.path`);
+  Tour keeps Try it Free in front of it. "Join Wait List" is GONE from the home: it lives on each
+  landing, which is where Learn More takes you, so `WaitlistDialog` is no longer mounted here. Each
+  card carries its landing's palette via `Product.tone` = the same `ds-violet` / `ds-emerald` classes
+  those pages use (cyan needs none) — so icon, name, status pill, border, glow and button all match
+  the page the card opens. Those classes now match a nested element as well as a page root
+  (driftSite), which is what makes one palette serve both. The grid is 1 / 2x2 / 4 columns — auto-fit
+  used to give a 3+1 in the middle range. It no longer loads the player. Brand custom
   domains keep the full-screen `HeroLanding` (SpinViewer loaded lazily there). The **/tour landing**
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark

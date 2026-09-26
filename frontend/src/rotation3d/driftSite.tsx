@@ -26,10 +26,13 @@ const SITE_STYLES = `
   radial-gradient(34% 40% at 12% 12%, rgba(139,92,246,.07), transparent 70%)}
 
 /* Product accents — View keeps drift cyan. */
-.drift-ui.ds-violet{--accent:#a78bfa;--accent-2:#c4b5fd;--accent-soft:rgba(167,139,250,.14);--accent-border:rgba(167,139,250,.4);--accent-ink:#130b24}
-.drift-ui[data-theme="light"].ds-violet{--accent:#7c3aed;--accent-2:#6d28d9;--accent-soft:rgba(124,58,237,.10);--accent-border:rgba(124,58,237,.30);--accent-ink:#ffffff}
-.drift-ui.ds-emerald{--accent:#34d399;--accent-2:#6ee7b7;--accent-soft:rgba(52,211,153,.14);--accent-border:rgba(52,211,153,.4);--accent-ink:#03140d}
-.drift-ui[data-theme="light"].ds-emerald{--accent:#047857;--accent-2:#065f46;--accent-soft:rgba(4,120,87,.10);--accent-border:rgba(4,120,87,.30);--accent-ink:#ffffff}
+/* A product's palette. On a page root it retints the whole landing; on one element it retints
+   just that (the home's product cards, so each matches the page it leads to) — same tokens
+   either way, so the two can never drift apart. */
+.drift-ui.ds-violet,.drift-ui .ds-violet{--accent:#a78bfa;--accent-2:#c4b5fd;--accent-soft:rgba(167,139,250,.14);--accent-border:rgba(167,139,250,.4);--accent-ink:#130b24}
+.drift-ui[data-theme="light"].ds-violet,.drift-ui[data-theme="light"] .ds-violet{--accent:#7c3aed;--accent-2:#6d28d9;--accent-soft:rgba(124,58,237,.10);--accent-border:rgba(124,58,237,.30);--accent-ink:#ffffff}
+.drift-ui.ds-emerald,.drift-ui .ds-emerald{--accent:#34d399;--accent-2:#6ee7b7;--accent-soft:rgba(52,211,153,.14);--accent-border:rgba(52,211,153,.4);--accent-ink:#03140d}
+.drift-ui[data-theme="light"].ds-emerald,.drift-ui[data-theme="light"] .ds-emerald{--accent:#047857;--accent-2:#065f46;--accent-soft:rgba(4,120,87,.10);--accent-border:rgba(4,120,87,.30);--accent-ink:#ffffff}
 
 .dh-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(16px,4vw,48px);background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .dh-logo{display:flex;align-items:center;gap:18px;text-decoration:none;min-width:0}
