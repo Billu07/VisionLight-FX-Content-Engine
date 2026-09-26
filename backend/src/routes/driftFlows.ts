@@ -176,12 +176,22 @@ const loadFlow = (orgId: string, id: string) =>
 
 // Translate a FlowError into a response; anything else goes to Express' handler.
 /**
+ * What the CHANNEL owns about a tour it features, as opposed to what the creator owns. These are
+ * the fields `mergeFeature` keeps from the entry rather than taking from the source: whether it
+ * is featured or in the library, where it sits on the page, its address there, and whether it is
+ * the demo. Curating those is the whole point of the channel.
+ */
+const CHANNEL_OWNED = new Set(["hidden", "order", "isDemo", "slug"]);
+
+/**
  * A tour featured on the Drift channel is a POINTER at the creator's tour, not a copy of it
- * (services/driftChannel.ts), so there is nothing of its own to change: its drifts, its name
- * and its cover all belong to the page that made it. Every write below addresses a flow as
- * /api/drift/my/flows/:id, so one guard on that prefix covers all of them — including the
- * step, pin and reel routes underneath. Reads pass (they resolve through the pointer), and so
- * does DELETE, which removes the entry and simply un-features the tour.
+ * (services/driftChannel.ts), so its drifts, its name and its cover belong to the page that made
+ * it and cannot be edited here. Every write addresses a flow as /api/drift/my/flows/:id, so one
+ * guard on that prefix covers all of them — including the step, pin and reel routes underneath.
+ *
+ * What passes: reads; DELETE (removing the entry just un-features the tour); publishing and
+ * unpublishing, which is the entry's own status; and a PATCH that touches nothing but
+ * CHANNEL_OWNED fields — Feature / Move to Library being exactly that.
  */
 router.use("/api/drift/my/flows/:id", async (req: AuthenticatedRequest, res, next) => {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") return next();
@@ -189,6 +199,12 @@ router.use("/api/drift/my/flows/:id", async (req: AuthenticatedRequest, res, nex
   // it twice would validate the session twice on every write. A caller with no token falls
   // straight through to the route's own 401, so nothing is looked up for a stranger either.
   if (!req.headers.authorization) return next();
+  // req.url is the remainder after the mount path: "/" for the flow itself, "/publish", …
+  const onTheFlow = req.path === "/" || req.path === "";
+  const curating =
+    (req.method === "PATCH" && onTheFlow && Object.keys(req.body || {}).every((k) => CHANNEL_OWNED.has(k))) ||
+    (req.method === "POST" && (req.path === "/publish" || req.path === "/unpublish"));
+  if (curating) return next();
   const flow = await prisma.driftFlow.findUnique({ where: { id: req.params.id }, select: { settings: true } });
   if (!flow || !featureSourceId(flow.settings)) return next();
   return res.status(409).json({

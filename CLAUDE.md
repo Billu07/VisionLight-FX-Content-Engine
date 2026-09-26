@@ -528,8 +528,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `/tour/drift/{tour}/{drift}` and the creator's pixel, stored CTAs, forms and enquiry button are dropped (an enquiry
   would otherwise reach the channel instead of them). A source deleted or unpublished drops out of the public page and
   404s its pathway, but the row stays in the channel's OWN lists so it can be removed. One guard —
-  `router.use("/api/drift/my/flows/:id")` — refuses every write to a feature (GET and DELETE pass), and the builder
-  shows it read-only as "Featured from {page}". Entries copied BEFORE this are ordinary flows with a credit and no
+  `router.use("/api/drift/my/flows/:id")` — refuses writes to a feature, and the builder shows it read-only as
+  "Featured from {page}". What it lets through is the CHANNEL's own curation, i.e. the fields `mergeFeature` keeps
+  from the entry rather than the source (`CHANNEL_OWNED`: hidden, order, isDemo, slug) plus publish/unpublish and
+  DELETE — **Feature It is `hidden:false`, so a guard that blocked everything blocked featuring** (caught in use,
+  2026-09-26). A PATCH mixing an owned field with a content one is still refused outright. Entries copied BEFORE this are ordinary flows with a credit and no
   `featureOf`: they keep working; remove and re-save one to make it live. Saving the same tour again returns the entry
   already there (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
   pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Captured by {creator}"** top right (always, client
