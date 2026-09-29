@@ -23,7 +23,6 @@ export const TOUR_PAGE_STYLES = `
 .tpg-sub{margin:12px 0 0;font-size:15px;line-height:1.55;color:var(--muted);max-width:50ch}
 .tpg-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 .tpg-cta .d-btn{padding:12px 18px;font-size:14px}
-.tpg-linkrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:18px}
 .tpg-art{height:220px;display:none}
 @media(min-width:900px){.tpg-art{display:block}}
 .tpg-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;color:var(--muted);margin-bottom:18px}
@@ -137,6 +136,10 @@ export const TOUR_PAGE_STYLES = `
 .t-drop.t-drop-more{padding:14px 12px;gap:2px;border-radius:14px}
 .t-drop.t-drop-more .big{font-size:14px}
 .t-drop-pick{margin-top:6px;pointer-events:none}
+/* Start Tour: the preview a creator opens constantly while building. Accent-soft so it is
+   unmissable without taking the filled accent that Publish and Share use (client, 2026-09-30). */
+.t-page .d-btn.t-start{font-weight:750}
+.t-page .d-btn.t-start:hover{background:var(--accent);border-color:transparent;color:var(--accent-ink);filter:none}
 .t-page .d-btn.t-guide{background:#1db954;border-color:#1db954;color:#04140a;font-weight:750}
 .t-page .d-btn.t-guide:hover{background:#1ed760;border-color:#1ed760}
 .drift-ui[data-theme="dark"] .d-btn.t-guide{box-shadow:0 8px 22px -10px rgba(30,215,96,.65)}

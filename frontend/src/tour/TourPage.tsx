@@ -726,16 +726,6 @@ export default function TourPage() {
                   )}
                 </div>
               )}
-              {page.path && (
-                <div className="tpg-linkrow">
-                  <span className="t-link">
-                    <code>{publicUrl(page.path).replace(/^https?:\/\//, "")}</code>
-                    <button className="d-btn ghost sm" onClick={() => copy(page.path!)}>
-                      Copy
-                    </button>
-                  </span>
-                </div>
-              )}
             </>
           ) : (
             <>

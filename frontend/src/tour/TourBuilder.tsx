@@ -986,19 +986,13 @@ export default function TourBuilder({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
               Capture Guide
             </button>
-            <span className="t-link" style={{ padding: "4px 8px" }}>
-              <code>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</code>
-              {flow.status === "PUBLISHED" && (
-                <button className="d-btn ghost sm" onClick={copyLink}>
-                  Copy
-                </button>
-              )}
-            </span>
           </div>
         </div>
         <div className="t-actions">
+          {/* Pressed after every upload, to go and look at the drift just made — so it reads at
+              a glance. Soft rather than filled: the filled one in this row is Publish or Share. */}
           {flow.entryPath && (
-            <a className="d-btn ghost" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <a className="d-btn soft t-start" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
               ▶ Start Tour
             </a>
           )}

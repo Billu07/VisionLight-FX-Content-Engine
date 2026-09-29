@@ -507,7 +507,12 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   channel's Featured / Library counts in Admin → drift.li → Tour are links to the channel.
   New-tour card = `.tpg-new` (accent, big input, scrolls into
   view). Builder toolbar: Start Tour · Insights · Tour Settings · Share|Publish (Unpublish lives in Tour Settings,
-  Capture Guide in the meta row). A tour drift's background defaults to drift.li's dark ground
+  Capture Guide in the meta row). **2026-09-30 (client)**: the bare URL chip is gone from BOTH the builder's meta
+  row and a page's admin view — it sat there permanently to say what the address bar says, and Share (builder) /
+  each tour's own Copy Link (page) are where a link is actually handed over. The published tour's "Live at …"
+  banner stays: it appears with Share beside it and says edits are live. **Start Tour** is `d-btn soft t-start`
+  (accent text on accent-soft, filling on hover) rather than ghost — it is pressed after every upload and was
+  hard to pick out; the filled accent in that row belongs to Publish and Share. A tour drift's background defaults to drift.li's dark ground
   (`TOUR_DEFAULT_BACKGROUND` #0d1119): processing no longer fills the detected colour in for tour steps, and
   `pickedTourBackground` treats a stored colour equal to the manifest's `detectedBg` (older builds) as not picked —
   the public payload serves the default, the builder shows "Default · drift.li Dark". A demo tour (the site's
