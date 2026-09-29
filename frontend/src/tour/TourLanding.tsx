@@ -40,6 +40,13 @@ const STYLES = `
 .tl-h1{margin:20px 0 0;font-size:clamp(46px,7.6vw,92px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}
 @media(min-width:960px){.tl-h1{font-size:clamp(54px,5.2vw,72px)}}
 .tl-lead{margin:22px 0 0;font-size:clamp(18px,2.1vw,22px);line-height:1.45;color:var(--muted);max-width:34ch}
+.tl-hero-text{min-width:0}
+/* One centred column below the split point, like every other landing (client, 2026-09-29). */
+@media(max-width:959px){
+  .tl-hero-text{display:grid;justify-items:center;text-align:center}
+  .tl-hero-text .tl-lead{margin-left:auto;margin-right:auto}
+  .tl-hero-text .tl-cta{justify-content:center}
+}
 .tl-badge{display:inline-flex;align-items:center;gap:10px;margin-top:24px;padding:9px 16px;border-radius:999px;border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--text);font-size:14px;font-weight:750}
 .drift-ui[data-theme="dark"] .tl-badge{box-shadow:0 0 26px -10px rgba(34,211,238,.55)}
 .tl-badge svg{color:var(--accent)}
@@ -175,7 +182,7 @@ export default function TourLanding() {
 
       <div className="tl">
         <section className="tl-hero t-rise">
-          <div style={{ minWidth: 0 }}>
+          <div className="tl-hero-text">
             <div className="tl-kicker">Drift Tour</div>
             <h1 className="tl-h1">Show Any Space</h1>
             <p className="tl-lead">Turn a 3-second video into a Live Interactive. Connect them and create a Tour.</p>

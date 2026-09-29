@@ -368,7 +368,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `relinkAllFlows()` at boot, re-run when a drift turns READY) — the player ignores them for tour
   drifts, but they remain the stored truth for anything that reads a product's CTAs.
 - **Pay per drift** (`services/driftBilling.ts`): free while `Organization.freeDrifts` last, then
-  `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour, with
+  `AWAITING_PAYMENT` (clip stored, not processed — but `storePendingClip` also takes ONE frame out of it
+  (`pipeline.posterFrame`, a third of the way in, ≤720px WebP, ~250ms) and stores it as `thumbnailUrl`, so the
+  builder shows the creator's own footage instead of an empty square while it waits; the step card keeps
+  "Clip Saved · Converts After Checkout" as a scrim over it. Never blocks an upload: no frame just means no
+  picture. 2026-09-29, client) → Stripe Checkout (one per tour, with
   `customer_creation: "always"` + `invoice_creation` since 2026-09-26, so Stripe raises a real
   numbered invoice — the buyer's receipt, carrying the business name and address; `fulfillSession`
   reads its `hosted_invoice_url` back and `sendTourOrderPaidEmails` puts it in the "payment
@@ -478,7 +482,10 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   → the drift.li home, "tour" → /tour; pages the viewer can manage pass `view` (`ShellView`) → an **Admin View /
   Public View** switch in the header (replaces the old "You're editing / viewing as a visitor" strips on the page,
   pathway and builder; a superadmin not yet managing sees Public, "Admin" = Manage). `PageSwitcher` is also the account
-  menu (pages · Signed in as · Log Out); Dashboard hides when the view switch shows. The page and the builder show
+  menu (pages · Signed in as · Log Out); Dashboard hides when the view switch shows. The switch wears the accent
+  since 2026-09-29 (client: make it obvious) — accent border and tint on `.t-view`, the selected side filled with
+  `var(--accent)` on `--accent-ink` — because it is the one control in the header that changes what you are
+  looking at. The page and the builder show
   **Path only** (Cards removed). Page: admin view = Create New Tour + Page Settings (accent) + Leave Page (members) +
   the link; public view = View Demo / enquiry / contact. **Client pass 2026-09-23**: the header's
   "TOUR" reads at the wordmark's size (`.t-kind`, one lockup with drift.li); the page hero is the
@@ -608,6 +615,12 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
   (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
+- **Every landing's hero is one centred column on a phone** (2026-09-29, client): below each page's own split
+  point — 1024px for the product landings and the home, 960px for /tour — the kicker, headline, lead, tags and
+  CTAs centre, which is what /path (`layout="stack"`) has always looked like at every width. Desktop is
+  untouched: split and flip still put the words beside the scene. The rules live with each hero (`.ds-hero` in
+  driftSite, `.dh-copy` in DriftHome, `.tl-hero-text` in TourLanding) — the scene keeps its full width in all
+  three, only the words move.
 - **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
   all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
   horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →

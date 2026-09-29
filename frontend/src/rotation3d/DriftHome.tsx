@@ -87,6 +87,13 @@ const STYLES = `
 .dh-hero{display:grid;gap:clamp(34px,6vw,56px);align-items:center;padding:clamp(34px,6vw,80px) 0 clamp(28px,4vw,52px)}
 @media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px}}
 .dh-copy{min-width:0}
+/* One centred column on a phone, like the product landings (client, 2026-09-29). The scene
+   keeps its full width — only the words move to the middle. */
+@media(max-width:1023px){
+  .dh-copy{display:grid;justify-items:center;text-align:center}
+  .dh-copy .dh-lead{margin-left:auto;margin-right:auto;max-width:34ch}
+  .dh-copy .dh-kinds{justify-content:center}
+}
 .dh-kicker{display:inline-flex;align-items:center;gap:14px;font-size:12.5px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
 .dh-kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .dh-h1{margin:22px 0 0;font-size:clamp(44px,7.4vw,106px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}

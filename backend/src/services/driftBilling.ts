@@ -5,7 +5,8 @@ import path from "node:path";
 import type { Request, Response } from "express";
 import Stripe from "stripe";
 import { prisma } from "./database";
-import { uploadManagedBuffer } from "../utils/managedStorage";
+import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
+import { posterFrame } from "./rotation3d/pipeline";
 import { processClip } from "../routes/drift";
 import { FlowError, flowPublicPath } from "./driftFlows";
 import { sendTourOrderPaidEmails } from "./mail";
@@ -111,15 +112,29 @@ export async function storePendingClip(args: {
   frameCount: number;
 }) {
   const buffer = await fs.readFile(args.file.path);
-  const url = await uploadManagedBuffer({
-    buffer,
-    contentType: args.file.mimetype || "video/mp4",
-    keyPrefix: `drift/org_${args.orgId}/pending/product_${args.productId}`,
-    fallbackExtension: "mp4",
-  });
+  // The clip goes up, and one frame of it goes up beside it: until this is paid for and
+  // converted there are no frames to show, and an empty square reads as "nothing arrived".
+  const [url, poster] = await Promise.all([
+    uploadManagedBuffer({
+      buffer,
+      contentType: args.file.mimetype || "video/mp4",
+      keyPrefix: `drift/org_${args.orgId}/pending/product_${args.productId}`,
+      fallbackExtension: "mp4",
+    }),
+    posterFrame(args.file.path),
+  ]);
+  const thumbnailUrl = poster
+    ? await uploadManagedBuffer({
+        buffer: poster,
+        contentType: "image/webp",
+        keyPrefix: `drift/org_${args.orgId}/product_${args.productId}/poster`,
+        fallbackExtension: "webp",
+        cacheControl: IMMUTABLE_CACHE_CONTROL,
+      }).catch(() => null)
+    : null;
   const { count } = await prisma.driftProduct.updateMany({
     where: { id: args.productId, billingStatus: "AWAITING_PAYMENT" },
-    data: { pendingVideoUrl: url, pendingFrameCount: args.frameCount },
+    data: { pendingVideoUrl: url, pendingFrameCount: args.frameCount, ...(thumbnailUrl ? { thumbnailUrl } : {}) },
   });
   if (!count) {
     console.warn(`[${NS}] product ${args.productId} was paid while a new clip uploaded — kept the paid clip`);

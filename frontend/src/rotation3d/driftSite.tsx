@@ -66,6 +66,16 @@ const SITE_STYLES = `
   .ds-hero.split,.ds-hero.flip{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px}
   .ds-hero.flip .ds-hero-text{order:2}
 }
+/* Below the split point every hero is one column anyway, so centre it — the words read as a
+   headline rather than as a column that lost its partner (client, 2026-09-29). /path already
+   looked like this at every width; this is the same treatment for the rest, on phones only. */
+@media(max-width:1023px){
+  .ds-hero{justify-items:center;text-align:center}
+  .ds-hero-text{display:grid;justify-items:center}
+  .ds-hero .ds-lead{max-width:44ch}
+  .ds-hero .ds-kicker-row,.ds-hero .ds-tags,.ds-hero .ds-cta{justify-content:center}
+  .ds-hero .ds-stage{width:100%}
+}
 .ds-hero.stack{justify-items:center;text-align:center}
 .ds-hero.stack .ds-hero-text{display:grid;justify-items:center;max-width:900px}
 .ds-hero.stack .ds-lead{max-width:44ch}

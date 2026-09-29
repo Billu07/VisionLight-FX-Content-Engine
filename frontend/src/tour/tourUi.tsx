@@ -161,6 +161,10 @@ export const TOUR_STYLES = `
 .t-step-thumb{aspect-ratio:4/5;border-radius:16px}
 .t-building{display:grid;gap:8px;justify-items:center}
 .t-previewing{position:absolute;left:8px;bottom:8px;z-index:1;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--accent);color:var(--accent-ink)}
+/* Over a drift that is waiting for checkout: the frame is the reassurance, this is the reason
+   it isn't playable yet. Readable over any footage, hence the scrim rather than a tint. */
+.t-step-wait{position:absolute;left:0;right:0;bottom:0;z-index:1;padding:14px 8px 8px;font-size:10.5px;font-weight:750;line-height:1.3;
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);background:linear-gradient(to top,rgba(2,6,23,.86),rgba(2,6,23,0))}
 .t-step-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
 .t-tip{font-size:11.5px;line-height:1.4}
 .t-step-body{display:grid;gap:14px;min-width:0}
@@ -355,8 +359,15 @@ export const TOUR_STYLES = `
 .t-wordmark a{color:inherit;text-decoration:none}
 .t-wordmark a:hover{opacity:.82}
 .t-wordmark a.t-kind{color:var(--accent)}
-.t-view{flex:none}
-.t-view .d-tab{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650}
+/* The one control in the header that changes what you are looking at, so it is allowed to look
+   like one (client, 2026-09-29): the accent border and tint mark the whole switch out, and the
+   selected side sits on the accent so which way it is set can be read at a glance. */
+.t-view{flex:none;border-color:var(--accent-border);background:color-mix(in srgb,var(--accent) 10%,var(--surface-2))}
+.t-view .d-tab{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--muted)}
+.t-view .d-tab:hover{color:var(--accent)}
+.t-view .d-tab.active{background:var(--accent);color:var(--accent-ink);box-shadow:0 2px 10px -3px color-mix(in srgb,var(--accent) 70%,transparent)}
+.t-view .d-tab.active svg{color:inherit}
+.t-view .d-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .t-view svg{flex:none}
 @media(max-width:700px){.t-view-x{display:none}}
 /* ── Small screens: the header reflows in bands instead of colliding ──────────────

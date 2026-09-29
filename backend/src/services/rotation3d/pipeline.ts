@@ -11,6 +11,7 @@ import { ANALYSIS_FILE, extractFramesForCleanup, planCleanup, steadyCropFor, typ
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const EXTRACT_TIMEOUT_MS = 300000;
+const POSTER_TIMEOUT_MS = 20000; // one frame; a clip that can't manage it won't manage 180
 const NULL_DEVICE = os.platform() === "win32" ? "NUL" : "/dev/null";
 const UPLOAD_CONCURRENCY = 8; // parallel frame → R2 uploads
 // Keep native resolution for standard product footage (≤1440p keeps its width);
@@ -126,6 +127,51 @@ export const probeClipInfo = (input: string): Promise<{ duration: number; fps: n
     cmd.on("error", done);
     cmd.run();
   });
+
+/**
+ * A single frame from a clip, as a WebP — the picture shown for a drift that exists but has not
+ * been converted yet (one waiting for checkout). Taken a third of the way in, where a pan has
+ * usually started moving and the first frame's focus hunt is over.
+ *
+ * Never throws: no picture is a fine outcome, a failed upload is not.
+ */
+export async function posterFrame(input: string, width = 720): Promise<Buffer | null> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "r3d-poster-"));
+  const out = path.join(dir, "poster.png");
+  try {
+    const duration = await probeDurationSeconds(input).catch(() => 0);
+    const at = duration > 0.6 ? Math.min(duration - 0.2, duration / 3) : 0;
+    await new Promise<void>((resolve, reject) => {
+      const cmd = ffmpeg(input).seekInput(at).outputOptions(["-frames:v", "1", "-an", "-y"]).output(out);
+      let settled = false;
+      const done = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+      // A clip that cannot be decoded must not hold an upload open.
+      const timer = setTimeout(() => {
+        try {
+          cmd.kill("SIGKILL");
+        } catch {
+          /* ignore */
+        }
+        done(() => reject(new Error("poster frame timed out")));
+      }, POSTER_TIMEOUT_MS);
+      cmd.on("end", () => done(() => resolve()));
+      cmd.on("error", (err: Error) => done(() => reject(err)));
+      cmd.run();
+    });
+    const raw = await fs.readFile(out);
+    return await sharp(raw).resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+  } catch (err: any) {
+    console.warn(`[r3d] no poster frame for ${path.basename(input)}: ${err?.message || err}`);
+    return null;
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
 
 // One ffmpeg pass extracts ~targetCount evenly-spaced frames as lossless PNG
 // (no intermediate JPEG generation loss).

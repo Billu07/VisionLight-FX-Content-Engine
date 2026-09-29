@@ -218,7 +218,11 @@ function StepCard({
         <div className="t-step-thumb">
           <span className="t-num">{index + 1}</span>
           {p?.thumb ? (
-            <img src={p.thumb} alt="" />
+            <>
+              <img src={p.thumb} alt="" />
+              {/* The frame proves the clip arrived; this says what happens to it next. */}
+              {status === "AWAITING_PAYMENT" && <span className="t-step-wait">Clip Saved · Converts After Checkout</span>}
+            </>
           ) : status === "PROCESSING" ? (
             <div className="t-building">
               <Spinner />
