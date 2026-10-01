@@ -233,11 +233,17 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   - **A landscape drift on a phone** (2026-10-02, client; `landscape_button.jpeg`): the drift's own
     shape decides this, measured off what is drawn (`r3d-wide`, frame aspect >= 1.2) — not the screen's.
     Held UPRIGHT it shows "Turn your phone for the full view" under the frame the whole time
-    (`.r3d-turnhint`, anchored to `--r3d-framebot`) — not a flash after a tap. The `[data-fs]` button is
-    there only inside an app's OWN browser (`r3d-inapp`, `rotation3d/inAppBrowser.ts`), where turning the
-    phone may not hand the screen over by itself; on a normal mobile browser the hint does the job and the
-    button was offering the same thing twice (client, 2026-10-02). Where it does show it means
-    "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
+    (`.r3d-turnhint`) — not a flash after a tap. The DRAG CUE hangs off the frame's bottom edge there
+    (the hand riding onto the footage, the cue under it), and the pill steps BELOW the pair: `draw()`
+    publishes `--r3d-cuebot` while the cue is hanging there and the pill's `top` reads
+    `var(--r3d-cuebot, var(--r3d-framebot))`. Before that the cue floated in the middle of the band and
+    the two sat level with each other (client's refine3.jpeg, 2026-10-02). The `[data-fs]` button is
+    there inside an app's OWN browser (`r3d-inapp`, `rotation3d/inAppBrowser.ts`), where turning the
+    phone may not hand the screen over by itself — and on the FIRST landscape drift of a visit anywhere
+    (`r3d-fsfirst`; the module flag `fsOfferedFor` is keyed to the drift's first frame url, so a
+    re-render keeps the offer and the next stop never inherits it). Shown once, the way to fill the
+    screen is taught; after that the line under the drift does the asking, which is what the client
+    asked for in place of a permanent button. Where it does show it means "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
     `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. The lock is tried THREE
     times: before any await (while the tap is still the user gesture), straight after fullscreen resolves,
     and once more 350ms later — on X's in-app browser the first open never turned and the second always
@@ -249,7 +255,13 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     own arrangement) — instead of a row across the room; the nav buttons carry `r3d-nav-prev/menu/next`
     for it. It applies to ANY clip on a sideways phone since 2026-10-02, portrait included: a portrait
     clip used to stack them down the right-hand side (`r3d-siderail`) and the two should match. Buttons
-    are sized to `--r3d-side` (the ground beside the footage, set in draw()) and keep 14px off it.
+    are sized to `--r3d-side` (the ground beside the footage, set in draw()) and keep off it. Prev and
+    Next stand `7vh` up off the bottom edge and are bigger, one line each (`nowrap`, and a 104px floor
+    under the max-width): down in the corners they sat under the thumbs and "‹ Prev" broke over two
+    lines (refine4.jpeg, 2026-10-02). The +/- zoom pair is KEPT here — `.r3d-stage.r3d-corners
+    .r3d-zoomcol` overrides the three fullscreen rules that hide it, and it sits above Next — because a
+    sideways phone pillarboxes the footage, so the pair has ground of its own beside it. A product with
+    mobile zoom switched off still wins (that rule is `!important`).
     **Desktop is not touched by any of this**: `immersive` there means fullscreen, and fullscreen on a
     desktop is band mode, which keeps the row along the bottom.
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
