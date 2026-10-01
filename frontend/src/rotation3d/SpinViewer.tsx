@@ -955,22 +955,25 @@ export default function SpinViewer({
         const stageH = H / DPR;
         // A landscape clip held upright leaves a wide band of ground under the footage, and the
         // cue was floating out in the middle of it, level with the "turn your phone" pill
-        // (client's refine3.jpeg). There it hangs off the frame instead - the hand just onto the
-        // footage's bottom edge, the cue under it - which is also where it means something.
+        // (client's refine3.jpeg). It sits just UNDER the frame instead - close to it, which is
+        // where it means something, but never ON it: a phone's screen is small and the hand was
+        // covering part of the room (client, 2026-10-02). 8px of air, and it still gives way to
+        // the buttons if a screen is ever too short to hold both.
         const underFrame = wideClip && !corners && realMode && frameRect.h > 0;
         let topPx: number;
         if (underFrame) {
           const frameBottomCss = (frameRect.y + frameRect.h) / DPR;
-          const lift = Math.min((frameRect.h / DPR) * 0.16, handH + 14);
-          topPx = Math.max(12, Math.min(frameBottomCss - lift, stageH - (handH + 7 + cueH) - 12));
+          const hintH = hintRef.current.offsetHeight || handH + 7 + cueH;
+          const roomFor = ctasRef.current?.offsetTop || stageH - 120;
+          topPx = Math.max(12, Math.min(frameBottomCss + 8, roomFor - hintH - 10, stageH - hintH - 12));
         } else {
           // With the buttons in the side column there is nothing above to hang from, so the
           // helper keeps its own place near the bottom of the footage.
           const ctaTop = sideRail ? stageH - 96 : ctasRef.current?.offsetTop || stageH - 120;
           topPx = Math.max(12, ctaTop - (handH + 7 + cueH) - 16);
         }
-        // Where the cue ends, so the pill can take its place under the pair instead of beside it.
-        const cueBottom = underFrame ? Math.round(topPx + handH + 7 + cueH) : -1;
+        // Where the cue ends, so the pill can take its place under it instead of beside it.
+        const cueBottom = underFrame ? Math.round(topPx + (hintRef.current.offsetHeight || handH + 7 + cueH)) : -1;
         if (cueBottom !== cueBot) {
           cueBot = cueBottom;
           if (cueBottom < 0) stage.style.removeProperty("--r3d-cuebot");
