@@ -187,6 +187,15 @@ const CREATOR_LANDING_URL = "/tour";
 // Raise it if a little crop is ever worth a little more bleed — it is the only knob.
 const FILL_MAX_MISMATCH = 1;
 
+/**
+ * The one drift that is offered the "fill the screen" button outside an app's own browser:
+ * the FIRST landscape clip of a visit (client, 2026-10-02 - "make it so turn fullscreen is on
+ * the first time you see a horizontal in the sequence"). After that the line under the drift
+ * does the asking, since turning the phone fills the screen by itself. Keyed to the drift, so
+ * the offer survives a re-render of the same one and never follows the visitor to the next.
+ */
+let fsOfferedFor: string | null = null;
+
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
   const s = bg.trim().toLowerCase();
@@ -446,6 +455,9 @@ export default function SpinViewer({
     let wideClip = false;
     let corners = false;
     let frameTop = -1;
+    let cueBot = -1;
+    // A new drift starts without the offer; the flag below decides whether it earns it.
+    stage.classList.remove("r3d-fsfirst");
     // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
     // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
     if (isInAppBrowser()) stage.classList.add("r3d-inapp");
@@ -885,6 +897,12 @@ export default function SpinViewer({
         wideClip = wantWide;
         stage.classList.toggle("r3d-wide", wantWide);
         syncFsIcon();
+        // Taught once: the first landscape drift shows the button, the rest rely on the hint.
+        const driftKey = (realMode && urls ? urls[0] : "") || "";
+        if (wantWide && (fsOfferedFor === null || fsOfferedFor === driftKey)) {
+          fsOfferedFor = driftKey;
+          stage.classList.add("r3d-fsfirst");
+        }
       }
       if (wantCorners !== corners) {
         corners = wantCorners;
@@ -935,10 +953,29 @@ export default function SpinViewer({
         const handH = handRef.current?.offsetHeight || 28;
         const cueH = cueRef.current?.offsetHeight || 26;
         const stageH = H / DPR;
-        // With the buttons in the side column there is nothing above to hang from, so the
-        // helper keeps its own place near the bottom of the footage.
-        const ctaTop = sideRail ? stageH - 96 : ctasRef.current?.offsetTop || stageH - 120;
-        const topPx = Math.max(12, ctaTop - (handH + 7 + cueH) - 16);
+        // A landscape clip held upright leaves a wide band of ground under the footage, and the
+        // cue was floating out in the middle of it, level with the "turn your phone" pill
+        // (client's refine3.jpeg). There it hangs off the frame instead - the hand just onto the
+        // footage's bottom edge, the cue under it - which is also where it means something.
+        const underFrame = wideClip && !corners && realMode && frameRect.h > 0;
+        let topPx: number;
+        if (underFrame) {
+          const frameBottomCss = (frameRect.y + frameRect.h) / DPR;
+          const lift = Math.min((frameRect.h / DPR) * 0.16, handH + 14);
+          topPx = Math.max(12, Math.min(frameBottomCss - lift, stageH - (handH + 7 + cueH) - 12));
+        } else {
+          // With the buttons in the side column there is nothing above to hang from, so the
+          // helper keeps its own place near the bottom of the footage.
+          const ctaTop = sideRail ? stageH - 96 : ctasRef.current?.offsetTop || stageH - 120;
+          topPx = Math.max(12, ctaTop - (handH + 7 + cueH) - 16);
+        }
+        // Where the cue ends, so the pill can take its place under the pair instead of beside it.
+        const cueBottom = underFrame ? Math.round(topPx + handH + 7 + cueH) : -1;
+        if (cueBottom !== cueBot) {
+          cueBot = cueBottom;
+          if (cueBottom < 0) stage.style.removeProperty("--r3d-cuebot");
+          else stage.style.setProperty("--r3d-cuebot", cueBottom + "px");
+        }
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
         if (cueRef.current) cueRef.current.style.marginTop = "0px";
@@ -2595,8 +2632,16 @@ const R3D_CSS = `
 /* The BOTTOM corners sit outside the notch and outside the home indicator, so they take the
    screen edge rather than the safe inset — that inset is what pinned Prev against the frame on a
    notched phone (client's refine2.jpeg). */
-.r3d-corners .r3d-nav-prev{bottom:max(12px,env(safe-area-inset-bottom));left:12px}
-.r3d-corners .r3d-nav-next{bottom:max(12px,env(safe-area-inset-bottom));right:12px}
+.r3d-corners .r3d-nav-prev{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh);left:12px}
+.r3d-corners .r3d-nav-next{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh);right:12px}
+/* Up off the very bottom edge, and bigger: down in the corners of a sideways phone they sat
+   under the thumbs and read as small (client's refine4.jpeg, 2026-10-02). 7vh of a landscape
+   phone is ~27px, which lifts the pair into the hand without leaving the ground beside the
+   footage. nowrap because at this size "Prev" with its arrow broke over two lines inside a
+   narrow side column; the floor under the max-width is what keeps it on one line there. */
+.r3d-corners .r3d-ctas.r3d-tournav :is(.r3d-nav-prev,.r3d-nav-next){white-space:nowrap;
+  max-width:max(104px,calc(var(--r3d-side,96px) - 8px));
+  padding:clamp(11px,3vmin,15px) clamp(14px,3.8vmin,22px);font-size:clamp(14px,3.2vmin,17px)}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
    nothing to hang from, so it sits above the bottom buttons instead. */
 .r3d-corners .r3d-hint{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 52px)}
@@ -2611,9 +2656,11 @@ const R3D_CSS = `
 /* A1: a landscape drift held upright gets the one button that fills the screen. Everything
    else on a phone drift stays hidden (see the rule that hides reset + fullscreen below). */
 @media (pointer: coarse) and (orientation: portrait){
-  /* Only inside an app's own browser. On a normal mobile browser turning the phone already fills
-     the screen, so the button was offering what the hint below asks for (client, 2026-10-02). */
-  .r3d-drift.r3d-wide.r3d-inapp [data-fs]{display:inline-grid!important}
+  /* Inside an app's own browser, where turning the phone may not hand the screen over at all -
+     and on the FIRST landscape drift of a visit anywhere, so the way to fill the screen is shown
+     once rather than only described (client, 2026-10-02). Every landscape drift after that has
+     the line below it, which is what the client asked for in place of a permanent button. */
+  .r3d-drift.r3d-wide:is(.r3d-inapp,.r3d-fsfirst) [data-fs]{display:inline-grid!important}
   /* "Turn your phone for the full view" is no longer a flash after a tap — it stands under the
      drift the whole time a landscape clip is held upright, the only state where it means
      anything (client, 2026-10-02: "should be on the screen on mobile always"). */
@@ -2627,8 +2674,11 @@ const R3D_CSS = `
 
 /* "Turn your phone": only after the button was pressed and the browser refused to turn it
    for us. It cannot be done from a web page on iOS — there is no API — so we ask. */
-/* Under the footage, not over it: --r3d-framebot is where the frame ends, set in draw(). */
-.r3d-turnhint{position:absolute;left:50%;top:calc(var(--r3d-framebot,60%) + 18px);transform:translateX(-50%);z-index:9;opacity:0;pointer-events:none;
+/* Under the footage, not over it, and under the drag cue that now hangs off the frame's bottom
+   edge - the two were landing on the same line (client's refine3.jpeg, 2026-10-02).
+   --r3d-cuebot is where that cue ends and --r3d-framebot where the frame does; draw() sets the
+   first only while the cue is hanging there, so the frame's edge is the standing fallback. */
+.r3d-turnhint{position:absolute;left:50%;top:calc(var(--r3d-cuebot,var(--r3d-framebot,60%)) + 14px);transform:translateX(-50%);z-index:9;opacity:0;pointer-events:none;
   padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;
   background:rgba(11,15,25,.72);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(10px);transition:opacity .25s ease}
 .r3d-turn .r3d-turnhint{opacity:1}
@@ -2672,6 +2722,12 @@ const R3D_CSS = `
 .r3d-stage:fullscreen .r3d-zoomcol{display:none}
 .r3d-stage:-webkit-full-screen .r3d-zoomcol{display:none}
 .r3d-pseudo-fs .r3d-zoomcol{display:none}
+/* ...except on a phone held sideways. There the footage is pillarboxed, so the pair has ground
+   of its own beside it and the client asked for it back - higher than it was, above Next, so
+   the bottom corners stay with the hands (refine4.jpeg, 2026-10-02). A product with zoom turned
+   off on phones still wins: that rule is !important. */
+.r3d-stage.r3d-corners .r3d-zoomcol{display:flex;top:auto;right:14px;
+  bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh + 58px)}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 /* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,
