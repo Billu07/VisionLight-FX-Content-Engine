@@ -165,26 +165,43 @@ const Glyph = ({ d, x, y, size = 18 }: { d: readonly string[]; x: number; y: num
 
 // ── the four worlds (each drawn in its own 340 × 210 cell) ──
 
-const TOUR_WALK = "M40 192 C 96 172, 136 164, 170 164 C 204 164, 244 172, 300 192";
+// The walk through the room, and where it stops. Kept inside the safe box (26..314) so a
+// settled world never touches the window's rounded corners — see the note on SAFE below.
+const TOUR_WALK = "M64 182 C 110 170, 142 162, 170 162 C 198 162, 230 170, 276 182";
 const TOUR_STOPS = [
-  { x: 40, y: 192 },
-  { x: 170, y: 164 },
-  { x: 300, y: 192 },
+  { x: 64, y: 182 },
+  { x: 170, y: 162 },
+  { x: 276, y: 182 },
 ];
 
-/** Tour — a space you walk through: a room, and the stops of a tour across its floor. */
+/**
+ * Tour — a room you could walk into: back wall with a lit window, the ceiling and floor running
+ * away to it, furniture standing on the floor, and the tour's stops threaded across it. It used
+ * to be a corner with two picture frames, which the client said didn't paint a full picture
+ * (2026-10-02) — a corner reads as a detail, not as a space.
+ */
 const TourWorld = () => (
   <>
-    <path className="ln" d="M96 52 L8 4" />
-    <path className="ln" d="M244 52 L332 4" />
-    <path className="ln" d="M96 148 L8 206" />
-    <path className="ln" d="M244 148 L332 206" />
-    <rect className="ln" x={96} y={52} width={148} height={96} rx={3} />
-    <path className="ln" d="M96 148 H244" />
-    <rect className="ln" x={112} y={72} width={34} height={26} rx={3} />
-    <rect className="ln" x={194} y={72} width={34} height={26} rx={3} />
-    <path className="soft" d="M156 148 V114 a14 14 0 0 1 28 0 V148 Z" />
-    <path className="ac" d="M156 148 V114 a14 14 0 0 1 28 0 V148" />
+    {/* ceiling and floor running back to the far wall */}
+    <path className="ln" d="M124 72 L40 30" />
+    <path className="ln" d="M216 72 L300 30" />
+    <path className="ln" d="M124 140 L40 186" />
+    <path className="ln" d="M216 140 L300 186" />
+    <path className="ln" d="M40 30 V186" />
+    <path className="ln" d="M300 30 V186" />
+    {/* the far wall */}
+    <rect className="ln" x={124} y={72} width={92} height={68} rx={2} />
+    {/* its window, and the light it throws onto the floor */}
+    <path className="soft" d="M142 112 L118 186 H222 L198 112 Z" />
+    <rect className="ac" x={142} y={84} width={56} height={28} rx={2} />
+    <path className="ac" d="M170 84 V112 M142 98 H198" opacity={0.55} />
+    {/* a sofa against the left wall, a low table, a plant by the right */}
+    <path className="ln" d="M58 150 h44 v22 h-44 z" />
+    <path className="ln" d="M58 150 v-12 h44 v12" />
+    <ellipse className="ln" cx={170} cy={156} rx={22} ry={8} />
+    <path className="ln" d="M266 170 v-16" />
+    <path className="ln" d="M266 154 c -10 -2 -12 -12 -2 -14 c 8 -2 14 6 2 14 z" />
+    {/* the walk, and its stops */}
     <path className="ac dash" d={TOUR_WALK} opacity={0.85} />
     {TOUR_STOPS.map((s, i) => (
       <g key={`${s.x}`}>
@@ -197,35 +214,62 @@ const TourWorld = () => (
   </>
 );
 
-/** View — what someone sees from where they stand: a horizon, and a sightline sweeping it. */
+/**
+ * View — a sunset you can look around: sky, a sun low over the horizon, and its light broken up
+ * on the water below. The client asked for "a proper sunset" (2026-10-02); what was here before
+ * was an arc with a sightline sweeping it, which read as a diagram rather than a place. The
+ * sweep survives as the small fan at the viewpoint — that is still what View means — but the
+ * sunset is what the picture is of.
+ */
 const ViewWorld = () => (
   <>
-    <path className="ln" d="M0 132 H340" />
-    <circle className="soft" cx={170} cy={104} r={34} />
-    <circle className="ac" cx={170} cy={104} r={21} />
-    <path className="ln" d="M22 132 V110 h20 v22" />
-    <path className="ln" d="M48 132 V96 h16 v36" />
-    <path className="ln" d="M262 132 V102 h18 v30" />
-    <path className="ln" d="M286 132 V114 h16 v18" />
-    <path className="ln dash" d="M36 152 H150" />
-    <path className="ln dash" d="M198 168 H304" />
-    <path className="ln dash" d="M70 184 H262" />
-    <g className="dh-sweep">
-      <path className="soft" d="M170 196 L128 128 A 84 84 0 0 1 212 128 Z" />
-      <path className="ac" d="M170 196 V120" />
+    {/* sky */}
+    <path className="ln" d="M96 52 H206" opacity={0.5} />
+    <path className="ln" d="M74 68 H158" opacity={0.4} />
+    <path className="ln" d="M196 68 H254" opacity={0.4} />
+    {/* the sun, sinking */}
+    <g className="dh-lift">
+      <circle className="soft" cx={170} cy={104} r={42} />
+      <circle className="soft" cx={170} cy={104} r={27} />
+      <circle className="ac" cx={170} cy={104} r={27} />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+        const r = (a * Math.PI) / 180;
+        return (
+          <path
+            key={a}
+            className="ac"
+            opacity={0.45}
+            d={`M${(170 + Math.cos(r) * 36).toFixed(1)} ${(104 + Math.sin(r) * 36).toFixed(1)} L${(170 + Math.cos(r) * 46).toFixed(1)} ${(104 + Math.sin(r) * 46).toFixed(1)}`}
+          />
+        );
+      })}
     </g>
-    <circle className="pin" cx={170} cy={196} r={10} />
-    <circle className="solid" cx={170} cy={196} r={3.6} />
+    {/* the horizon, and the land either side of it */}
+    <path className="ac" d="M30 136 H310" />
+    <path className="ln" d="M30 136 l24 -14 l18 8 l22 -12 l16 18" />
+    <path className="ln" d="M310 136 l-22 -16 l-18 10 l-20 -8 l-14 14" />
+    {/* the light broken up on the water */}
     {[
-      { x: 84, y: 132, d: ICONS.sun },
-      { x: 252, y: 132, d: ICONS.cup },
-    ].map((p) => (
-      <g key={p.x}>
-        <circle className="dh-ping" cx={p.x} cy={p.y} r={13} />
-        <circle className="pin" cx={p.x} cy={p.y} r={13} />
-        <Glyph d={p.d} x={p.x} y={p.y} size={15} />
-      </g>
+      { y: 148, w: 74 },
+      { y: 158, w: 58 },
+      { y: 168, w: 42 },
+      { y: 178, w: 26 },
+    ].map((b, i) => (
+      <path
+        key={b.y}
+        className="ac dh-beat"
+        opacity={0.6 - i * 0.1}
+        style={{ animationDelay: `${i * 0.35}s` }}
+        d={`M${170 - b.w / 2} ${b.y} H${170 + b.w / 2}`}
+      />
     ))}
+    {/* standing here, looking around — what View is for */}
+    <g className="dh-sweep">
+      <path className="soft" d="M170 190 L140 150 A 50 50 0 0 1 200 150 Z" />
+      <path className="ac" d="M170 190 V146" opacity={0.7} />
+    </g>
+    <circle className="pin" cx={170} cy={190} r={9} />
+    <circle className="solid" cx={170} cy={190} r={3.4} />
   </>
 );
 
@@ -270,6 +314,10 @@ const PATH_NODES = [
 /** Path — pieces joined into one route: drifts, images, video and links along a line. */
 const PathWorld = () => (
   <>
+    {/* Inset to the same safe box the other worlds use: its end nodes ran to within 10 units
+        of the cell edge, which is what read as cut off at the window's rounded corners
+        (client, 2026-10-02). Scaled rather than redrawn — the drawing itself is fine. */}
+    <g transform="translate(21 6) scale(.875)">
     <path className="ln" d={PATH_ROUTE} strokeWidth={7} opacity={0.5} />
     <path className="ac dh-draw" d={PATH_ROUTE} strokeWidth={3} />
     {PATH_NODES.map((n) => (
@@ -282,6 +330,7 @@ const PathWorld = () => (
       </g>
     ))}
     <circle className="dh-rove" r={6} style={{ offsetPath: `path("${PATH_ROUTE}")`, animationDuration: "7s" }} />
+    </g>
   </>
 );
 

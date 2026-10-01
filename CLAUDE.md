@@ -627,8 +627,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   Nothing hangs off a corner any more, which is what the iOS alignment complaint was.
   The hero's scene is **`rotation3d/DriftHomeScene.tsx`**
   (2026-09-17): this is the parent page, so one Drift frame stands on the shared `DriftStage` floor with all
-  four worlds drawn side by side inside it (Tour room + stops · View horizon + sightline · Memory frames +
-  Private badge · Path route + nodes), each in its product colour (cyan / cyan / violet / emerald), while a
+  four worlds drawn side by side inside it (Tour room + stops · View sunset + viewpoint · Memory frames +
+  Private badge · Path route + nodes). **Redrawn 2026-10-02 (client)**: View is a sunset — sun, rays, horizon
+  with land, light broken on the water — because the old arc-and-sightline read as a diagram, not a place;
+  Tour is a room with a far wall, a lit window throwing light on the floor and furniture standing on it,
+  because a corner reads as a detail rather than a space. Every world is drawn inside a SAFE BOX
+  (x 26..314, y 18..192 of its 340x210 cell) and all four now carry >=30 units of margin: View used to run
+  0..340, edge to edge, which is exactly what the client saw as "not completely shown" while scrubbing.
+  Path is scaled into the box rather than redrawn. scratchpad/world-bbox.js measures this — run it after
+  touching any world, each in its product colour (cyan / cyan / violet / emerald), while a
   playhead travels the rail below (hold 2.6s, glide 1.15s, turns around at the ends) and a caption names the
   world with the card's own title + status. Drawn art, NOT photos — it matches the product landings and never
   depends on the demo tour. On a mouse or pen the pointer takes the playhead over (`follow`/`release`: this is
