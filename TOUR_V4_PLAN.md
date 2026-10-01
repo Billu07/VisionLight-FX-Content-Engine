@@ -124,3 +124,46 @@ the page and how it loads.
 Headless Chrome covers layout and the Android path. **It cannot answer the iOS question** — the
 one that matters most here — so A needs a real iPhone (Safari, and the Facebook in-app browser for
 C) before it is called done.
+
+---
+
+## As shipped (2026-10-02)
+
+**A-H are in `main`, unverified on a real iPhone.** Three rounds, because the client watched each
+one on a phone and sent the next note back.
+
+**Round 1** - A1 the fill-the-screen button (Android really turns the screen via
+`orientation.lock`; iOS takes the viewport and asks) - A2 the corner layout - A3 the centre-top
+indicator off on touch - B1 tap-to-hide gone - B2 the drag fade narrowed to a portrait clip - C the
+Facebook browser lands on the tour menu - D the drift.li mark in the player's corner - E "Try Drift
+Tour" -> `/tour` - F the home hero's worlds (centred, View is a sunset, Tour is a room) - G more
+blue on a phone - H the tour page header's spacing.
+
+**Round 2** (refine1 / refine2 + the client's video) - the fullscreen button comes DOWN beside the
+frame on an upright phone (`--r3d-frametop`); the corner buttons are bigger and off the picture;
+"Turn your phone for the full view" stands under the drift the whole time a landscape clip is
+upright instead of flashing after a tap; the button itself narrows to in-app browsers, since
+turning the phone already fills the screen everywhere else. And the regression that made the
+client's Instagram report ("your buttons not loading on insta"): the in-app redirect fired on
+every mount, so tapping a drift from the menu bounced straight back - now once per load, and
+Instagram is out of the matcher.
+
+**Round 3** (refine3 / refine4) - the drag cue hangs off the frame's bottom edge and the turn-your-
+phone pill steps below it (`--r3d-cuebot`); a turned phone keeps its zoom pair, above Next; Prev
+and Next come up off the bottom edge and get bigger; and the fill-the-screen button is offered on
+the FIRST landscape drift of a visit, not only in an app's browser.
+
+Measured by a CDP probe against a mocked API - the cue, the pill and the button on a 390x844
+phone, the in-app swap losing the offer, the corner layout on 844x390, a 1440x900 desktop
+unchanged: 26/26.
+
+### Still owed on A
+
+A real iPhone. Headless Chrome cannot say whether Safari's pseudo-fullscreen reads right, whether
+the turn hint lands where it should over a real notch, or how the Facebook browser behaves. The
+client has the build; their phone is the test.
+
+### Not started
+
+**I** the first-run drag coach and **J** the ~30s explainer video. Both need a storyboard before
+any code - see above.
