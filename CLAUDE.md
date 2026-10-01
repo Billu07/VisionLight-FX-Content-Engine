@@ -363,6 +363,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   untouched. Builder: `RouteInk` (TourBuilder) draws the rail as an inked route from the items'
   pin positions (`:scope > .t-route-item`, pin centre = offsetTop + 33); `ShareSheet.tsx` is the
   publish moment (link + copy + QR via `qrcode-generator` + system share), also behind "Share".
+- **Facebook's in-app browser** (2026-10-02, client): it swallows the first touch sequence on a page,
+  so a drift opened straight from a shared post looks dead — you drag and nothing moves. We can't fix
+  their webview, so `Rotation3DPlayer` sends a `/tour/{page}/{tour}/{drift}` link opened in it to the
+  tour's MENU instead (`isInAppBrowser`, matching FBAN/FBAV/FB_IAB/FBIOS/Instagram/Messenger — they
+  share the webview). There the first interaction is a tap on a link, which that browser handles, and
+  the drift is one tap away with the gesture already spent. Every other browser goes straight to the
+  drift, and the share CARD is untouched — this is a runtime redirect, not a change to any link.
 - **Rules**: creator button links = drift.li / picdrift.com / same-site paths only (server-validated,
   env `DRIFT_CREATOR_LINK_HOSTS`); a flow-step drift's `ctaPrimary` is flow-managed (the generic
   product patch drops it); product/form deletes cascade the step → the product delete route relinks.

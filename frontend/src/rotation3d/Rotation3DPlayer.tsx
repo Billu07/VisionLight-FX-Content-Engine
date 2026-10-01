@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Navigate, useNavigate, useLocation } from "react-router-dom";
+
+/** Facebook / Instagram / Messenger's shared webview, which eats the first touch on a page. */
+const isInAppBrowser = () => {
+  if (typeof navigator === "undefined") return false;
+  // FBAN/FBAV = the Facebook app, FB_IAB = its in-app browser, then Instagram and Messenger.
+  return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger/i.test(navigator.userAgent || "");
+};
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
@@ -136,6 +143,15 @@ export default function Rotation3DPlayer() {
   // readable link /tour/:tourPage/:tourFlow/:tourDrift.
   const { productId, brandSlug, productSlug, tourPage, tourFlow, tourDrift } = useParams();
   const byFlow = !!(tourPage && tourFlow && tourDrift);
+  /**
+   * Facebook's in-app browser swallows the first touch sequence on a page, so a drift opened
+   * straight from a shared post looks dead: you drag and nothing happens (client, 2026-10-02).
+   * We cannot fix their webview, so a link opened in it lands on the tour's MENU instead — there
+   * the first thing a visitor does is tap a link, which that browser handles, and the drift is
+   * one tap away with the gesture already spent. Instagram and Messenger share the webview, so
+   * they match too. Every other browser is untouched.
+   */
+  const inAppMenu = byFlow && isInAppBrowser() ? `/tour/${tourPage}/${tourFlow}` : null;
   const [search] = useSearchParams();
   // embed customization via URL params (?cta=0&controls=0&brand=0)
   const showCtas = search.get("cta") !== "0";
@@ -335,6 +351,8 @@ export default function Rotation3DPlayer() {
     if (!drift || !data?.id || !data?.flow || window.location.pathname.startsWith("/embed/")) return null;
     return { productId: String(data.id), key: newViewKey(), link: shareLinkFor(data.flow.id) };
   }, [data, drift]);
+
+  if (inAppMenu) return <Navigate to={inAppMenu} replace />;
 
   if (tourAlias) return <Navigate to={`/tour/${brandSlug}`} replace />;
 
