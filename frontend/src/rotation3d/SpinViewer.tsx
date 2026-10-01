@@ -444,6 +444,7 @@ export default function SpinViewer({
     let sideRail = false;
     let wideClip = false;
     let corners = false;
+    let frameTop = -1;
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -857,7 +858,13 @@ export default function SpinViewer({
       // for the buttons, which beats laying them over the footage (client, 2026-09-23).
       // Only when the drift fills the screen: a band already gives the buttons somewhere to be.
       const sideGap = immersive && !bandMode && frameRect.w > 0 ? (W - frameRect.w) / 2 / DPR : 0;
-      const wantSide = sideGap >= 132;
+      // Is the FOOTAGE landscape? Measured off what is drawn, so it follows the clip, not the screen.
+      const wantWide = frameRect.w > 0 && frameRect.w / Math.max(1, frameRect.h) >= 1.2;
+      // The client's arrangement for a landscape drift on a sideways phone: Menu top-right,
+      // Prev bottom-left, Next bottom-right, in the ground either side of the frame.
+      const wantCorners = wantWide && immersive && touchLike?.matches === true && isLandscape();
+      // Both layouts want that ground; the corner one is the more specific of the two.
+      const wantSide = sideGap >= 132 && !wantCorners;
       if (wantSide) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
       if (wantSide !== sideRail) {
         sideRail = wantSide;
@@ -865,23 +872,26 @@ export default function SpinViewer({
         if (!wantSide) stage.style.removeProperty("--r3d-side");
       }
 
-      // Is the FOOTAGE landscape? Measured off what is actually drawn, so it follows the clip
-      // rather than the screen. Two things hang off it: a sideways phone puts the nav in the
-      // corners (client's landscape_button.jpeg), and only a PORTRAIT clip still fades its
-      // chrome while being dragged.
-      const wantWide = frameRect.w > 0 && frameRect.w / Math.max(1, frameRect.h) >= 1.2;
+      // Only a PORTRAIT clip still fades its chrome while being dragged, so the class is needed
+      // either way.
       if (wantWide !== wideClip) {
         wideClip = wantWide;
         stage.classList.toggle("r3d-wide", wantWide);
         syncFsIcon();
       }
-      // The client's arrangement for a landscape drift on a sideways phone: Menu top-right,
-      // Prev bottom-left, Next bottom-right, in the ground either side of the frame — rather
-      // than one row lying across the room.
-      const wantCorners = wantWide && immersive && touchLike?.matches === true && isLandscape();
       if (wantCorners !== corners) {
         corners = wantCorners;
         stage.classList.toggle("r3d-corners", wantCorners);
+      }
+      // How much ground there is beside the footage, so the corner buttons can be sized to it and
+      // kept off the picture (client: "too close to frame ... there's room").
+      if (wantCorners) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
+      // Where the footage starts, so the fullscreen button sits just above it rather than in the
+      // far corner of an empty screen (client's refine1.jpeg).
+      const topCss = Math.round(frameRect.y / DPR);
+      if (topCss !== frameTop) {
+        frameTop = topCss;
+        stage.style.setProperty("--r3d-frametop", topCss + "px");
       }
 
       // Drift on mobile: the canvas frame is vertically centered but the headline
@@ -2553,15 +2563,22 @@ const R3D_CSS = `
    The footage is pillarboxed, so the nav moves out into the ground either side of it instead
    of lying across the room: Menu top-right, Prev bottom-left, Next bottom-right. */
 .r3d-corners .r3d-ctas.r3d-tournav{position:absolute;inset:0;left:0;right:0;top:0;bottom:0;max-width:none;margin:0;padding:0;display:block;pointer-events:none;transform:none}
+/* Bigger, and never touching the picture (client, 2026-10-02). --r3d-side is how much ground
+   there is beside the footage; 12px off the screen edge plus a 14px gap leaves the rest for the
+   button, so it grows where the margin is generous and stays clear where it is not. */
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
-  padding:clamp(7px,1.6vmin,10px) clamp(12px,2.6vmin,18px);font-size:clamp(12px,2.1vmin,15px)}
+  padding:clamp(9px,2.2vmin,13px) clamp(13px,3vmin,20px);font-size:clamp(13px,2.4vmin,16px);
+  max-width:calc(var(--r3d-side,96px) - 26px)}
 /* Under the icon column, not on it: the fullscreen button lives in the top-right corner too and
    Menu was landing on top of it (client, 2026-10-02). One icon's height plus a gap, and the same
    right edge as the icons (the top bar pads 16px), so the two read as one stack. */
 .r3d-corners .r3d-nav-menu{top:calc(max(16px,env(safe-area-inset-top)) + clamp(32px,9vmin,40px) + 10px);
-  right:max(16px,env(safe-area-inset-right))}
-.r3d-corners .r3d-nav-prev{bottom:max(14px,env(safe-area-inset-bottom));left:max(14px,env(safe-area-inset-left))}
-.r3d-corners .r3d-nav-next{bottom:max(14px,env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right))}
+  right:max(12px,env(safe-area-inset-right))}
+/* The BOTTOM corners sit outside the notch and outside the home indicator, so they take the
+   screen edge rather than the safe inset — that inset is what pinned Prev against the frame on a
+   notched phone (client's refine2.jpeg). */
+.r3d-corners .r3d-nav-prev{bottom:max(12px,env(safe-area-inset-bottom));left:12px}
+.r3d-corners .r3d-nav-next{bottom:max(12px,env(safe-area-inset-bottom));right:12px}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
    nothing to hang from, so it sits above the bottom buttons instead. */
 .r3d-corners .r3d-hint{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 52px)}
@@ -2577,6 +2594,11 @@ const R3D_CSS = `
    else on a phone drift stays hidden (see the rule that hides reset + fullscreen below). */
 @media (pointer: coarse) and (orientation: portrait){
   .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+  /* Beside the drift, not in the far corner of an empty screen: a landscape drift held upright
+     leaves a lot of dead space above the frame and the button sat at the top of it (client's
+     refine1.jpeg). --r3d-frametop is where the footage begins, set each frame in draw(). */
+  .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
+    top:calc(var(--r3d-frametop,120px) - clamp(32px,9vmin,40px) - 12px)}
 }
 
 /* "Turn your phone": only after the button was pressed and the browser refused to turn it

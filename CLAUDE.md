@@ -366,10 +366,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 - **Facebook's in-app browser** (2026-10-02, client): it swallows the first touch sequence on a page,
   so a drift opened straight from a shared post looks dead — you drag and nothing moves. We can't fix
   their webview, so `Rotation3DPlayer` sends a `/tour/{page}/{tour}/{drift}` link opened in it to the
-  tour's MENU instead (`isInAppBrowser`, matching FBAN/FBAV/FB_IAB/FBIOS/Instagram/Messenger — they
-  share the webview). There the first interaction is a tap on a link, which that browser handles, and
-  the drift is one tap away with the gesture already spent. Every other browser goes straight to the
-  drift, and the share CARD is untouched — this is a runtime redirect, not a change to any link.
+  tour's MENU instead (`isInAppBrowser`, matching FBAN/FBAV/FB_IAB/FBIOS). There the first interaction
+  is a tap on a link, which that browser handles, and the drift is one tap away with the gesture
+  already spent. Every other browser goes straight to the drift, and the share CARD is untouched —
+  this is a runtime redirect, not a change to any link.
+  **Two things it must keep doing** (both bit on 2026-10-02): it fires ONCE per page session
+  (`inAppHandled`) — otherwise tapping a drift FROM that menu redirects straight back and the tour
+  can never be opened, which is what "the buttons don't load" was. And it does NOT match Instagram:
+  drifts opened from there worked fine, so sending those visitors the long way round cost something
+  for nothing.
 - **Rules**: creator button links = drift.li / picdrift.com / same-site paths only (server-validated,
   env `DRIFT_CREATOR_LINK_HOSTS`); a flow-step drift's `ctaPrimary` is flow-managed (the generic
   product patch drops it); product/form deletes cascade the step → the product delete route relinks.

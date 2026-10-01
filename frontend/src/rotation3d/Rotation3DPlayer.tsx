@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Navigate, useNavigate, useLocation } from "react-router-dom";
 
-/** Facebook / Instagram / Messenger's shared webview, which eats the first touch on a page. */
-const isInAppBrowser = () => {
-  if (typeof navigator === "undefined") return false;
-  // FBAN/FBAV = the Facebook app, FB_IAB = its in-app browser, then Instagram and Messenger.
-  return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger/i.test(navigator.userAgent || "");
-};
+/**
+ * Facebook's in-app webview, which eats the first touch sequence on a page. FBAN/FBAV name
+ * the app, FB_IAB its in-app browser; Messenger carries FBAN too.
+ *
+ * NOT Instagram: drifts opened from there worked fine, and routing its visitors the long way
+ * round was a cost with no benefit (client, 2026-10-02).
+ */
+const isInAppBrowser = () =>
+  typeof navigator !== "undefined" && /FBAN|FBAV|FB_IAB|FBIOS/i.test(navigator.userAgent || "");
+
+/**
+ * Only the FIRST drift of a page session goes to the menu. Without this the redirect fires
+ * again the moment someone taps a drift FROM that menu, so they bounce back and the tour can
+ * never be opened at all — which is what "the buttons don't load" turned out to be (client,
+ * 2026-10-02; it surfaced on Instagram because that was the app being tested).
+ */
+let inAppHandled = false;
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
@@ -151,7 +162,12 @@ export default function Rotation3DPlayer() {
    * one tap away with the gesture already spent. Instagram and Messenger share the webview, so
    * they match too. Every other browser is untouched.
    */
-  const inAppMenu = byFlow && isInAppBrowser() ? `/tour/${tourPage}/${tourFlow}` : null;
+  const inAppMenu = useMemo(() => {
+    if (!byFlow || inAppHandled || !isInAppBrowser()) return null;
+    inAppHandled = true; // whatever happens next, this session has had its one redirect
+    return `/tour/${tourPage}/${tourFlow}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [search] = useSearchParams();
   // embed customization via URL params (?cta=0&controls=0&brand=0)
   const showCtas = search.get("cta") !== "0";
