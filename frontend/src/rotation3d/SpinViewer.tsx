@@ -1,6 +1,7 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { isInAppBrowser } from "./inAppBrowser";
+import { createDragCoach, type DragCoach } from "./dragCoach";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
@@ -326,6 +327,9 @@ export default function SpinViewer({
   const poweredRef = useRef<HTMLElement>(null);
   const legalRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
+  const coachRef = useRef<HTMLDivElement>(null);
+  const coachTextRef = useRef<HTMLSpanElement>(null);
+  const coachBarRef = useRef<HTMLSpanElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -567,23 +571,63 @@ export default function SpinViewer({
       stage.classList.remove("r3d-introing");
       yaw = 0; // back to the start frame
       yawVel = 0;
+      // The drift moved without the visitor: the coach measures again from here, so a
+      // demonstration can never tick off the step they were asked to do themselves.
+      coach?.rebase(0);
       dirty = true;
     };
+    // Since 2026-10-02 this is the NUDGE, not the lesson: it plays for a visitor who is
+    // standing still on a step of the coach below. The coach owns "once ever", so the
+    // demo no longer keeps its own key.
     const startIntro = () => {
       if (introActive || userTookOver || !driftMode || !introHint || FRAMES < 4) return;
-      // Respect reduced-motion: skip the auto-demo (the static hint still guides).
+      // Respect reduced-motion: skip the auto-demo (the coach's words still guide).
       if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
-      try {
-        if (localStorage.getItem("drift-intro-seen")) return;
-        localStorage.setItem("drift-intro-seen", "1");
-      } catch {
-        /* private mode / blocked storage → still show it this once */
-      }
       introRange = endYaw * 0.45; // demo ~45% of the drift (not the full reveal)
       introStart = performance.now();
       introActive = true;
       introHandRef.current?.classList.add("r3d-intro-on");
       stage.classList.add("r3d-introing"); // hides the resting hint during the demo
+    };
+
+    // --- the first-run coach ---
+    // A visitor who watches a hand learns nothing; one who drags it forward and back has
+    // learned the whole gesture (client, 2026-10-02). Rules in dragCoach.ts; this owns the
+    // card, the storage and when to stand down.
+    const COACH_KEY = "drift-coach-done";
+    let coach: DragCoach | null = null;
+    let coachDoneAt = 0;
+    const coachSay = (text: string) => {
+      const el = coachTextRef.current;
+      if (el && el.textContent !== text) el.textContent = text;
+    };
+    const endCoach = (learned: boolean) => {
+      if (!coach) return;
+      coach = null;
+      coachDoneAt = 0;
+      stage.classList.remove("r3d-coaching");
+      coachRef.current?.classList.remove("r3d-back", "r3d-coach-done");
+      // Skipping counts too: someone who waved it away does not want it on the next drift.
+      if (learned) {
+        try {
+          localStorage.setItem(COACH_KEY, "1");
+        } catch {
+          /* private mode / blocked storage → they may meet it once more */
+        }
+      }
+    };
+    const startCoach = () => {
+      if (coach || !driftMode || !introHint || FRAMES < 4) return;
+      try {
+        if (localStorage.getItem(COACH_KEY)) return; // they have done this before
+      } catch {
+        /* unreadable storage → coach them; it is the first drift as far as we know */
+      }
+      coach = createDragCoach(performance.now());
+      coachSay("Drag to Look Around");
+      if (coachBarRef.current) coachBarRef.current.style.width = "0%";
+      stage.classList.add("r3d-coaching");
+      dirty = true;
     };
 
     // --- frame images (real mode) ---
@@ -943,6 +987,22 @@ export default function SpinViewer({
         }
       }
 
+      // The coach stands in the band between the footage and the buttons — the cue's own
+      // ground, with room for a card — centred in it, so it covers neither the room nor the
+      // row. A tall clip can leave no band at all; then it rides the bottom of the footage,
+      // which is the only place left and is worth the few seconds it is there.
+      if (coach && coachRef.current && frameRect.h > 0) {
+        const stageHc = H / DPR;
+        const underFrameCss = (frameRect.y + frameRect.h) / DPR;
+        const rowTop = ctasRef.current?.offsetTop || stageHc - 110;
+        const cardH = coachRef.current.offsetHeight || 92;
+        const mid = (Math.max(0, underFrameCss) + rowTop) / 2 - cardH / 2;
+        // Above the buttons, whatever else: Skip must never land on Prev, Menu or Next, and a
+        // portrait clip filling a phone leaves the frame's bottom edge BELOW the row.
+        coachRef.current.style.top =
+          Math.max(12, Math.min(mid, rowTop - cardH - 10, stageHc - cardH - 12)) + "px";
+      }
+
       // Drift: pin the "drag to drift" helper just UNDER the product's rendered
       // bottom (the real frame rect when drawn; the box half-height otherwise —
       // the old code used `scale`, i.e. half the true height, so the arrow landed
@@ -1243,6 +1303,25 @@ export default function SpinViewer({
           dirty = true;
         }
       }
+      // The coach reads the visitor's own dragging. Never the demo's: that is paused out
+      // here and rebased when it ends, so the lesson stays theirs to do.
+      if (coach && !introActive) {
+        const now = performance.now();
+        const v = coach.update(endYaw > 0 ? yaw / endYaw : 0, now);
+        if (coachBarRef.current) coachBarRef.current.style.width = Math.round(v.progress * 100) + "%";
+        if (v.justAdvanced) {
+          if (v.step === "back") {
+            coachSay("Now Drag Back");
+            coachRef.current?.classList.add("r3d-back");
+          } else {
+            coachSay("That's It");
+            coachRef.current?.classList.add("r3d-coach-done");
+            coachDoneAt = now;
+          }
+        }
+        if (v.nudge) startIntro();
+        if (coachDoneAt && now - coachDoneAt > 1200) endCoach(true);
+      }
       if (!introActive) {
         if (idleSpin) yaw += spin * 0.004;
         else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
@@ -1317,6 +1396,7 @@ export default function SpinViewer({
         t.closest(".r3d-pin") ||
         t.closest(".r3d-enquire") ||
         t.closest(".r3d-powered-badge") ||
+        t.closest(".r3d-coach-skip") ||
         t.closest(".r3d-thumbs") ||
         t.closest(".r3d-media"));
 
@@ -1685,6 +1765,8 @@ export default function SpinViewer({
         // means "fill the screen", not "toggle fullscreen".
         if (wideClip && !pseudoFs && !nativeFsActive() && touchLike?.matches === true && !isLandscape()) void fillLandscape();
         else toggleFs();
+      } else if (t.closest(".r3d-coach-skip")) {
+        endCoach(true);
       } else if (t.closest("[data-loop]")) {
         loopOn = !loopOn;
         idleSpin = loopOn;
@@ -1756,7 +1838,7 @@ export default function SpinViewer({
           if (!hero) stage.focus({ preventScroll: true });
           // Sooner: the loader now lifts on the coarse ring rather than the last frame, so
           // half a second of stillness after it read as nothing happening (client, 2026-09-24).
-          window.setTimeout(startIntro, 200); // one-time first-visit drag demo
+          window.setTimeout(startCoach, 200); // the one-time first-visit coach
         }
       };
       requestAnimationFrame(sweep);
@@ -2205,6 +2287,24 @@ export default function SpinViewer({
       )}
 
       {driftMode && introHint && (
+        <div className="r3d-coach" ref={coachRef}>
+          <div className="r3d-coach-card">
+            <span className="r3d-coach-line">
+              <span className="r3d-coach-hand" aria-hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg></span>
+              <span className="r3d-coach-text" ref={coachTextRef}>Drag to Look Around</span>
+              <span className="r3d-coach-arrow" aria-hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg></span>
+            </span>
+            <span className="r3d-coach-bar" aria-hidden>
+              <i ref={coachBarRef} />
+            </span>
+          </div>
+          <button className="r3d-coach-skip" type="button">
+            Skip
+          </button>
+        </div>
+      )}
+
+      {driftMode && introHint && (
         <div className="r3d-intro" ref={introHandRef} aria-hidden>
           <span className="r3d-intro-ring" />
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
@@ -2517,6 +2617,43 @@ const R3D_CSS = `
 /* One-time first-visit drag demo — a finger (with a touch ripple) drags across
    the frame while the content scrubs. Position + opacity are driven from the RAF
    loop; the ring pulses only while the demo is on. */
+/* ── The first-run coach (client, 2026-10-02) ──────────────────────────────────────
+   The visitor learns the drag by doing it: forward, then back, then it stands down. It
+   lives in the band under the footage (draw() places it) so there is never a second hand
+   in a second place, and only the Skip button takes a tap — everything else must fall
+   through to the drag it is teaching. */
+.r3d-coach{position:absolute;left:50%;top:60%;transform:translateX(-50%);z-index:9;display:none;
+  flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(88vw,460px)}
+.r3d-coaching .r3d-coach{display:flex}
+.r3d-coach-card{display:flex;flex-direction:column;align-items:center;gap:9px;padding:11px 18px;border-radius:15px;
+  background:rgba(11,15,25,.74);border:1px solid rgba(255,255,255,.16);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 14px 34px -20px rgba(0,0,0,.85)}
+.r3d-coach-line{display:flex;align-items:center;gap:10px;color:#eef1f6;font-size:clamp(13px,3.4vmin,15px);font-weight:700;white-space:nowrap}
+.r3d-coach-hand,.r3d-coach-arrow{display:grid;place-items:center}
+.r3d-coach-hand svg,.r3d-coach-arrow svg{width:20px;height:20px;display:block}
+.r3d-coach-hand{color:#fff;animation:r3dsway 1.8s ease-in-out infinite}
+.r3d-coach-arrow{color:var(--r3d-primary)}
+.r3d-coach-bar{width:min(220px,58vw);height:4px;border-radius:999px;background:rgba(255,255,255,.17);overflow:hidden}
+.r3d-coach-bar i{display:block;height:100%;width:0;border-radius:999px;background:var(--r3d-primary);transition:width .14s linear}
+.r3d-coach-skip{pointer-events:auto;background:none;border:0;font:inherit;font-size:12px;font-weight:600;color:var(--r3d-muted);
+  padding:7px 12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.r3d-coach-skip:hover{color:#eef1f6}
+/* Done: the card says so for a beat, and there is nothing left to skip. */
+.r3d-coach.r3d-coach-done .r3d-coach-skip{visibility:hidden}
+.r3d-coach.r3d-coach-done .r3d-coach-hand{animation:none}
+/* One hand at a time: the resting cue waits until the lesson is over. */
+.r3d-coaching .r3d-hint{opacity:0!important}
+/* The arrow points the way the drift goes, and turns round for the way back — the same
+   rules the resting cue follows for each drift direction. */
+.r3d-coach.r3d-back .r3d-coach-arrow svg{transform:scaleX(-1)}
+.r3d-dir-rtl .r3d-coach-arrow svg{transform:scaleX(-1)}
+.r3d-dir-rtl .r3d-coach.r3d-back .r3d-coach-arrow svg{transform:none}
+.r3d-dir-ttb .r3d-coach-arrow svg,.r3d-dir-btt .r3d-coach-arrow svg{transform:rotate(90deg)}
+.r3d-dir-btt .r3d-coach-arrow svg{transform:rotate(-90deg)}
+.r3d-dir-ttb .r3d-coach.r3d-back .r3d-coach-arrow svg{transform:rotate(-90deg)}
+.r3d-dir-btt .r3d-coach.r3d-back .r3d-coach-arrow svg{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){.r3d-coach-hand{animation:none}}
+
 .r3d-intro{position:absolute;left:0;top:0;z-index:8;transform:translate(-50%,-50%);pointer-events:none;opacity:0;display:grid;place-items:center;color:#fff}
 .r3d-intro svg{width:clamp(30px,8vmin,40px);height:clamp(30px,8vmin,40px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.7))}
 .r3d-intro-ring{position:absolute;width:clamp(46px,12vmin,60px);height:clamp(46px,12vmin,60px);border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.55);box-shadow:0 0 18px rgba(255,255,255,.25)}
