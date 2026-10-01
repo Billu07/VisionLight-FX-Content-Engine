@@ -2555,7 +2555,11 @@ const R3D_CSS = `
 .r3d-corners .r3d-ctas.r3d-tournav{position:absolute;inset:0;left:0;right:0;top:0;bottom:0;max-width:none;margin:0;padding:0;display:block;pointer-events:none;transform:none}
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
   padding:clamp(7px,1.6vmin,10px) clamp(12px,2.6vmin,18px);font-size:clamp(12px,2.1vmin,15px)}
-.r3d-corners .r3d-nav-menu{top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right))}
+/* Under the icon column, not on it: the fullscreen button lives in the top-right corner too and
+   Menu was landing on top of it (client, 2026-10-02). One icon's height plus a gap, and the same
+   right edge as the icons (the top bar pads 16px), so the two read as one stack. */
+.r3d-corners .r3d-nav-menu{top:calc(max(16px,env(safe-area-inset-top)) + clamp(32px,9vmin,40px) + 10px);
+  right:max(16px,env(safe-area-inset-right))}
 .r3d-corners .r3d-nav-prev{bottom:max(14px,env(safe-area-inset-bottom));left:max(14px,env(safe-area-inset-left))}
 .r3d-corners .r3d-nav-next{bottom:max(14px,env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right))}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
