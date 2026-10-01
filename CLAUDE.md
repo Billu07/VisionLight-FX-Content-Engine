@@ -233,9 +233,10 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   - **A landscape drift on a phone** (2026-10-02, client; `landscape_button.jpeg`): the drift's own
     shape decides this, measured off what is drawn (`r3d-wide`, frame aspect >= 1.2) — not the screen's.
     Held UPRIGHT it shows "Turn your phone for the full view" under the frame the whole time
-    (`.r3d-turnhint`) — not a flash after a tap. The DRAG CUE hangs off the frame's bottom edge there
-    (the hand riding onto the footage, the cue under it), and the pill steps BELOW the pair: `draw()`
-    publishes `--r3d-cuebot` while the cue is hanging there and the pill's `top` reads
+    (`.r3d-turnhint`) — not a flash after a tap. The DRAG CUE sits just UNDER the frame there — 8px
+    below it, never ON it: a phone's screen is small and the hand was covering part of the room
+    (client, 2026-10-02) — and the pill steps BELOW the cue, because `draw()`
+    publishes `--r3d-cuebot` while the cue is sitting there and the pill's `top` reads
     `var(--r3d-cuebot, var(--r3d-framebot))`. Before that the cue floated in the middle of the band and
     the two sat level with each other (client's refine3.jpeg, 2026-10-02). The `[data-fs]` button is
     there inside an app's OWN browser (`r3d-inapp`, `rotation3d/inAppBrowser.ts`), where turning the
