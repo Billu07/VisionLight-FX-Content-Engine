@@ -1,5 +1,6 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
+import { isInAppBrowser } from "./inAppBrowser";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
@@ -445,6 +446,9 @@ export default function SpinViewer({
     let wideClip = false;
     let corners = false;
     let frameTop = -1;
+    // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
+    // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
+    if (isInAppBrowser()) stage.classList.add("r3d-inapp");
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -860,9 +864,12 @@ export default function SpinViewer({
       const sideGap = immersive && !bandMode && frameRect.w > 0 ? (W - frameRect.w) / 2 / DPR : 0;
       // Is the FOOTAGE landscape? Measured off what is drawn, so it follows the clip, not the screen.
       const wantWide = frameRect.w > 0 && frameRect.w / Math.max(1, frameRect.h) >= 1.2;
-      // The client's arrangement for a landscape drift on a sideways phone: Menu top-right,
-      // Prev bottom-left, Next bottom-right, in the ground either side of the frame.
-      const wantCorners = wantWide && immersive && touchLike?.matches === true && isLandscape();
+      // The client's arrangement — Menu top-right, Prev bottom-left, Next bottom-right — for ANY
+      // drift on a phone held sideways, whatever shape the clip is (client, 2026-10-02: a portrait
+      // clip put them in a stack down the right-hand side, and the two should match). Desktop is
+      // not touched by this: `immersive` only means fullscreen there, and fullscreen on a desktop
+      // is band mode, which keeps the row along the bottom.
+      const wantCorners = immersive && touchLike?.matches === true && isLandscape();
       // Both layouts want that ground; the corner one is the more specific of the two.
       const wantSide = sideGap >= 132 && !wantCorners;
       if (wantSide) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
@@ -892,6 +899,7 @@ export default function SpinViewer({
       if (topCss !== frameTop) {
         frameTop = topCss;
         stage.style.setProperty("--r3d-frametop", topCss + "px");
+        stage.style.setProperty("--r3d-framebot", Math.round((frameRect.y + frameRect.h) / DPR) + "px");
       }
 
       // Drift on mobile: the canvas frame is vertically centered but the headline
@@ -1541,7 +1549,20 @@ export default function SpinViewer({
       * ASKS for the turn, which is the honest best available. Turning it then hands over to
       * updateLandscapeTakeover exactly as before.
       */
+    const lockLandscape = async () => {
+      const orient = (screen as any)?.orientation;
+      if (typeof orient?.lock !== "function") return false;
+      try {
+        await orient.lock("landscape");
+        return true;
+      } catch {
+        return false; // iOS has no lock at all; others refuse outside fullscreen
+      }
+    };
     const fillLandscape = async () => {
+      // Before any await, while the tap is still the current user gesture: some webviews only
+      // honour the lock there.
+      if (await lockLandscape()) return;
       const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
       let native = false;
       if (reqFs) {
@@ -1552,18 +1573,15 @@ export default function SpinViewer({
           native = false;
         }
       }
-      const orient = (screen as any)?.orientation;
-      if (native && typeof orient?.lock === "function") {
-        try {
-          await orient.lock("landscape");
-          return; // the screen turned; nothing to ask for
-        } catch {
-          /* refused (iOS, and desktop Safari) — fall through to asking */
-        }
+      if (native) {
+        if (await lockLandscape()) return;
+        // One more go once the fullscreen transition has actually finished. On X's in-app
+        // browser the first open never turned and the second always did (client, 2026-10-02),
+        // which is what a lock asked for too early looks like.
+        window.setTimeout(() => void lockLandscape(), 350);
+        return;
       }
-      if (!native) setPseudo(true);
-      stage.classList.add("r3d-turn");
-      window.setTimeout(() => stage.classList.remove("r3d-turn"), 3600);
+      setPseudo(true);
     };
 
     const toggleFs = () => {
@@ -2593,7 +2611,13 @@ const R3D_CSS = `
 /* A1: a landscape drift held upright gets the one button that fills the screen. Everything
    else on a phone drift stays hidden (see the rule that hides reset + fullscreen below). */
 @media (pointer: coarse) and (orientation: portrait){
-  .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+  /* Only inside an app's own browser. On a normal mobile browser turning the phone already fills
+     the screen, so the button was offering what the hint below asks for (client, 2026-10-02). */
+  .r3d-drift.r3d-wide.r3d-inapp [data-fs]{display:inline-grid!important}
+  /* "Turn your phone for the full view" is no longer a flash after a tap — it stands under the
+     drift the whole time a landscape clip is held upright, the only state where it means
+     anything (client, 2026-10-02: "should be on the screen on mobile always"). */
+  .r3d-drift.r3d-wide .r3d-turnhint{opacity:1}
   /* Beside the drift, not in the far corner of an empty screen: a landscape drift held upright
      leaves a lot of dead space above the frame and the button sat at the top of it (client's
      refine1.jpeg). --r3d-frametop is where the footage begins, set each frame in draw(). */
@@ -2603,7 +2627,8 @@ const R3D_CSS = `
 
 /* "Turn your phone": only after the button was pressed and the browser refused to turn it
    for us. It cannot be done from a web page on iOS — there is no API — so we ask. */
-.r3d-turnhint{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:9;opacity:0;pointer-events:none;
+/* Under the footage, not over it: --r3d-framebot is where the frame ends, set in draw(). */
+.r3d-turnhint{position:absolute;left:50%;top:calc(var(--r3d-framebot,60%) + 18px);transform:translateX(-50%);z-index:9;opacity:0;pointer-events:none;
   padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;
   background:rgba(11,15,25,.72);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(10px);transition:opacity .25s ease}
 .r3d-turn .r3d-turnhint{opacity:1}

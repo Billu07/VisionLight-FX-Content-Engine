@@ -232,14 +232,26 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The drag helper hangs off `ctasRef.offsetTop` instead of the frame's bottom edge.
   - **A landscape drift on a phone** (2026-10-02, client; `landscape_button.jpeg`): the drift's own
     shape decides this, measured off what is drawn (`r3d-wide`, frame aspect >= 1.2) — not the screen's.
-    Held UPRIGHT it gets the one icon button back (`[data-fs]`, otherwise hidden on a phone drift):
+    Held UPRIGHT it shows "Turn your phone for the full view" under the frame the whole time
+    (`.r3d-turnhint`, anchored to `--r3d-framebot`) — not a flash after a tap. The `[data-fs]` button is
+    there only inside an app's OWN browser (`r3d-inapp`, `rotation3d/inAppBrowser.ts`), where turning the
+    phone may not hand the screen over by itself; on a normal mobile browser the hint does the job and the
+    button was offering the same thing twice (client, 2026-10-02). Where it does show it means
     "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
-    `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. **iPhone Safari cannot be
+    `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. The lock is tried THREE
+    times: before any await (while the tap is still the user gesture), straight after fullscreen resolves,
+    and once more 350ms later — on X's in-app browser the first open never turned and the second always
+    did, which is what a lock asked for too early looks like (client, 2026-10-02). **iPhone Safari cannot be
     turned from a web page at all**: there is no orientation lock and element fullscreen is `<video>`-only,
     so there it falls back to pseudo-fullscreen plus `r3d-turn` (a 3.6s "Turn your phone" hint). Don't
     promise rotation on iOS. Turned SIDEWAYS, `r3d-corners` puts the nav in the ground either side of the
-    pillarboxed footage — Menu top-right, Prev bottom-left, Next bottom-right (the client's own
-    arrangement) — instead of a row across the room; the nav buttons carry `r3d-nav-prev/menu/next` for it.
+    footage — Menu top-right (under the icon column), Prev bottom-left, Next bottom-right (the client's
+    own arrangement) — instead of a row across the room; the nav buttons carry `r3d-nav-prev/menu/next`
+    for it. It applies to ANY clip on a sideways phone since 2026-10-02, portrait included: a portrait
+    clip used to stack them down the right-hand side (`r3d-siderail`) and the two should match. Buttons
+    are sized to `--r3d-side` (the ground beside the footage, set in draw()) and keep 14px off it.
+    **Desktop is not touched by any of this**: `immersive` there means fullscreen, and fullscreen on a
+    desktop is band mode, which keeps the row along the bottom.
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
     desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
     that is the acceptance test, and v4-* in ui-shots asserts it.

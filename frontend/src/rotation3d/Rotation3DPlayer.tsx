@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Navigate, useNavigate, useLocation } from "react-router-dom";
 
-/**
- * Facebook's in-app webview, which eats the first touch sequence on a page. FBAN/FBAV name
- * the app, FB_IAB its in-app browser; Messenger carries FBAN too.
- *
- * NOT Instagram: drifts opened from there worked fine, and routing its visitors the long way
- * round was a cost with no benefit (client, 2026-10-02).
- */
-const isInAppBrowser = () =>
-  typeof navigator !== "undefined" && /FBAN|FBAV|FB_IAB|FBIOS/i.test(navigator.userAgent || "");
+import { isFacebookBrowser } from "./inAppBrowser";
+import SpinViewer from "./SpinViewer";
+import { apiEndpoints } from "../lib/api";
+import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
+import { initMetaPixel, track } from "./metaPixel";
+import { resolveDriftTarget, prefetchDriftTargets, warmFlowAhead, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets, framesReady, playerFrames } from "./driftNav";
+import { captureShareLink, shareLinkFor } from "./personalLink";
+import { newViewKey, type AttentionTarget } from "./attention";
 
 /**
  * Only the FIRST drift of a page session goes to the menu. Without this the redirect fires
@@ -18,13 +17,6 @@ const isInAppBrowser = () =>
  * 2026-10-02; it surfaced on Instagram because that was the app being tested).
  */
 let inAppHandled = false;
-import SpinViewer from "./SpinViewer";
-import { apiEndpoints } from "../lib/api";
-import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
-import { initMetaPixel, track } from "./metaPixel";
-import { resolveDriftTarget, prefetchDriftTargets, warmFlowAhead, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets, framesReady, playerFrames } from "./driftNav";
-import { captureShareLink, shareLinkFor } from "./personalLink";
-import { newViewKey, type AttentionTarget } from "./attention";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -163,7 +155,7 @@ export default function Rotation3DPlayer() {
    * they match too. Every other browser is untouched.
    */
   const inAppMenu = useMemo(() => {
-    if (!byFlow || inAppHandled || !isInAppBrowser()) return null;
+    if (!byFlow || inAppHandled || !isFacebookBrowser()) return null;
     inAppHandled = true; // whatever happens next, this session has had its one redirect
     return `/tour/${tourPage}/${tourFlow}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
