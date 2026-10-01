@@ -1982,6 +1982,17 @@ export default function SpinViewer({
         <div className="r3d-brand">
           {logoUrl ? (
             <img className="r3d-logo-img" src={logoUrl} alt={brandName} />
+          ) : driftMode && flowNav ? (
+            /* A TOUR drift is always drift.li's own, so it carries drift.li's mark — the
+               circular arrow that used to sit here meant nothing (client, 2026-10-02). A BRAND
+               drift keeps the neutral square below: its page is not ours to badge. */
+            <span className="r3d-logo r3d-logo-drift" aria-hidden>
+              <svg viewBox="0 0 64 64">
+                <rect width="64" height="64" rx="14.08" fill="#0b0f19" />
+                <path d="M22.22 49.69Q17.66 49.69 14.87 46.92Q12.08 44.16 12.08 39.65L12.08 39.65L12.08 33.82Q12.08 30.69 13.41 28.31Q14.75 25.93 17.15 24.63Q19.56 23.32 22.73 23.32L22.73 23.32L25.55 23.32Q27.03 23.32 28.57 23.96Q30.11 24.60 31.13 25.68L31.13 25.68L31.13 13.44L38.09 13.44L38.09 49.28L31.64 49.28L31.64 45.90Q30.62 47.59 28.88 48.64Q27.14 49.69 25.24 49.69L25.24 49.69L22.22 49.69ZM23.09 43.70L26.01 43.70Q28.11 43.70 29.52 42.19Q30.92 40.68 31.13 38.17L31.13 38.17L31.13 33.72Q30.77 31.72 29.57 30.52Q28.36 29.31 26.73 29.31L26.73 29.31L23.60 29.31Q21.56 29.31 20.30 30.69Q19.05 32.08 19.05 34.33L19.05 34.33L19.05 39.14Q19.05 41.19 20.17 42.44Q21.30 43.70 23.09 43.70L23.09 43.70Z" fill="#ffffff" />
+                <circle cx="48.42" cy="43.84" r="5.44" fill="#22d3ee" />
+              </svg>
+            </span>
           ) : (
             <span className="r3d-logo" aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
@@ -2331,6 +2342,9 @@ const R3D_CSS = `
 .r3d-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .r3d-logo{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);display:grid;place-items:center}
 .r3d-logo svg{width:16px;height:16px;color:#fff}
+/* drift.li's own mark fills the square: it IS the rounded tile, so no gradient behind it. */
+.r3d-logo-drift{background:none;overflow:hidden}
+.r3d-logo-drift svg{width:100%;height:100%}
 /* theme-adaptive halo keeps a static brand logo legible on any background:
    dark bg → faint light ring (protects dark logos); light bg override below */
 .r3d-logo-img{height:34px;max-width:130px;object-fit:contain;flex:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.45)) drop-shadow(0 0 6px rgba(255,255,255,.14))}
@@ -2495,6 +2509,15 @@ const R3D_CSS = `
   radial-gradient(52% 44% at 10% 0%,rgba(34,211,238,.13),transparent 70%),
   radial-gradient(48% 40% at 100% 6%,rgba(59,130,246,.15),transparent 70%),
   radial-gradient(60% 50% at 50% 112%,rgba(37,99,235,.10),transparent 70%)}
+/* A phone is a few hundred pixels across, so the same percentages cover far less ground and
+   the wash fades to flat dark — the client asked for more of the blue (2026-10-02). Wider pools,
+   stronger, and one more from the bottom where the buttons sit. */
+@media (max-width: 820px){
+  .r3d-tour.r3d-ground::before{background:
+    radial-gradient(90% 46% at 6% 0%,rgba(34,211,238,.22),transparent 72%),
+    radial-gradient(86% 42% at 100% 4%,rgba(59,130,246,.24),transparent 72%),
+    radial-gradient(120% 52% at 50% 108%,rgba(37,99,235,.20),transparent 74%)}
+}
 .r3d-tour.r3d-ground .r3d-loader{background:#0d1119}
 /* The ring is the one teal the client asked for — the same as "Drift Live Interactive"
    under it — rather than a gradient that drifts to blue at its tail. A brand with its
@@ -2600,7 +2623,13 @@ const R3D_CSS = `
 .r3d-pseudo-fs .r3d-zoomcol{display:none}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
-.r3d-immersive:not(.r3d-siderail):not(.r3d-band).r3d-ground::before{display:none}
+/* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,
+   where filling never crops (FILL_MAX_MISMATCH is 1) and there is always ground around the
+   frame. That ground is exactly where the client wanted more blue (2026-10-02), so the wash
+   stays there and this only applies from tablet width up. */
+@media (min-width: 821px){
+  .r3d-immersive:not(.r3d-siderail):not(.r3d-band).r3d-ground::before{display:none}
+}
 /* ── The ground beside a tall clip is where the buttons go ──────────────────────────
    A portrait room on a wide screen keeps its full height, so there is nothing below it
    to put the buttons on — but there is a column either side. --r3d-side is how wide that

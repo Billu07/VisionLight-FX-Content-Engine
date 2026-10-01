@@ -246,7 +246,10 @@ export default function DriftHome() {
         <section className="dh-close">
           <h2 className="dh-h2">A New Way to Explore</h2>
           <Kinds />
-          <Link className="d-btn primary dh-go" to="/tour/start">
+          {/* The Tour landing, not the signup wizard — someone who has read this far wants to
+              see what it is, not to make an account (client, 2026-10-02). ScrollToTop lands them
+              at the top of it. */}
+          <Link className="d-btn primary dh-go" to="/tour">
             Try Drift Tour
             <Arrow />
           </Link>

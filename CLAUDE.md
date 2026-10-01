@@ -243,6 +243,12 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
     desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
     that is the acceptance test, and v4-* in ui-shots asserts it.
+  - **The player's top-left mark** (2026-10-02): a TOUR drift with no brand logo shows drift.li's own
+    mark (the icon from frontend/public/drift/icon.svg, inlined — ink tile, white "d", cyan dot) instead of
+    the old circular arrow, which meant nothing. A BRAND drift keeps the neutral gradient square: its page
+    is not ours to badge. The background wash (`r3d-tour.r3d-ground::before`) is stronger and wider below
+    820px, and it is no longer hidden there when the drift fills the screen — filling never crops on a
+    phone, so there is always ground around the frame and that ground is where the blue belongs.
   - **Chrome no longer hides on a tap** (2026-10-02, client): tap-to-hide is gone, desktop and mobile
     (`r3d-bare` is dead). It still fades while DRAGGING, but only for a portrait drift on a touch screen
     (`@media (pointer: coarse){ .r3d-immersive:not(.r3d-wide).r3d-grabbing … }`) — a landscape drift keeps
@@ -537,7 +543,9 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   enquiry or contact. The client wants **Title Case** on UI text ("That Sounds Good"): done across the tour UI on
   2026-09-22 — major words capitalized, short joining words lowercase unless first/last ("Keep the Moments That
   Matter"), phrasal particles up ("Log In"), drift.li / emails / links untouched; one-line text only — multi-sentence
-  help paragraphs keep sentence case; the client's own copy (TourLanding, CaptureGuide, landings) untouched. **Write
+  help paragraphs keep sentence case; the client's own copy (TourLanding, CaptureGuide, landings) untouched. The home's closing
+  **"Try Drift Tour" goes to `/tour`**, not `/tour/start` (2026-10-02): someone who has read that far wants
+  to see what it is, not to open a signup wizard. **Write
   new UI strings in Title Case.** Contact button (`ContactButton`, tourPageParts): "Contact {page}" — its own link when
   set, else (url null, when the page takes enquiries) it opens the page's message form (`EnquirySheet`, exported, sent
   with `via: "contact"` → the lead's button reads "Contact {page}"); only a page with neither falls back to

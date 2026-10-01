@@ -19,7 +19,10 @@ export const TOUR_PAGE_STYLES = `
 .tpg-brand{display:flex;align-items:center;gap:14px;min-width:0}
 .tpg-logo{width:58px;height:58px;border-radius:16px;object-fit:contain;background:var(--surface);border:1px solid var(--border);padding:6px;flex:none}
 .tpg-mark{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);color:var(--accent);font-weight:800;font-size:23px;flex:none;text-transform:uppercase}
-.tpg-title{margin:0;font-size:clamp(28px,4.8vw,44px);line-height:1.04;letter-spacing:-.03em;font-weight:800;color:var(--text);overflow-wrap:anywhere}
+/* The gap under the name was the heading's own line box — its descender space — not a margin,
+   so "Tours" sat further away than it looked like it should (client, 2026-10-02). Taken back in
+   em, so it holds at every size the clamp produces. */
+.tpg-title{margin:0 0 -.1em;font-size:clamp(28px,4.8vw,44px);line-height:1.04;letter-spacing:-.03em;font-weight:800;color:var(--text);overflow-wrap:anywhere}
 .tpg-sub{margin:12px 0 0;font-size:15px;line-height:1.55;color:var(--muted);max-width:50ch}
 .tpg-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 .tpg-cta .d-btn{padding:12px 18px;font-size:14px}
@@ -71,7 +74,7 @@ export const TOUR_PAGE_STYLES = `
 .tpg-cover{width:62px;aspect-ratio:4/5;border-radius:12px;overflow:hidden;background:var(--surface-3);flex:none}
 .tpg-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .tpg-meta{min-width:0;display:grid;gap:5px}
-.tpg-kind{margin-top:2px}
+.tpg-kind{margin-top:0}
 .tpg-name{font-weight:800;font-size:16px;letter-spacing:-.01em;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The arrow that says the row opens (a visitor's view — admins get their tools). */
 .tpg-go{margin-left:auto;flex:none;padding-left:14px;color:var(--faint);font-size:26px;line-height:1;transition:color .16s,transform .16s}
