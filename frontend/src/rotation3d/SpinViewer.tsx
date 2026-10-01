@@ -442,6 +442,8 @@ export default function SpinViewer({
     // it is a local that applyImmersive() keeps current, not a render-time constant.
     let immersive = false;
     let sideRail = false;
+    let wideClip = false;
+    let corners = false;
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -861,6 +863,25 @@ export default function SpinViewer({
         sideRail = wantSide;
         stage.classList.toggle("r3d-siderail", wantSide);
         if (!wantSide) stage.style.removeProperty("--r3d-side");
+      }
+
+      // Is the FOOTAGE landscape? Measured off what is actually drawn, so it follows the clip
+      // rather than the screen. Two things hang off it: a sideways phone puts the nav in the
+      // corners (client's landscape_button.jpeg), and only a PORTRAIT clip still fades its
+      // chrome while being dragged.
+      const wantWide = frameRect.w > 0 && frameRect.w / Math.max(1, frameRect.h) >= 1.2;
+      if (wantWide !== wideClip) {
+        wideClip = wantWide;
+        stage.classList.toggle("r3d-wide", wantWide);
+        syncFsIcon();
+      }
+      // The client's arrangement for a landscape drift on a sideways phone: Menu top-right,
+      // Prev bottom-left, Next bottom-right, in the ground either side of the frame — rather
+      // than one row lying across the room.
+      const wantCorners = wantWide && immersive && touchLike?.matches === true && isLandscape();
+      if (wantCorners !== corners) {
+        corners = wantCorners;
+        stage.classList.toggle("r3d-corners", wantCorners);
       }
 
       // Drift on mobile: the canvas frame is vertically centered but the headline
@@ -1329,13 +1350,9 @@ export default function SpinViewer({
       stage.classList.remove("r3d-grabbing");
     };
 
-    let tapX = 0, tapY = 0, tapT = 0;
     const onDown = (e: PointerEvent) => {
       attn?.activity();
       setWarmPaused(true); // the drag owns the network and the main thread
-      tapX = e.clientX;
-      tapY = e.clientY;
-      tapT = performance.now();
       userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
@@ -1361,16 +1378,10 @@ export default function SpinViewer({
       if (pointers.size < 2) pinchD = 0;
       if (!pointers.size) up();
       if (isControl(e.target)) return;
-      // A tap — not a drag — on the footage puts the chrome away so the room is
-      // unobstructed; the next tap brings it back. The progress rail stays either way.
-      if (
-        immersive &&
-        !pointers.size &&
-        Math.hypot(e.clientX - tapX, e.clientY - tapY) < 12 &&
-        performance.now() - tapT < 450
-      ) {
-        stage.classList.toggle("r3d-bare");
-      }
+      // A tap used to put the chrome away and the next tap brought it back. Removed on the
+      // client's word (2026-10-02): a visitor who tapped the room once lost the buttons with
+      // no sign they were coming back. The chrome still fades while a PORTRAIT drift is being
+      // dragged, which is the case where it is genuinely in the way (see .r3d-grabbing).
       const now = performance.now();
       // Drift: no double-tap zoom (accidental double-taps caused a jarring zoom).
       if (!driftMode && now - lastTap < 300) {
@@ -1513,6 +1524,38 @@ export default function SpinViewer({
         }
       }
     };
+    /**
+      * A landscape drift on an upright phone. Where the browser allows it this really turns the
+      * screen; where it does not — iPhone Safari, which has never shipped an orientation lock
+      * and grants element fullscreen to <video> alone — the player takes the whole viewport and
+      * ASKS for the turn, which is the honest best available. Turning it then hands over to
+      * updateLandscapeTakeover exactly as before.
+      */
+    const fillLandscape = async () => {
+      const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
+      let native = false;
+      if (reqFs) {
+        try {
+          await reqFs.call(stage);
+          native = true;
+        } catch {
+          native = false;
+        }
+      }
+      const orient = (screen as any)?.orientation;
+      if (native && typeof orient?.lock === "function") {
+        try {
+          await orient.lock("landscape");
+          return; // the screen turned; nothing to ask for
+        } catch {
+          /* refused (iOS, and desktop Safari) — fall through to asking */
+        }
+      }
+      if (!native) setPseudo(true);
+      stage.classList.add("r3d-turn");
+      window.setTimeout(() => stage.classList.remove("r3d-turn"), 3600);
+    };
+
     const toggleFs = () => {
       if (pseudoFs) {
         // Leaving pseudo-fullscreen (auto or manual) always works with one tap.
@@ -1570,7 +1613,10 @@ export default function SpinViewer({
       } else if (t.closest("[data-reset]")) {
         yaw = (START_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = panTX = panTY = 0;
       } else if (t.closest("[data-fs]")) {
-        toggleFs();
+        // On a phone the button only exists for a landscape drift held upright, and there it
+        // means "fill the screen", not "toggle fullscreen".
+        if (wideClip && !pseudoFs && !nativeFsActive() && touchLike?.matches === true && !isLandscape()) void fillLandscape();
+        else toggleFs();
       } else if (t.closest("[data-loop]")) {
         loopOn = !loopOn;
         idleSpin = loopOn;
@@ -1969,6 +2015,9 @@ export default function SpinViewer({
         </div>
       </div>
 
+      {/* Shown for a few seconds when the screen could not be turned for us (iOS). */}
+      {driftMode && <div className="r3d-turnhint" aria-hidden>Turn your phone for the full view</div>}
+
       {driftMode && flowNav && flowNav.stops.length > 1 && (
         <div className="r3d-stops" role="navigation" aria-label="Tour drifts">
           {flowNav.stops.map((s, i) => (
@@ -2086,15 +2135,15 @@ export default function SpinViewer({
       {tourNav ? (
         <div className="r3d-ctas r3d-tournav" ref={ctasRef}>
           {tourNav.prev && (
-            <button className="r3d-cta r3d-nav" onClick={() => fireCta("secondary", tourNav.prev!)}>
+            <button className="r3d-cta r3d-nav r3d-nav-prev" onClick={() => fireCta("secondary", tourNav.prev!)}>
               <span aria-hidden>‹</span> Prev
             </button>
           )}
-          <button className="r3d-cta r3d-nav" onClick={() => fireCta("secondary", tourNav.menu)}>
+          <button className="r3d-cta r3d-nav r3d-nav-menu" onClick={() => fireCta("secondary", tourNav.menu)}>
             Menu
           </button>
           {tourNav.next && (
-            <button className="r3d-cta r3d-nav r3d-next" onClick={() => fireCta("primary", tourNav.next!)}>
+            <button className="r3d-cta r3d-nav r3d-next r3d-nav-next" onClick={() => fireCta("primary", tourNav.next!)}>
               Next <span aria-hidden>›</span>
             </button>
           )}
@@ -2470,7 +2519,45 @@ const R3D_CSS = `
    on the footage while it moves. Both are the same fade, and the scrims above and below
    go with it — with nothing left over the footage there is nothing to keep legible. */
 .r3d-immersive :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){transition:opacity .25s ease}
-.r3d-immersive:is(.r3d-bare,.r3d-grabbing) :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
+/* Only while a PORTRAIT drift is being dragged on a touch screen (client, 2026-10-02).
+   A landscape drift keeps its chrome: it lives in the ground either side, not over the room.
+   Tap-to-hide is gone entirely, so the bare class no longer appears here. */
+@media (pointer: coarse){
+  .r3d-immersive:not(.r3d-wide).r3d-grabbing :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
+}
+
+/* ── A landscape drift on a sideways phone (client's landscape_button.jpeg, 2026-10-02) ──
+   The footage is pillarboxed, so the nav moves out into the ground either side of it instead
+   of lying across the room: Menu top-right, Prev bottom-left, Next bottom-right. */
+.r3d-corners .r3d-ctas.r3d-tournav{position:absolute;inset:0;left:0;right:0;top:0;bottom:0;max-width:none;margin:0;padding:0;display:block;pointer-events:none;transform:none}
+.r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
+  padding:clamp(7px,1.6vmin,10px) clamp(12px,2.6vmin,18px);font-size:clamp(12px,2.1vmin,15px)}
+.r3d-corners .r3d-nav-menu{top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right))}
+.r3d-corners .r3d-nav-prev{bottom:max(14px,env(safe-area-inset-bottom));left:max(14px,env(safe-area-inset-left))}
+.r3d-corners .r3d-nav-next{bottom:max(14px,env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right))}
+/* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
+   nothing to hang from, so it sits above the bottom buttons instead. */
+.r3d-corners .r3d-hint{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 52px)}
+
+/* A3: the "7/10" panel sits over the top of the frame on a phone — the client asked for it
+   gone (2026-10-02). Desktop keeps it: there it has the band above the footage to live in. */
+@media (pointer: coarse){
+  /* .r3d-stage scopes it so this beats the base .r3d-stops rule further down the sheet. */
+  .r3d-stage .r3d-stops{display:none}
+}
+
+/* A1: a landscape drift held upright gets the one button that fills the screen. Everything
+   else on a phone drift stays hidden (see the rule that hides reset + fullscreen below). */
+@media (pointer: coarse) and (orientation: portrait){
+  .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+}
+
+/* "Turn your phone": only after the button was pressed and the browser refused to turn it
+   for us. It cannot be done from a web page on iOS — there is no API — so we ask. */
+.r3d-turnhint{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:9;opacity:0;pointer-events:none;
+  padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;
+  background:rgba(11,15,25,.72);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(10px);transition:opacity .25s ease}
+.r3d-turn .r3d-turnhint{opacity:1}
 /* ── The drag cue in full screen (2026-09-24, client) ───────────────────────────────
    A tour stop with no helper copy draws its hand INSIDE the cue row (in place of the
    text), and the animated hand sits above it. Framed, those two are far apart — one on

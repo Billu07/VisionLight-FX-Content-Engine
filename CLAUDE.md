@@ -230,6 +230,23 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `r3d-grabbing`; one `:is()` rule fades both, scrims included. The progress rail rides the SCREEN's
     edge in fill mode (the frame's own edges are off screen) and is canvas-drawn, so it survives the tap.
     The drag helper hangs off `ctasRef.offsetTop` instead of the frame's bottom edge.
+  - **A landscape drift on a phone** (2026-10-02, client; `landscape_button.jpeg`): the drift's own
+    shape decides this, measured off what is drawn (`r3d-wide`, frame aspect >= 1.2) — not the screen's.
+    Held UPRIGHT it gets the one icon button back (`[data-fs]`, otherwise hidden on a phone drift):
+    "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
+    `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. **iPhone Safari cannot be
+    turned from a web page at all**: there is no orientation lock and element fullscreen is `<video>`-only,
+    so there it falls back to pseudo-fullscreen plus `r3d-turn` (a 3.6s "Turn your phone" hint). Don't
+    promise rotation on iOS. Turned SIDEWAYS, `r3d-corners` puts the nav in the ground either side of the
+    pillarboxed footage — Menu top-right, Prev bottom-left, Next bottom-right (the client's own
+    arrangement) — instead of a row across the room; the nav buttons carry `r3d-nav-prev/menu/next` for it.
+    The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
+    desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
+    that is the acceptance test, and v4-* in ui-shots asserts it.
+  - **Chrome no longer hides on a tap** (2026-10-02, client): tap-to-hide is gone, desktop and mobile
+    (`r3d-bare` is dead). It still fades while DRAGGING, but only for a portrait drift on a touch screen
+    (`@media (pointer: coarse){ .r3d-immersive:not(.r3d-wide).r3d-grabbing … }`) — a landscape drift keeps
+    its chrome because that lives beside the footage, not over it.
   - **The player follows the device; it never turns the drift itself** (2026-09-23, client: "we don't
     want to make them turn their phone. It needs to respond only IF they turn their phone"). An earlier
     pass rotated the stage a quarter turn for a landscape drift on an upright phone — that is REMOVED,
