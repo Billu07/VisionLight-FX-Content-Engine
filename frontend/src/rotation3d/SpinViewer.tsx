@@ -2758,30 +2758,30 @@ const R3D_CSS = `
    The footage is pillarboxed, so the nav moves out into the ground either side of it instead
    of lying across the room: Menu top-right, Prev bottom-left, Next bottom-right. */
 .r3d-corners .r3d-ctas.r3d-tournav{position:absolute;inset:0;left:0;right:0;top:0;bottom:0;max-width:none;margin:0;padding:0;display:block;pointer-events:none;transform:none}
-/* Bigger, and never touching the picture (client, 2026-10-02). --r3d-side is how much ground
-   there is beside the footage; 12px off the screen edge plus a 14px gap leaves the rest for the
-   button, so it grows where the margin is generous and stays clear where it is not. */
+/* Sized by the ground, not by a guess (client, 2026-10-02: "part of it is in the frame, dial it
+   down a bit so it is off the frame"). --r3d-side is how much ground there is beside the footage,
+   measured every frame in draw(); the button takes that minus 8px off the screen edge and 10px
+   clear of the picture, and the TYPE scales with whatever is left. So it is as large as the room
+   allows on a generous clip and still lands beside the footage on a tight one - a 16:9 clip on a
+   19.5:9 phone leaves about 75px, which a fixed size cannot fit. */
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
-  padding:clamp(9px,2.2vmin,13px) clamp(13px,3vmin,20px);font-size:clamp(13px,2.4vmin,16px);
-  max-width:calc(var(--r3d-side,96px) - 26px)}
+  white-space:nowrap;overflow:hidden;
+  max-width:calc(var(--r3d-side,96px) - 18px);
+  padding:clamp(9px,2.6vmin,13px) clamp(8px,2vmin,14px);
+  font-size:min(clamp(12px,2.8vmin,16px),calc(var(--r3d-side,96px) * 0.17))}
 /* Under the icon column, not on it: the fullscreen button lives in the top-right corner too and
    Menu was landing on top of it (client, 2026-10-02). One icon's height plus a gap, and the same
    right edge as the icons (the top bar pads 16px), so the two read as one stack. */
 .r3d-corners .r3d-nav-menu{top:calc(max(16px,env(safe-area-inset-top)) + clamp(32px,9vmin,40px) + 10px);
-  right:max(12px,env(safe-area-inset-right))}
+  right:8px}
 /* The BOTTOM corners sit outside the notch and outside the home indicator, so they take the
    screen edge rather than the safe inset — that inset is what pinned Prev against the frame on a
    notched phone (client's refine2.jpeg). */
-.r3d-corners .r3d-nav-prev{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh);left:12px}
-.r3d-corners .r3d-nav-next{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh);right:12px}
-/* Up off the very bottom edge, and bigger: down in the corners of a sideways phone they sat
-   under the thumbs and read as small (client's refine4.jpeg, 2026-10-02). 7vh of a landscape
-   phone is ~27px, which lifts the pair into the hand without leaving the ground beside the
-   footage. nowrap because at this size "Prev" with its arrow broke over two lines inside a
-   narrow side column; the floor under the max-width is what keeps it on one line there. */
-.r3d-corners .r3d-ctas.r3d-tournav :is(.r3d-nav-prev,.r3d-nav-next){white-space:nowrap;
-  max-width:max(104px,calc(var(--r3d-side,96px) - 8px));
-  padding:clamp(11px,3vmin,15px) clamp(14px,3.8vmin,22px);font-size:clamp(14px,3.2vmin,17px)}
+/* A little further up the ground than before, so the pair sits in the hand rather than under the
+   thumb - 9vh of a landscape phone is about 39px (client, 2026-10-02: "bring them a little up,
+   not too much"). */
+.r3d-corners .r3d-nav-prev{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh);left:8px}
+.r3d-corners .r3d-nav-next{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh);right:8px}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
    nothing to hang from, so it sits above the bottom buttons instead. */
 .r3d-corners .r3d-hint{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 52px)}
@@ -2866,8 +2866,11 @@ const R3D_CSS = `
    of its own beside it and the client asked for it back - higher than it was, above Next, so
    the bottom corners stay with the hands (refine4.jpeg, 2026-10-02). A product with zoom turned
    off on phones still wins: that rule is !important. */
+/* Clear above Next, by the height of a nav button and a gap on top: at 58px the minus key was
+   landing on it (client, 2026-10-02). It rides up with the pair, so the spacing holds whatever
+   the screen's height makes of 9vh. */
 .r3d-stage.r3d-corners .r3d-zoomcol{display:flex;top:auto;right:14px;
-  bottom:calc(max(12px,env(safe-area-inset-bottom)) + 7vh + 58px)}
+  bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh + 76px)}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 /* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,

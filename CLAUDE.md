@@ -256,10 +256,13 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     own arrangement) — instead of a row across the room; the nav buttons carry `r3d-nav-prev/menu/next`
     for it. It applies to ANY clip on a sideways phone since 2026-10-02, portrait included: a portrait
     clip used to stack them down the right-hand side (`r3d-siderail`) and the two should match. Buttons
-    are sized to `--r3d-side` (the ground beside the footage, set in draw()) and keep off it. Prev and
-    Next stand `7vh` up off the bottom edge and are bigger, one line each (`nowrap`, and a 104px floor
-    under the max-width): down in the corners they sat under the thumbs and "‹ Prev" broke over two
-    lines (refine4.jpeg, 2026-10-02). The +/- zoom pair is KEPT here — `.r3d-stage.r3d-corners
+    are sized FROM `--r3d-side` — the ground beside the footage, measured every frame in draw() —
+    width and type both: the max-width is that ground less 18px and the font is capped at 0.17 of it,
+    so each button is as large as the room allows and never lies on the picture. A fixed size cannot
+    do this: a 16:9 clip on a 19.5:9 phone leaves about 75px, and the 104px floor an earlier pass put
+    under the max-width is exactly what pushed them back onto the footage (client, 2026-10-02: "part
+    of it is in the frame, dial it down a bit"). Prev and Next stand `9vh` up off the bottom edge,
+    one line each (`nowrap`), with the zoom pair `9vh + 76px` so the minus key clears Next. The +/- zoom pair is KEPT here — `.r3d-stage.r3d-corners
     .r3d-zoomcol` overrides the three fullscreen rules that hide it, and it sits above Next — because a
     sideways phone pillarboxes the footage, so the pair has ground of its own beside it. A product with
     mobile zoom switched off still wins (that rule is `!important`).
