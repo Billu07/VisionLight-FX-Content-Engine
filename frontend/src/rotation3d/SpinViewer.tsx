@@ -1,6 +1,6 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
-import { isInAppBrowser } from "./inAppBrowser";
+import { isInAppBrowser, isApple } from "./inAppBrowser";
 import { createDragCoach, type DragCoach } from "./dragCoach";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -465,6 +465,8 @@ export default function SpinViewer({
     // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
     // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
     if (isInAppBrowser()) stage.classList.add("r3d-inapp");
+    // No fullscreen to offer on an iPhone or iPad — see isApple().
+    if (isApple()) stage.classList.add("r3d-ios");
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -2769,19 +2771,25 @@ const R3D_CSS = `
   max-width:calc(var(--r3d-side,96px) - 18px);
   padding:clamp(9px,2.6vmin,13px) clamp(8px,2vmin,14px);
   font-size:min(clamp(12px,2.8vmin,16px),calc(var(--r3d-side,96px) * 0.17))}
-/* Under the icon column, not on it: the fullscreen button lives in the top-right corner too and
-   Menu was landing on top of it (client, 2026-10-02). One icon's height plus a gap, and the same
-   right edge as the icons (the top bar pads 16px), so the two read as one stack. */
-.r3d-corners .r3d-nav-menu{top:calc(max(16px,env(safe-area-inset-top)) + clamp(32px,9vmin,40px) + 10px);
-  right:8px}
+/* The corner itself. Menu used to sit one icon's height down, under the fullscreen button; on a
+   phone held sideways that button is never there — the turn already filled the screen — so the
+   corner is Menu's (client, 2026-10-03). */
+.r3d-corners .r3d-nav-menu{top:max(14px,env(safe-area-inset-top));right:8px}
 /* The BOTTOM corners sit outside the notch and outside the home indicator, so they take the
    screen edge rather than the safe inset — that inset is what pinned Prev against the frame on a
    notched phone (client's refine2.jpeg). */
-/* A little further up the ground than before, so the pair sits in the hand rather than under the
-   thumb - 9vh of a landscape phone is about 39px (client, 2026-10-02: "bring them a little up,
-   not too much"). */
-.r3d-corners .r3d-nav-prev{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh);left:8px}
-.r3d-corners .r3d-nav-next{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh);right:8px}
+/* Up to about halfway, where a hand holding a phone sideways actually rests (client,
+   2026-10-03: "take the next and prev button almost to the halfway of the frame from the
+   bottom"). A share of the height rather than a fixed distance, so it holds its place on any
+   screen. */
+.r3d-corners .r3d-nav-prev{bottom:38%;left:8px}
+.r3d-corners .r3d-nav-next{bottom:38%;right:8px}
+/* The branding stacks here: the mark, then the page, the tour and the drift under it (the
+   client's own sketch, 2026-10-03). Side by side it ran a long way across the top of the room;
+   stacked it keeps to the corner. The lines already cut themselves off with an ellipsis. */
+.r3d-corners .r3d-topbar{padding:max(12px,env(safe-area-inset-top)) 12px 0}
+.r3d-corners .r3d-brand{flex-direction:column;align-items:flex-start;gap:6px}
+.r3d-corners .r3d-titles{max-width:min(36vw,176px)}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
    nothing to hang from, so it sits above the bottom buttons instead. */
 .r3d-corners .r3d-hint{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 52px)}
@@ -2811,6 +2819,14 @@ const R3D_CSS = `
   .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
     top:calc(var(--r3d-frametop,120px) - clamp(32px,9vmin,40px) - 12px)}
 }
+
+/* An iPhone or iPad has no fullscreen to give a web page and no orientation lock, so the button
+   could only ever take the viewport and ask — which is what the hint under the drift already
+   does. Removed there entirely (client, 2026-10-03: "in iOS the fullscreen icon doesn't really
+   do anything... those devices fullscreen works on turning the phone"); Android and the desktop
+   keep it, where it genuinely turns the screen. Specific enough to beat the rule above that puts
+   it back for a landscape drift held upright. */
+.r3d-stage.r3d-ios .r3d-tools .r3d-iconbtn[data-fs]{display:none!important}
 
 /* "Turn your phone": only after the button was pressed and the browser refused to turn it
    for us. It cannot be done from a web page on iOS — there is no API — so we ask. */
@@ -2866,11 +2882,11 @@ const R3D_CSS = `
    of its own beside it and the client asked for it back - higher than it was, above Next, so
    the bottom corners stay with the hands (refine4.jpeg, 2026-10-02). A product with zoom turned
    off on phones still wins: that rule is !important. */
-/* Clear above Next, by the height of a nav button and a gap on top: at 58px the minus key was
-   landing on it (client, 2026-10-02). It rides up with the pair, so the spacing holds whatever
-   the screen's height makes of 9vh. */
-.r3d-stage.r3d-corners .r3d-zoomcol{display:flex;top:auto;right:14px;
-  bottom:calc(max(12px,env(safe-area-inset-bottom)) + 9vh + 76px)}
+/* Directly under Menu, not in the bottom corner (client, 2026-10-03). One icon's height plus a
+   gap below Menu's top, and the same right edge, so the three read as one column down the ground
+   beside the footage. */
+.r3d-stage.r3d-corners .r3d-zoomcol{display:flex;bottom:auto;right:12px;
+  top:calc(max(14px,env(safe-area-inset-top)) + clamp(34px,9.5vmin,44px) + 12px)}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 /* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,

@@ -18,3 +18,16 @@ export const isFacebookBrowser = () => /FBAN|FBAV|FB_IAB|FBIOS/i.test(ua());
  * off unless it's needed for insta / fb browser"). Broader than the above on purpose.
  */
 export const isInAppBrowser = () => /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Twitter|TwitterAndroid|Line\//i.test(ua());
+
+/**
+ * An iPhone or iPad — every browser on them is Safari's engine, so this is a capability
+ * question, not a brand one. There is no orientation lock and element fullscreen is granted to
+ * `<video>` alone, so a "fill the screen" button can only ever pseudo-fullscreen and ask, which
+ * the client found did "nothing" in practice (2026-10-03). Turning the phone is the real route
+ * there, and the landscape takeover already handles it. iPadOS reports itself as a Mac, so the
+ * touch points are what give it away.
+ */
+export const isApple = () => {
+  const s = ua();
+  return /iPad|iPhone|iPod/.test(s) || (/Macintosh/.test(s) && (navigator.maxTouchPoints || 0) > 1);
+};
