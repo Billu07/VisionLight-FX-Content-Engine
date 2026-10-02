@@ -23,10 +23,20 @@ export interface CoachView {
   nudge: boolean;
 }
 
-/** How much of the drift counts as "you dragged it". A third is a real look around. */
-export const FORWARD_SHARE = 0.3;
+/**
+ * How much of the drift counts as "you dragged it".
+ *
+ * In pixels, which is what the thumb feels: the player turns a drag into yaw at 0.006 rad/px
+ * (`k` in SpinViewer's move handler) and a whole drift is 2π, so **the full sweep is ~1047px**
+ * of dragging. A third of that is 314px — 80% of a phone's width in one stroke, which is a
+ * chore for a lesson. These are set from that measurement, not from a feel for percentages:
+ * ~188px forward (about half a phone's width, one confident swipe) and ~147px back, shorter
+ * because by then they know how. Short swipes still add up — the leg measures the span
+ * covered, not one gesture.
+ */
+export const FORWARD_SHARE = 0.18;
 /** And how far back from the furthest point counts as "and back again". */
-export const BACK_SHARE = 0.22;
+export const BACK_SHARE = 0.14;
 /** Standing still this long on a step → nudge. */
 export const NUDGE_AFTER = 3400;
 /**
