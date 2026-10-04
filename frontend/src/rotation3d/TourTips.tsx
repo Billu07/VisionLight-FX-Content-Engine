@@ -20,7 +20,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * so names as common as `.stage`, `.w` and `.skip` cannot touch the player around it.
  */
 
-const KEY = "drift-tips-seen";
+/**
+ * Bumped when the tips were replaced by the client's own guide (2026-10-05): the screen that used
+ * to set `drift-tips-seen` was a different thing entirely, and anyone who had met it — the client
+ * included — would never have seen this one. Bump it again if the guide is ever replaced.
+ */
+const KEY = "drift-tips-seen-2";
+
+/** `?tips=1` shows them however many times they have been seen — for demonstrating. */
+export const tipsForced = (): boolean => {
+  try {
+    return new URLSearchParams(window.location.search).get("tips") === "1";
+  } catch {
+    return false;
+  }
+};
 
 export const tipsSeen = (): boolean => {
   try {

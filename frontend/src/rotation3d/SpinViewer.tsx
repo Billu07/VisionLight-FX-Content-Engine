@@ -1,7 +1,7 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { isInAppBrowser, isApple } from "./inAppBrowser";
-import TourTips, { tipsSeen } from "./TourTips";
+import TourTips, { tipsSeen, tipsForced } from "./TourTips";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
@@ -295,7 +295,7 @@ export default function SpinViewer({
   // The tips meet a visitor before their first TOUR drift, on their own screen - never over
   // the footage, which is what the card they replace was doing (client, 2026-10-05).
   const [tips, setTips] = useState(
-    () => driftMode && !!flowNav && introHint && variant !== "hero" && !landing && !tipsSeen(),
+    () => driftMode && !!flowNav && introHint && variant !== "hero" && !landing && (tipsForced() || !tipsSeen()),
   );
   // The effect reads this to know not to demonstrate at someone who has just been taught.
   const tipsRef = useRef(tips);

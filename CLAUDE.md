@@ -289,7 +289,12 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     then at 1840ms hands the pano over for real, its title moving *Drag To Look Around* → (1340ms)
     *Try It Here Now* → on touch, hidden → (250ms) *You Got It*.
     **Ours only in the plumbing**: it ends with `onDone()` instead of navigating to a tour URL, it is
-    shown once per browser (`drift-tips-seen`, `tipsSeen()`), and the whole sheet is scoped under
+    shown once per browser (`drift-tips-seen-2`, `tipsSeen()` — the key was BUMPED when the port
+    landed, because the screen that set `drift-tips-seen` was a different thing entirely and
+    everyone who had met it, the client included, would never have seen this one; bump it again if
+    the guide is ever replaced, and remember the key is only written when a visitor finishes or
+    skips, not when it merely appears). **`?tips=1` reopens them however many times they have been
+    seen** — that is the link to hand anyone who wants to see them again, and the whole sheet is scoped under
     `.r3d-tips` with the keyframes renamed `tt*` — names as common as `.stage`, `.w`, `.flash` and
     `.skip` would otherwise reach into the player around it. Reduced motion skips straight to the
     tour, as theirs does. `.r3d-tips` is in `isControl` so the drift behind cannot be dragged while
