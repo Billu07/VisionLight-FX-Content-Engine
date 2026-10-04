@@ -1054,6 +1054,9 @@ const flowNavPayload = (p: any) => {
         title: s.product.title ?? null,
         slug,
         thumb: s.product.thumbnailUrl || list[s.product.defaultFrame ?? 0] || list[0] || null,
+        // Which way this room is dragged. The tips before a tour read these to teach the axes
+        // the tour actually uses — some rooms tilt up and down (client, 2026-10-05).
+        dir: s.product.driftDirection || "LTR",
         playerPath: pageSlug && slug ? driftPublicPath(kind, pageSlug, f.slug, slug) : stepPlayerPath(s.product.id),
       };
     });
@@ -1245,7 +1248,7 @@ async function loadPublicDrift(productId: string) {
                   order: true,
                   productId: true,
                   product: {
-                    select: { id: true, name: true, title: true, status: true, thumbnailUrl: true, defaultFrame: true, spin: { select: { manifest: true } } },
+                    select: { id: true, name: true, title: true, status: true, thumbnailUrl: true, defaultFrame: true, driftDirection: true, spin: { select: { manifest: true } } },
                   },
                 },
               },

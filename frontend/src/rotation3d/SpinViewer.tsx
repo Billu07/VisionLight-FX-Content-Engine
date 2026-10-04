@@ -52,7 +52,9 @@ export type SpinCaption = {
 
 /** A tour/flow this drift is a stop of — player-side context for the stop strip
  * and the closing card. `stops` are the flow's viewable drifts in order. */
-export type FlowNavStop = { id: string; productId: string; name: string; title?: string | null; thumb: string | null; playerPath: string };
+export type FlowNavStop = { id: string; productId: string; name: string; title?: string | null; thumb: string | null; playerPath: string;
+  /** Which way this room is dragged — a tour may mix horizontal and vertical rooms. */
+  dir?: "LTR" | "RTL" | "TTB" | "BTT" | null };
 export type FlowNav = {
   id: string;
   /** TOUR | VIEW | MEMORY | PATH — "Tour Powered by …" */
@@ -2226,6 +2228,14 @@ export default function SpinViewer({
       {tips && (
         <TourTips
           touch={typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)")?.matches ?? false)}
+          axis={driftDirection === "TTB" || driftDirection === "BTT" ? "y" : "x"}
+          /* The axes the REST of this tour uses, so the other one is only taught when a room
+             really moves that way. A stop from before the payload carried `dir` reads as
+             horizontal, which is what every drift was until vertical ones existed. */
+          tourAxes={(flowNav?.stops || []).map((s) => (s.dir === "TTB" || s.dir === "BTT" ? "y" : "x"))}
+          /* The room they are about to enter names the practice strip, the way the guide's own
+             "180°" names its pano. */
+          roomName={productName}
           onDone={() => setTips(false)}
         />
       )}

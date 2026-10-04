@@ -271,23 +271,32 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
     desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
     that is the acceptance test, and v4-* in ui-shots asserts it.
-  - **The first-run tips** (2026-10-05, client, with a guide of their own to match): a visitor meets
-    the gestures on **their own screen before the tour**, `rotation3d/TourTips.tsx` — not on a card over
-    the footage. That card is gone: it covered a drift's own title and caption, which is what the client
-    flagged ("our one that literally covers text in a drift"). Shape taken from the guide they sent: one
-    gesture per step, something to try it on, **Next**, dots, and **Skip Tips** at any point.
-    Three steps on a phone, two on a desktop — there is no phone to turn there: **Try It Here Now** (a
-    strip of bands you really drag, which is where the client's earlier "drag back and forth, so all
-    learned" now lives — `dragCoach.ts` still judges it, in the same pixels as the player), **Turn Your
-    Phone**, **Prev · Menu · Next**. It teaches only what this player does: no pan or tilt, which the
-    reference has and a drift does not — one axis, and promising two is a lie the first room exposes.
-    Gated by `tipsSeen()` (`drift-tips-seen`, once per browser) and shown only for a TOUR drift in a real
-    player (`driftMode && flowNav && introHint`, never the hero or a landing). `.r3d-tips` is in
-    `isControl`, so while it is up the drift behind cannot be dragged AND the strip keeps the pointer the
-    stage would otherwise capture — that one line is the difference between the strip working and not.
+  - **The first-run tips** (2026-10-05, client, built to a guide of their own): a visitor meets the
+    gestures on **their own screen before the tour**, `rotation3d/TourTips.tsx` — never a card over the
+    footage, which is what it replaces and what the client flagged ("our one that literally covers text
+    in a drift"). **Walk the client's reference before touching this**: zip.link/drift-tour-instructions
+    (mobile, five steps) and zip.link/drift-desktop (desktop, three) — reading one screenshot is how the
+    first attempt came out thin, and the polish is all in the parts a still does not show.
+    What the guide does, and what this now does: a two-line heading whose **accent half shimmers in word
+    by word** (`ttWordIn` + `ttShimmer`; the space lives inside each word's span so the line still reads
+    as a sentence to anything taking the text); **one piece of animated line art per step** — a phone
+    turning under a long swept arrow, a device with sliding arrows and a hand; a pill that reads
+    **Enter Tour** on the last step; a **connected stepper rail** that fills behind you; **Skip Tips** in
+    the corner throughout. Step one is live: the strip is really dragged, `dragCoach` judges it in the
+    player's own pixels (0.006 rad/px), and the badge — named for the room they are about to enter, the
+    way the guide's "180°" names its pano — turns to "That's It".
+    Steps are what THIS player does, not what theirs does: drag · turn the phone · turn it back, plus
+    **pan left and right** or **tilt up and down** only when the tour really holds a room on that axis.
+    A drift has one axis, but a tour can mix them (`driftDirection` TTB/BTT), which is why the public
+    stop payload now carries `dir` (`flowNavPayload`, additive) and `tourAxes` reaches the tips. A
+    desktop drops the two turn steps and draws a monitor rather than a phone.
+    Gated by `tipsSeen()` (`drift-tips-seen`, once per browser), tour drifts in a real player only
+    (`driftMode && flowNav && introHint`, never the hero or a landing). `.r3d-tips` is in `isControl`,
+    so while it is up the drift behind cannot be dragged AND the strip keeps the pointer the stage would
+    otherwise capture — that one line is the difference between the strip working and not.
     The hand demo (`startIntro`) is back to what it was before the coach: one wordless "this moves" on
-    the first drift ever, its own `drift-intro-seen` key, skipped for anyone who has just been shown the
-    tips. Verified by driving the screen with real touch: 16 checks.
+    the first drift ever, its own `drift-intro-seen` key, skipped for anyone just shown the tips.
+    Driven with real touch: 27 checks.
   - **Superseded, for history** (2026-10-02): the client asked for a coach that made the visitor drag
     forward and back inside the player before moving on. It shipped, then the card's placement became the
     problem — over the footage there is nowhere it does not cover something. The lesson survived; the
