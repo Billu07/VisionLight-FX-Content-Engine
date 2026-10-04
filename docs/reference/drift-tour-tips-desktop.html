@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drift Tour — Quick Instructions (16:9)</title>
+<meta name="description" content="How to experience a Drift Tour: drag to look around, rotate for fullscreen.">
+<meta property="og:title" content="Drift Tour — Quick Instructions">
+<meta property="og:description" content="Drag to look around. Rotate for fullscreen.">
+<meta property="og:image" content="https://zip.link/images/muse-hero.webp">
+<noscript><meta http-equiv="refresh" content="1;url=https://drift.li/tour/drift/45-birch-f7d4/main-area"></noscript>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "Bai Jamjuree", "Avenir Next", "Segoe UI", sans-serif;
+    background: radial-gradient(ellipse 90% 70% at 50% 42%, #0e1626 0%, #0b0f19 62%, #070b13 100%);
+    color: #f2f7ff; -webkit-font-smoothing: antialiased;
+  }
+  #di { position: fixed; inset: 0; overflow: hidden; }
+  .stagewrap { position: relative; width: 100%; height: 100%; }
+  .ctl { position: absolute; top: calc(50% + clamp(130px, 24%, 190px)); left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .ctl.outro { top: calc(50% + clamp(36px, 8%, 64px)); }
+
+  /* tip numbers + 3-step progress + next button */
+  .kicker { font-size: 27.30px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase;
+    color: #22d3ee; margin-bottom: 18px; text-shadow: 0 0 18px rgba(34,211,238,.5); }
+  .stepper { display: flex; align-items: center; z-index: 60;
+    opacity: 0; transition: opacity .45s ease; }
+  .stepper.show { opacity: 1; }
+  .sdot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(34,211,238,.4);
+    background: transparent; transition: all .3s ease; cursor: pointer; position: relative; }
+  .sdot::after { content: ''; position: absolute; inset: -8px; }
+  .sdot.done { background: #22d3ee; border-color: #22d3ee; box-shadow: 0 0 10px rgba(34,211,238,.7); }
+  .sdot.now { border-color: #22d3ee; box-shadow: 0 0 10px rgba(34,211,238,.8); transform: scale(1.3); }
+  .sline { width: 44px; height: 2px; background: rgba(34,211,238,.25); transition: background .3s ease; }
+  .sline.done { background: #22d3ee; box-shadow: 0 0 8px rgba(34,211,238,.6); }
+  .donecheck { line-height: 0; opacity: 0; transition: opacity .45s ease; }
+  .donecheck.show { opacity: 1; }
+  .donecheck svg { width: 36px; height: 36px; filter: drop-shadow(0 0 8px rgba(34,211,238,.6)); }
+  .donecheck circle { fill: rgba(34,211,238,.08); stroke: #22d3ee; stroke-width: 2.5;
+    stroke-dasharray: 151; stroke-dashoffset: 151; }
+  .donecheck path { fill: none; stroke: #22d3ee; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 36; stroke-dashoffset: 36; }
+  .donecheck.show svg { animation: dpop .45s ease; }
+  .donecheck.show circle { animation: ddraw .5s ease forwards; }
+  .donecheck.show path { animation: ddraw .35s .35s ease forwards; }
+  @keyframes ddraw { to { stroke-dashoffset: 0; } }
+  @keyframes dpop { 0% { transform: scale(.5); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .nextbtn { z-index: 55;
+    font-family: inherit; font-size: 13.60px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: #062a33; background: #22d3ee; border: none; padding: 12px 34px; border-radius: 99px; cursor: pointer;
+    box-shadow: 0 0 18px rgba(34,211,238,.45);
+    opacity: 0; pointer-events: none; transition: opacity .4s ease; }
+  .nextbtn.show { opacity: 1; pointer-events: auto; }
+  .nextbtn:active { transform: scale(.96); }
+
+  /* full-screen cyan flash between stages */
+  .flash { position: absolute; inset: 0; z-index: 35; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse 62% 46% at 50% 50%,
+      rgba(165,243,252,.85) 0%, rgba(34,211,238,.28) 52%, rgba(0,0,0,0) 76%); }
+  .flash.go { animation: fl .7s ease-out; }
+  @keyframes fl { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* sweep that wipes each incoming stage */
+  .zwipe { position: absolute; top: 0; bottom: 0; left: 0; width: 0; z-index: 40; pointer-events: none; opacity: 0; }
+  .zwipe.go { opacity: 1; animation: zsweep .7s cubic-bezier(.6,0,.3,1) forwards; }
+  @keyframes zsweep { from { left: 0; } to { left: 100%; } }
+  .zwipe .zline { position: absolute; top: 0; bottom: 0; left: -2px; width: 5px;
+    background: repeating-linear-gradient(to bottom, #67e8f9 0 6px, transparent 6px 12px);
+    filter: drop-shadow(0 0 9px rgba(34,211,238,.95)); }
+  .zwipe .zpull { position: absolute; top: 50%; left: -14px; transform: translateY(-50%);
+    width: 28px; height: 40px; border-radius: 8px;
+    background: linear-gradient(135deg, #a5f3fc, #0ea5c4 70%);
+    border: 1px solid rgba(200,245,255,.75);
+    filter: drop-shadow(0 0 16px rgba(34,211,238,.95)); }
+
+  /* stages */
+  .stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; opacity: 0; pointer-events: none; z-index: 10;
+    transform: translateX(100%);
+    transition: opacity .53s ease, transform .53s cubic-bezier(.3,.7,.3,1); }
+  .stage.on { opacity: 1; pointer-events: auto; z-index: 20; transform: translateX(0); }
+  .stage.leaving { opacity: 0; transform: translateX(-100%); z-index: 15; }
+  /* leaving: pin the exit frame (words stay visible, intro visual holds) so the stage
+     flies out smoothly and fades as it goes — no blink when .on drops */
+  .stage.leaving .w { animation: none; opacity: 1; transform: none; }
+  .stage.leaving .turn180 .phoneflip { animation: none; opacity: 1; }
+  /* tips: nudge content up to hold its vertical place now the step numbers are gone */
+  #st2, #st3, #st4 { padding-bottom: 36px; }
+  /* drag tip: lift the title + viewer a touch; the controls below stay put */
+  #st2 .t2, #st2 .viewer { transform: translateY(-40px); }
+
+  /* tip 4: phone with a left-right pan arrow */
+  .pananim { margin-top: 4px; width: 150.00px; }
+  .pananim svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 14px rgba(34,211,238,.4)); }
+  .stage.on .pananim .lrslide { animation: lrslide 2.2s ease-in-out infinite; }
+  @keyframes lrslide { 0%, 100% { transform: translateX(-8px); } 50% { transform: translateX(8px); } }
+
+  /* tip 5: phone with an up-down tilt arrow */
+  .tiltanim { margin-top: 4px; width: 130.00px; }
+  .tiltanim svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 14px rgba(34,211,238,.4)); }
+  .stage.on .tiltanim .udslide { animation: udslide 2.2s ease-in-out infinite; }
+  @keyframes udslide { 0%, 100% { transform: translateY(-7px); } 50% { transform: translateY(7px); } }
+
+  /* word stagger — animations start only when the stage turns on */
+  .w { display: inline-block; opacity: 0; transform: translateY(14px); }
+  .stage.on .w { animation: diWordIn .55s cubic-bezier(.2,.7,.3,1) var(--d, 0s) forwards; }
+  @keyframes diWordIn { to { opacity: 1; transform: none; } }
+  .t1 { font-size: 32.76px; font-weight: 800; letter-spacing: -0.015em; line-height: 1.25;
+    text-shadow: 0 0 30px rgba(34,211,238,.5); }
+  .t2 { font-size: 25.74px; font-weight: 800; letter-spacing: -0.015em; line-height: 1.35;
+    text-shadow: 0 0 26px rgba(34,211,238,.45); }
+  .t1 .b, .t2 .b { background: linear-gradient(110deg, #67e8f9 20%, #ffffff 50%, #67e8f9 80%); background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 12px rgba(34,211,238,.75), 0 0 34px rgba(34,211,238,.3); }
+  .stage.on .b { animation: diShimmer 2.2s linear infinite; }
+  .stage.on .w.b { animation: diWordIn .55s cubic-bezier(.2,.7,.3,1) var(--d, 0s) forwards, diShimmer 2.2s linear infinite; }
+  @keyframes diShimmer { to { background-position: -220% 0; } }
+  .sub { margin-top: 18px; font-size: 17.16px; color: #9fd8e8; font-weight: 600; max-width: 544.00px; }
+
+  /* skip */
+  .skip { position: absolute; bottom: 30px; right: 14px; z-index: 55;
+    font-family: inherit; font-size: 12.80px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: #d9f6fd; text-decoration: none;
+    background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.45);
+    padding: 10px 20px; border-radius: 99px;
+    opacity: 0; pointer-events: none; transition: opacity .45s ease; }
+  .skip.show { opacity: 1; pointer-events: auto; }
+  .skip:hover { background: rgba(34,211,238,.22); }
+
+  /* stage 3: interactive viewer mock (reused from the Drift Tour demo) */
+  .viewer { margin-top: 4px; width: 640px; border-radius: 18px; overflow: hidden; position: relative;
+    border: 1px solid rgba(34,211,238,.35); box-shadow: 0 0 44px rgba(34,211,238,.22); }
+  .pano { height: 140.00px;
+    background:
+      linear-gradient(180deg, rgba(34,211,238,.10) 0%, transparent 30%),
+      repeating-linear-gradient(90deg,
+        #123043 0 60px, #16405a 60px 110px, #0f2a3d 110px 170px, #1a4a63 170px 210px, #123043 210px 280px);
+    background-size: 100% 100%, 840px 100%; }
+  .stage.on .pano { animation: panDrag 1.84s ease-in-out infinite; }
+  @keyframes panDrag { 0%, 100% { background-position: 0 0, -100px 0; } 50% { background-position: 0 0, 100px 0; } }
+  .badge180 { position: absolute; top: 12px; left: 12px; font-size: 11.52px; font-weight: 800; letter-spacing: .14em;
+    color: #062a33; background: #22d3ee; border-radius: 99px; padding: 5px 12px; }
+  .draghint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; align-items: center; color: #a5f3fc; font-weight: 800; font-size: 12.80px;
+    letter-spacing: .2em; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,.7); }
+  .dragrow { display: flex; align-items: center; gap: 14px; }
+  .dragrow svg { width: 26px; height: 18px; }
+  .stage.on .draghint { animation: dragHint 1.84s ease-in-out infinite; }
+  .handcenter { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
+    transform: translate(-50%, -50%); filter: drop-shadow(0 3px 12px rgba(0,0,0,.65)); opacity: 0; }
+  .stage.on .handcenter { opacity: 1; }
+  .stage.on .handcenter { animation: handSlide 1.84s ease-in-out infinite; }
+  @keyframes handSlide { 0%, 100% { transform: translate(-200%, -50%); } 50% { transform: translate(100%, -50%); } }
+  @keyframes dragHint { 0%, 100% { transform: translateX(-62%); } 50% { transform: translateX(-38%); } }
+  /* interactive mode: after the auto demo, the viewer becomes draggable */
+  .viewer.interactive { cursor: grab; touch-action: none; }
+  .viewer.interactive.dragging { cursor: grabbing; }
+  .viewer.interactive .pano { animation: none; }
+  .draghint svg.hand { width: 34px; height: 34px; }
+
+  /* stage 1: phone turning 180 in 3d, side to side */
+  .turn180 { margin-top: 12px; width: 220.00px; perspective: 500px; }
+  .turn180 svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 12px rgba(34,211,238,.35)); }
+  .turn180 .phoneflip { transform-box: fill-box; transform-origin: center; opacity: 0; }
+  .stage.on .turn180 .phoneflip { opacity: 1; }
+  .stage.on .turn180 .phoneflip { animation: sway180 3s ease-in-out infinite; }
+  @keyframes sway180 { 0%, 100% { transform: rotateY(-68deg); } 50% { transform: rotateY(68deg); } }
+
+  /* ---- 16:9 stage: fixed 1280x720 design canvas, px-locked 9:16 column, scaled to fit ---- */
+  #di { left: 50%; top: 50%; width: 1280px; height: 720px; right: auto; bottom: auto; }
+  .stagewrap { width: 1280px; height: 720px; }
+</style>
+</head>
+<body>
+<div id="di">
+  <div class="flash" id="diFlash"></div>
+  <div class="zwipe" id="diWipe"><div class="zline"></div><div class="zpull"></div></div>
+  <a class="skip" href="https://drift.li/tour/drift/45-birch-f7d4/main-area">Skip Tips</a>
+  <div class="stagewrap">
+  <!-- beat 1: quick tour tips (~2.05s) -->
+  <section class="stage on" id="st1">
+    <div class="t2">
+      <span class="w" style="--d:.1s">Quick</span>
+      <span class="w" style="--d:.2s">Tour</span>
+      <span class="w b" style="--d:.3s">Tips</span>
+    </div>
+    <div class="turn180">
+      <svg viewBox="0 0 200 130" fill="none" aria-hidden="true">
+        <defs>
+          <path id="arc180" d="M 30 112 A 70 70 0 0 1 170 112" />
+        </defs>
+        <use href="#arc180" stroke="#22d3ee" stroke-width="3" stroke-dasharray="6 8" opacity=".5"/>
+        <circle r="6" fill="#a5f3fc">
+          <animateMotion dur="2.6s" repeatCount="indefinite" keyPoints="0;1;0" keyTimes="0;.5;1" calcMode="linear">
+            <mpath href="#arc180"/>
+          </animateMotion>
+        </circle>
+        <g class="phoneflip">
+          <rect x="72" y="70" width="56" height="28" rx="7" stroke="#a5f3fc" stroke-width="3" fill="rgba(34,211,238,.08)"/>
+          <circle cx="120" cy="84" r="2.5" fill="#a5f3fc"/>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- beat 2: drag to look around (~1.84s, hero — one back-and-forth, cuts as the hand reaches the left) -->
+  <section class="stage" id="st2">
+    <div class="t2" id="dragTitle">
+      <span class="w" style="--d:.1s">Drag</span>
+      <span class="w" style="--d:.2s">To</span>
+      <span class="w b" style="--d:.3s">Look</span>
+      <span class="w b" style="--d:.4s">Around</span>
+    </div>
+    <div class="viewer">
+      <div class="badge180">180&deg;</div>
+      <div class="pano"></div>
+      <svg class="handcenter" viewBox="0 0 24 24" fill="none" stroke="#a5f3fc" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 21V13L4.6 11.4a1.5 1.5 0 0 1 2.1-2.1L9 10.8V5.4a1.5 1.5 0 0 1 2.9 0V11"/>
+        <path d="M11.9 11V6.6a1.5 1.5 0 0 1 2.9 0v5"/>
+        <path d="M14.8 11.6V8a1.5 1.5 0 0 1 2.9 0v4.4"/>
+        <path d="M17.7 12.4v-2.2a1.4 1.4 0 0 1 2.8 0v3.4a6 6 0 0 1-6 6L7 21"/>
+      </svg>
+      <div class="draghint">
+        <div class="dragrow">
+          <svg viewBox="0 0 26 18" fill="none" aria-hidden="true"><path d="M8 2 L2 9 L8 16 M18 2 L24 9 L18 16" stroke="#a5f3fc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Drag</span>
+          <svg viewBox="0 0 26 18" fill="none" aria-hidden="true"><path d="M8 2 L2 9 L8 16 M18 2 L24 9 L18 16" stroke="#a5f3fc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- beat 3: some views pan left right -->
+  <section class="stage" id="st3">
+    <div class="t2">
+      <span class="w" style="--d:.05s">Some</span>
+      <span class="w" style="--d:.13s">Views</span><br>
+      <span class="w b" style="--d:.35s">Pan</span>
+      <span class="w b" style="--d:.43s">Left</span>
+      <span class="w b" style="--d:.51s">Right</span>
+    </div>
+    <div class="pananim">
+      <svg viewBox="0 0 120 90" fill="none" aria-hidden="true">
+        <rect x="34" y="8" width="52" height="30" rx="5" stroke="#a5f3fc" stroke-width="3"/>
+        <path d="M60 38 V46" stroke="#a5f3fc" stroke-width="3" stroke-linecap="round"/>
+        <path d="M48 46 H72" stroke="#a5f3fc" stroke-width="3" stroke-linecap="round"/>
+        <g class="lrslide">
+          <path d="M28 66 H92" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M28 66 l11 -7 v14 Z" fill="#22d3ee"/>
+          <path d="M92 66 l-11 -7 v14 Z" fill="#22d3ee"/>
+          <g transform="translate(51,69) scale(0.75)">
+            <path d="M9 11.5V6.5a1.5 1.5 0 0 1 3 0v4m0-1.5a1.5 1.5 0 0 1 3 0v1.5m0 0a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.8a6 6 0 0 1-4.7-2.3L3.6 15a1.6 1.6 0 0 1 2.4-2.1L9 15.5" stroke="#baf3ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- beat 4: some views tilt up down -->
+  <section class="stage" id="st4">
+    <div class="t2">
+      <span class="w" style="--d:.05s">Some</span>
+      <span class="w" style="--d:.13s">Views</span><br>
+      <span class="w b" style="--d:.35s">Tilt</span>
+      <span class="w b" style="--d:.43s">Up</span>
+      <span class="w b" style="--d:.51s">Down</span>
+    </div>
+    <div class="tiltanim">
+      <svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
+        <rect x="34" y="12" width="52" height="32" rx="5" stroke="#a5f3fc" stroke-width="3"/>
+        <path d="M60 44 V52" stroke="#a5f3fc" stroke-width="3" stroke-linecap="round"/>
+        <path d="M48 52 H72" stroke="#a5f3fc" stroke-width="3" stroke-linecap="round"/>
+        <g class="udslide">
+          <path d="M60 76 V104" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M60 76 l-7 11 h14 Z" fill="#22d3ee"/>
+          <path d="M60 104 l-7 -11 h14 Z" fill="#22d3ee"/>
+          <g transform="translate(74,79) scale(1.05)">
+            <path d="M9 11.5V6.5a1.5 1.5 0 0 1 3 0v4m0-1.5a1.5 1.5 0 0 1 3 0v1.5m0 0a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.8a6 6 0 0 1-4.7-2.3L3.6 15a1.6 1.6 0 0 1 2.4-2.1L9 15.5" stroke="#baf3ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- beat 5: entering tour now (~0.92s — its own screen, exit triggers right away) -->
+  <section class="stage" id="st5">
+    <div class="t2">
+      <span class="w" style="--d:.05s">Entering</span>
+      <span class="w" style="--d:.12s">Tour</span>
+      <span class="w b" style="--d:.19s">Now</span>
+    </div>
+  </section>
+  </div><!-- /stagewrap -->
+  <div class="ctl">
+    <button class="nextbtn" id="diNext" type="button">Next</button>
+    <div class="stepper" id="diStepper" style="display:none">
+      <span class="sdot"></span><span class="sline"></span><span class="sdot"></span><span class="sline"></span><span class="sdot"></span>
+    </div>
+    <div class="donecheck" id="diDone" style="display:none" aria-hidden="true">
+      <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l8 8 15-16"/></svg>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var TOUR = 'https://drift.li/tour/drift/45-birch-f7d4/main-area';
+  var di = document.getElementById('di');
+  var flash = document.getElementById('diFlash');
+  var wipe = document.getElementById('diWipe');
+  var viewer = document.querySelector('.viewer');
+  var pano = viewer.querySelector('.pano');
+  var stages = Array.prototype.slice.call(document.querySelectorAll('.stage'));
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { window.location.href = TOUR; return; }
+  var nextBtn = document.getElementById('diNext');
+  var skipBtn = document.querySelector('.skip');
+  var ctl = document.querySelector('.ctl');
+  var stepper = document.getElementById('diStepper');
+  var sDots = stepper.querySelectorAll('.sdot');
+  var sLines = stepper.querySelectorAll('.sline');
+  // Progress dots are clickable — hop straight to that tip.
+  sDots.forEach(function (dot, i) {
+    dot.addEventListener('click', function () { goStage(i + 1); });
+  });
+  // Drag tip title states: "Drag To Look Around" -> "Try It Here Now" (0.5s before the
+  // hand finishes its demo loop) -> hidden while dragging (hand stays) -> "You Got It"
+  // 0.25s after the drag starts.
+  var dragTitle = document.getElementById('dragTitle');
+  var dragTitleOrig = dragTitle.innerHTML;
+  var youGotTimer = null;
+  function setDragTitleWords(list) {
+    dragTitle.style.transition = '';
+    dragTitle.style.visibility = 'visible';
+    dragTitle.style.opacity = '1';
+    dragTitle.innerHTML = list.map(function (w, i) {
+      return '<span class="w' + (w.h ? ' b' : '') + '" style="--d:' + (0.08 + i * 0.09).toFixed(2) + 's">' + w.t + '</span>';
+    }).join(' ');
+  }
+  function hideDragTitle() {
+    if (dragTitle.style.visibility === 'hidden' || dragTitle.style.opacity === '0') return;
+    dragTitle.style.transition = 'opacity .35s ease';
+    dragTitle.style.opacity = '0';
+    setTimeout(function () {
+      if (dragTitle.style.opacity === '0') dragTitle.style.visibility = 'hidden';
+    }, 380);
+  }
+  function resetDragTitle() {
+    if (youGotTimer) { clearTimeout(youGotTimer); youGotTimer = null; }
+    dragTitle.style.transition = '';
+    dragTitle.style.visibility = 'visible';
+    dragTitle.style.opacity = '1';
+    dragTitle.innerHTML = dragTitleOrig;
+  }
+  var N = stages.length;
+  var cur = 0;
+  // Next appears a beat into each middle screen's animation (not after the full cycle).
+  // Quick Tour Tips (screen 1) has no Next button — it auto-advances like before.
+  // Entering Tour Now (last screen) has no button either — it goes into the tour right away.
+  var NEXT_DELAY = [0, 1265, 265, 265];
+  var STAGE1_MS = 1850;
+  var ENTER_MS = 900;
+  var nextTimer = null;
+  // Drag tip: after one auto back-and-forth (1.84s), the pano becomes user-draggable.
+  var interTimer = null;
+  var tryTimer = null;
+  var dragState = null;
+  var bgX = 0;
+
+  function goTour() {
+    window.location.href = TOUR;
+  }
+
+  function fireFx() {
+    // Blue flash only — the screens themselves slide now.
+    flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+  }
+
+  var TIP_COUNT = 3;
+  function paintStepper(n) {
+    // n: 0 intro, 1-5 tips, 6 outro
+    var tip = n - 1;
+    var done = document.getElementById('diDone');
+    if (n === N - 1) {
+      // Outro: animated check mark instead of the progress bar.
+      stepper.classList.remove('show');
+      stepper.dataset.vis = '';
+      stepper.style.display = 'none';
+      done.style.display = 'block';
+      done.classList.remove('show');
+      void done.offsetWidth;
+      done.classList.add('show');
+      return;
+    }
+    done.style.display = 'none';
+    done.classList.remove('show');
+    stepper.style.display = (n === 0) ? 'none' : 'flex';
+    for (var i = 0; i < TIP_COUNT; i++) {
+      var st = (tip >= TIP_COUNT || i < tip) ? 'done' : (i === tip ? 'now' : '');
+      sDots[i].className = 'sdot' + (st ? ' ' + st : '');
+      if (i < TIP_COUNT - 1) sLines[i].className = 'sline' + ((tip >= TIP_COUNT || i < tip) ? ' done' : '');
+    }
+    // Fade the progress bar on smoothly the first time it appears.
+    if (n !== 0 && stepper.dataset.vis !== '1') {
+      stepper.dataset.vis = '1';
+      stepper.classList.remove('show');
+      void stepper.offsetWidth;
+      stepper.classList.add('show');
+    } else if (n !== 0) {
+      stepper.classList.add('show');
+    }
+  }
+
+  function goStage(n) {
+    var prev = cur;
+    cur = n;
+    if (nextTimer) clearTimeout(nextTimer);
+    if (interTimer) clearTimeout(interTimer);
+    if (tryTimer) clearTimeout(tryTimer);
+    nextBtn.classList.remove('show');
+    nextBtn.style.display = (n === N - 1) ? 'none' : '';
+    ctl.classList.toggle('outro', n === N - 1);
+    viewer.classList.remove('interactive', 'dragging');
+    pano.style.backgroundPosition = '';
+    dragState = null;
+    resetDragTitle();
+    stages.forEach(function (s, i) {
+      s.classList.remove('on');
+      if (i === prev && i !== n) s.classList.add('leaving');
+      else s.classList.remove('leaving');
+    });
+    fireFx();
+    stages[n].classList.add('on');
+    setTimeout(function () {
+      stages.forEach(function (s) { s.classList.remove('leaving'); });
+    }, 600);
+    // Dock the Next + progress controls right under this screen's action.
+    ctl.style.display = (n === 0) ? 'none' : 'flex';
+    stages[n].appendChild(ctl);
+    paintStepper(n);
+    // Skip stays off the intro — it comes in on the first tip.
+    skipBtn.classList.toggle('show', n !== 0);
+    nextBtn.textContent = (n === N - 2) ? 'Enter Tour' : 'Next';
+    if (n === 0) {
+      nextTimer = setTimeout(function () { goStage(1); }, STAGE1_MS);
+    } else if (n === N - 1) {
+      nextTimer = setTimeout(goTour, ENTER_MS);
+    } else {
+      nextTimer = setTimeout(function () { nextBtn.classList.add('show'); }, NEXT_DELAY[n]);
+    }
+    if (n === 1) {
+      // "Try It Here Now." lands half a second before the hand finishes its demo loop...
+      tryTimer = setTimeout(function () {
+        setDragTitleWords([{ t: 'Try' }, { t: 'It' }, { t: 'Here', h: 1 }, { t: 'Now', h: 1 }]);
+      }, 1340);
+      // ...then one automatic back-and-forth, and the pano is handed to the user.
+      interTimer = setTimeout(function () {
+        bgX = -100;
+        pano.style.backgroundPosition = '0 0, ' + bgX + 'px 0';
+        viewer.classList.add('interactive');
+      }, 1840);
+    }
+  }
+
+  function next() {
+    if (cur < N - 1) goStage(cur + 1);
+    else goTour();
+  }
+
+  nextBtn.addEventListener('click', next);
+
+  // Drag the pano yourself once the auto demo hands it over (touch or mouse).
+  viewer.addEventListener('pointerdown', function (e) {
+    if (!viewer.classList.contains('interactive')) return;
+    hideDragTitle();
+    if (youGotTimer) clearTimeout(youGotTimer);
+    youGotTimer = setTimeout(function () {
+      setDragTitleWords([{ t: 'You' }, { t: 'Got', h: 1 }, { t: 'It', h: 1 }]);
+    }, 250);
+    dragState = { x: e.clientX, bg: bgX };
+    viewer.classList.add('dragging');
+    try { viewer.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  viewer.addEventListener('pointermove', function (e) {
+    if (!dragState) return;
+    bgX = dragState.bg + (e.clientX - dragState.x);
+    pano.style.backgroundPosition = '0 0, ' + bgX + 'px 0';
+  });
+  function endDrag() {
+    dragState = null;
+    viewer.classList.remove('dragging');
+  }
+  viewer.addEventListener('pointerup', endDrag);
+  viewer.addEventListener('pointercancel', endDrag);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') goTour();
+    if (e.key === 'ArrowRight' || e.key === 'Enter') next();
+  });
+
+  // If someone comes back to the page (back button / bfcache restore), start over from the beginning.
+  window.addEventListener('pageshow', function () { goStage(0); });
+
+  goStage(0);
+})();
+</script>
+
+<script>
+(function () {
+  var W = 1280, H = 720;
+  var di = document.getElementById('di');
+  function fit() {
+    var s = Math.min(window.innerWidth / W, window.innerHeight / H);
+    di.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>

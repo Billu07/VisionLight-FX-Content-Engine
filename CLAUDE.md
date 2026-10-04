@@ -271,32 +271,34 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
     desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
     that is the acceptance test, and v4-* in ui-shots asserts it.
-  - **The first-run tips** (2026-10-05, client, built to a guide of their own): a visitor meets the
-    gestures on **their own screen before the tour**, `rotation3d/TourTips.tsx` — never a card over the
-    footage, which is what it replaces and what the client flagged ("our one that literally covers text
-    in a drift"). **Walk the client's reference before touching this**: zip.link/drift-tour-instructions
-    (mobile, five steps) and zip.link/drift-desktop (desktop, three) — reading one screenshot is how the
-    first attempt came out thin, and the polish is all in the parts a still does not show.
-    What the guide does, and what this now does: a two-line heading whose **accent half shimmers in word
-    by word** (`ttWordIn` + `ttShimmer`; the space lives inside each word's span so the line still reads
-    as a sentence to anything taking the text); **one piece of animated line art per step** — a phone
-    turning under a long swept arrow, a device with sliding arrows and a hand; a pill that reads
-    **Enter Tour** on the last step; a **connected stepper rail** that fills behind you; **Skip Tips** in
-    the corner throughout. Step one is live: the strip is really dragged, `dragCoach` judges it in the
-    player's own pixels (0.006 rad/px), and the badge — named for the room they are about to enter, the
-    way the guide's "180°" names its pano — turns to "That's It".
-    Steps are what THIS player does, not what theirs does: drag · turn the phone · turn it back, plus
-    **pan left and right** or **tilt up and down** only when the tour really holds a room on that axis.
-    A drift has one axis, but a tour can mix them (`driftDirection` TTB/BTT), which is why the public
-    stop payload now carries `dir` (`flowNavPayload`, additive) and `tourAxes` reaches the tips. A
-    desktop drops the two turn steps and draws a monitor rather than a phone.
-    Gated by `tipsSeen()` (`drift-tips-seen`, once per browser), tour drifts in a real player only
-    (`driftMode && flowNav && introHint`, never the hero or a landing). `.r3d-tips` is in `isControl`,
-    so while it is up the drift behind cannot be dragged AND the strip keeps the pointer the stage would
-    otherwise capture — that one line is the difference between the strip working and not.
-    The hand demo (`startIntro`) is back to what it was before the coach: one wordless "this moves" on
-    the first drift ever, its own `drift-intro-seen` key, skipped for anyone just shown the tips.
-    Driven with real touch: 27 checks.
+  - **The first-run tips** (2026-10-05) are **the client's own guide, ported** — not a design of
+    ours. They built it for drift.li (its noscript fallback points at our own
+    /tour/drift/45-birch-f7d4/main-area), sent the HTML, and asked for it "100% same". So
+    `rotation3d/TourTips.tsx` is a port: the beats, the copy, the artwork, the easings and the
+    millisecond timings are theirs. **The two source files are in the repo**
+    (`docs/reference/drift-tour-tips-mobile.html`, `…-desktop.html`) — go back to them before changing anything here,
+    and do not "improve" the copy or the steps.
+    Seven beats on a phone: *Quick Tour Tips* (auto-advances after 1850ms, no button) · *Drag To Look
+    Around* · *For Horizontal Views / Rotate Phone* · *For Vertical Views / Rotate Phone Back* ·
+    *Some Views / Pan Left Right* · *Some Views / Tilt Up Down* · *Entering Tour Now* (900ms, then it
+    hands over). A desktop gets five — their second file drops the two rotate beats and widens the
+    viewer to 640px with an 840px band. Each screen slides in from the right behind a cyan flash; the
+    heading arrives word by word with the accent words shimmering; Next fades in after
+    `NEXT_DELAY` (1265ms on the early beats, 265ms on the late ones); the progress dots are
+    clickable; the outro swaps the rail for a drawn check mark. Tip one plays one automatic drag,
+    then at 1840ms hands the pano over for real, its title moving *Drag To Look Around* → (1340ms)
+    *Try It Here Now* → on touch, hidden → (250ms) *You Got It*.
+    **Ours only in the plumbing**: it ends with `onDone()` instead of navigating to a tour URL, it is
+    shown once per browser (`drift-tips-seen`, `tipsSeen()`), and the whole sheet is scoped under
+    `.r3d-tips` with the keyframes renamed `tt*` — names as common as `.stage`, `.w`, `.flash` and
+    `.skip` would otherwise reach into the player around it. Reduced motion skips straight to the
+    tour, as theirs does. `.r3d-tips` is in `isControl` so the drift behind cannot be dragged while
+    it is up, and the pano keeps the pointer the stage would otherwise capture.
+    Shown only for a TOUR drift in a real player (`driftMode && flowNav && introHint`, never the hero
+    or a landing). The hand demo (`startIntro`) is back to what it was before any of this: one
+    wordless "this moves" on the first drift ever, its own `drift-intro-seen` key, skipped for anyone
+    just shown the tips. Walked end to end against both source files: the beats, the copy, the dots
+    and the handover all line up.
   - **Superseded, for history** (2026-10-02): the client asked for a coach that made the visitor drag
     forward and back inside the player before moving on. It shipped, then the card's placement became the
     problem — over the footage there is nowhere it does not cover something. The lesson survived; the
@@ -311,6 +313,10 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     (`r3d-bare` is dead). It still fades while DRAGGING, but only for a portrait drift on a touch screen
     (`@media (pointer: coarse){ .r3d-immersive:not(.r3d-wide).r3d-grabbing … }`) — a landscape drift keeps
     its chrome because that lives beside the footage, not over it.
+  - **The drag hand waits at the far edge** (2026-10-05, client): the helper sits at the edge the
+    drag is HEADING FOR, not the one it starts from — a left-to-right drift carries it to the right
+    of the frame, a right-to-left drift to the left, and on the way back it crosses over. One
+    condition in `placeHelperX()`; vertical drifts stay centred, as they always were.
   - **The player follows the device; it never turns the drift itself** (2026-09-23, client: "we don't
     want to make them turn their phone. It needs to respond only IF they turn their phone"). An earlier
     pass rotated the stage a quarter turn for a landscape drift on an upright phone — that is REMOVED,

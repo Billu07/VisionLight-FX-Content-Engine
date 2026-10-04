@@ -501,12 +501,16 @@ export default function SpinViewer({
         const hintW = el.offsetWidth || 120;
         el.style.right = "auto";
         el.style.left = Math.max(inset, Math.min(stageW - hintW - inset, fx + fw / 2 - hintW / 2)) + "px";
-      } else if (helperBack !== dirSign < 0) {
-        // back on LTR, or forward on RTL → the frame's RIGHT edge
+      } else if (helperBack === dirSign < 0) {
+        // The hand waits at the edge the drag is HEADING FOR, not the one it starts from
+        // (client, 2026-10-05) — so a left-to-right drift carries it to the right, and a
+        // right-to-left drift to the left. On the way back it crosses to the other edge for
+        // the same reason.
+        // forward on LTR, or back on RTL → the frame's RIGHT edge
         el.style.left = "auto";
         el.style.right = Math.max(rightInset, stageW - (fx + fw)) + "px";
       } else {
-        // forward on LTR, or back on RTL → the frame's LEFT edge
+        // back on LTR, or forward on RTL → the frame's LEFT edge
         el.style.right = "auto";
         el.style.left = Math.max(inset, fx) + "px";
       }
@@ -2228,14 +2232,6 @@ export default function SpinViewer({
       {tips && (
         <TourTips
           touch={typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)")?.matches ?? false)}
-          axis={driftDirection === "TTB" || driftDirection === "BTT" ? "y" : "x"}
-          /* The axes the REST of this tour uses, so the other one is only taught when a room
-             really moves that way. A stop from before the payload carried `dir` reads as
-             horizontal, which is what every drift was until vertical ones existed. */
-          tourAxes={(flowNav?.stops || []).map((s) => (s.dir === "TTB" || s.dir === "BTT" ? "y" : "x"))}
-          /* The room they are about to enter names the practice strip, the way the guide's own
-             "180°" names its pano. */
-          roomName={productName}
           onDone={() => setTips(false)}
         />
       )}

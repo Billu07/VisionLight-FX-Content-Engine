@@ -1,21 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import { createDragCoach, type DragCoach } from "./dragCoach";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * The tips a visitor meets before their first tour drift.
  *
- * Built to the guide the client sent (2026-10-05) — their mobile and desktop versions both walked
- * end to end, not guessed at. Its shape: a screen of its own BEFORE the tour (never a card over
- * the footage, which is what it replaces); a two-line heading whose accent half shimmers in word
- * by word; one piece of animated line art per step; a pill that reads **Enter Tour** on the last
- * step; a connected stepper rail that fills as you go; **Skip Tips** in the corner throughout.
- * Five steps on a phone, three on a desktop — there the device drawn is a monitor and there is no
- * phone to turn.
+ * This is the client's own guide, ported — not a design of ours. They built it for drift.li (its
+ * noscript fallback points at /tour/drift/45-birch-f7d4/main-area) and sent the HTML, so the beats,
+ * the copy, the artwork, the easings and the millisecond timings are all theirs. Sources kept in
+ * the scratchpad: zip.link/drift-tour-instructions (phone, five tips) and zip.link/drift-desktop
+ * (desktop, three — no rotate-phone beats, a wider viewer).
  *
- * What it teaches is this player, not theirs: a drift has one axis, but a TOUR can mix rooms that
- * pan with rooms that tilt, so those two steps appear only when this tour really holds both.
- * Step one is live — the strip is dragged for real, and `dragCoach` judges it in the same pixels
- * as the player, which is where the client's earlier "drag back and forth, so all learned" lives.
+ * The shape: an intro that auto-advances, the tips, and an outro that hands over to the tour. Each
+ * screen slides in from the right behind a cyan flash; the heading comes in word by word with the
+ * accent words shimmering; Next appears a beat into each screen; the progress dots are clickable.
+ * Tip one plays one automatic drag and then hands the pano to the visitor, its title moving from
+ * "Drag To Look Around" to "Try It Here Now" to "You Got It".
+ *
+ * Ours only in the plumbing: it ends by calling `onDone()` instead of navigating to a tour URL, it
+ * is shown once per browser (`drift-tips-seen`), and the whole sheet is scoped under `.r3d-tips`
+ * so names as common as `.stage`, `.w` and `.skip` cannot touch the player around it.
  */
 
 const KEY = "drift-tips-seen";
@@ -35,350 +37,491 @@ const remember = () => {
   }
 };
 
-/** The px of dragging a whole drift takes (0.006 rad/px, 2π a drift) — see dragCoach. */
-const DRIFT_PX = 1047;
+type Word = { t: string; b?: boolean };
 
-export type Axis = "x" | "y";
-type StepKind = "drag" | "turn" | "turnback" | "pan" | "tilt";
-interface Step {
-  kind: StepKind;
-  lead: string;
-  accent: string;
-}
+/** Their own timings, kept to the millisecond. */
+const STAGE1_MS = 1850;
+const ENTER_MS = 900;
+const TRY_AT = 1340; // "Try It Here Now" lands before the hand finishes its loop
+const HANDOVER_AT = 1840; // ...then the pano becomes the visitor's
+const GOT_IT_AT = 250; // after they take hold
 
-const LEARN: Record<Axis, string> = { x: "Drag Left and Right", y: "Drag Up and Down" };
+const words = (list: Word[], step = 0.09, from = 0.08) =>
+  list.map((w, i) => (
+    <span key={`${w.t}${i}`} className={`w${w.b ? " b" : ""}`} style={{ ["--d" as string]: `${(from + i * step).toFixed(2)}s` }}>
+      {w.t}{" "}
+    </span>
+  ));
 
-const HAND = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" />
-    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" />
+/** The hand that drags the pano. */
+const HandCenter = () => (
+  <svg className="handcenter" viewBox="0 0 24 24" fill="none" stroke="#a5f3fc" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M7 21V13L4.6 11.4a1.5 1.5 0 0 1 2.1-2.1L9 10.8V5.4a1.5 1.5 0 0 1 2.9 0V11" />
+    <path d="M11.9 11V6.6a1.5 1.5 0 0 1 2.9 0v5" />
+    <path d="M14.8 11.6V8a1.5 1.5 0 0 1 2.9 0v4.4" />
+    <path d="M17.7 12.4v-2.2a1.4 1.4 0 0 1 2.8 0v3.4a6 6 0 0 1-6 6L7 21" />
   </svg>
 );
-
-/** A phone, or a desktop screen — whichever the visitor is actually holding. */
-const Device = ({ monitor, wide }: { monitor: boolean; wide?: boolean }) =>
-  monitor ? (
-    <svg viewBox="0 0 64 56" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round">
-      <rect x="4" y="4" width="56" height="38" rx="5" />
-      <path d="M26 48h12M32 42v6" strokeLinecap="round" />
-    </svg>
-  ) : wide ? (
-    <svg viewBox="0 0 64 40" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round">
-      <rect x="2" y="6" width="60" height="28" rx="6" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 40 64" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round">
-      <rect x="6" y="2" width="28" height="60" rx="6" />
-    </svg>
-  );
-
-/**
- * The arrow that says "turn it": a long arc sweeping around the device, the way the client's
- * guide draws it. A short hook over one corner reads as decoration; this reads as rotation.
- */
-const TurnArrow = ({ back }: { back?: boolean }) => (
-  <svg className={`tt-turnarrow${back ? " tt-back" : ""}`} viewBox="0 0 140 140" fill="none" stroke="currentColor" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M24 86A48 48 0 1 1 112 62" />
-    <path d="M112 36v28H84" />
+const Chev = () => (
+  <svg viewBox="0 0 26 18" fill="none" aria-hidden>
+    <path d="M8 2 L2 9 L8 16 M18 2 L24 9 L18 16" stroke="#a5f3fc" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+/** The little hand inside the pan / tilt drawings. */
+const HandGlyph = () => (
+  <path
+    d="M9 11.5V6.5a1.5 1.5 0 0 1 3 0v4m0-1.5a1.5 1.5 0 0 1 3 0v1.5m0 0a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.8a6 6 0 0 1-4.7-2.3L3.6 15a1.6 1.6 0 0 1 2.4-2.1L9 15.5"
+    stroke="#baf3ff"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+);
 
-export default function TourTips({
-  touch,
-  axis = "x",
-  tourAxes = [],
-  roomName,
-  onDone,
-}: {
-  touch: boolean;
-  /** The way the room about to open is dragged, so the strip matches what they will touch. */
-  axis?: Axis;
-  /** The way every room of this tour is dragged. */
-  tourAxes?: Axis[];
-  /** The room they are about to enter — it names the strip, the way their "180°" names a pano. */
-  roomName?: string | null;
-  onDone: () => void;
-}) {
-  // A drift has ONE axis; a tour can mix them. Only teach an axis this tour actually uses, and
-  // only as a separate step when it is not the one they are about to drag.
-  const other: Axis = axis === "x" ? "y" : "x";
-  const mixed = tourAxes.includes(other);
-  const steps: Step[] = [
-    { kind: "drag", lead: "Try It", accent: "Here Now" },
-    ...(touch
-      ? ([
-          { kind: "turn", lead: "For Wide Rooms", accent: "Turn Your Phone" },
-          { kind: "turnback", lead: "For Tall Rooms", accent: "Turn It Back" },
-        ] as Step[])
-      : []),
-    ...(mixed
-      ? ([other === "x"
-          ? { kind: "pan", lead: "Some Rooms", accent: "Pan Left and Right" }
-          : { kind: "tilt", lead: "Some Rooms", accent: "Tilt Up and Down" }] as Step[])
-      : []),
-  ];
+export default function TourTips({ touch, onDone }: { touch: boolean; onDone: () => void }) {
+  // Their page sends a visitor who asked for less motion straight into the tour.
+  const reduce = typeof window !== "undefined" && (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false);
 
-  const [i, setI] = useState(0);
-  const [leaving, setLeaving] = useState(false);
-  const [held, setHeld] = useState(false); // they have taken the strip over
-  const [done, setDone] = useState(false); // ...and dragged it both ways
-  const step = steps[Math.min(i, steps.length - 1)];
-  const last = i >= steps.length - 1;
-  const stepAxis: Axis = step.kind === "tilt" ? "y" : step.kind === "pan" ? "x" : axis;
+  const [title, setTitle] = useState<Word[] | null>(null); // null = the opening words
+  const [titleHidden, setTitleHidden] = useState(false);
+  const [interactive, setInteractive] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [cur, setCur] = useState(0);
+  const [prev, setPrev] = useState(-1);
+  const [flash, setFlash] = useState(0);
 
-  const close = () => {
-    if (leaving) return;
-    setLeaving(true);
+  const panoRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef(0);
+  const dragRef = useRef<{ x: number; bg: number } | null>(null);
+  const gotRef = useRef<number | null>(null);
+
+  // Five tips on a phone, three on a desktop — the two files the client sent.
+  const kinds = touch ? (["drag", "horiz", "vert", "pan", "tilt"] as const) : (["drag", "pan", "tilt"] as const);
+  const N = kinds.length + 2; // the intro and the outro
+  const NEXT_DELAY = touch ? [0, 1265, 1265, 1265, 265, 265] : [0, 1265, 265, 265];
+  const BAND = touch ? 69 : 100; // how far the auto demo leaves the pano pushed
+
+  const finish = useCallback(() => {
     remember();
-    window.setTimeout(onDone, 440);
+    onDone();
+  }, [onDone]);
+
+  const go = useCallback((n: number) => {
+    setPrev(n === 0 ? -1 : (p) => p);
+    setCur((c) => {
+      setPrev(c === n ? -1 : c);
+      return n;
+    });
+    setShowNext(false);
+    setInteractive(false);
+    setTitle(null);
+    setTitleHidden(false);
+    bgRef.current = 0;
+    dragRef.current = null;
+    if (panoRef.current) panoRef.current.style.backgroundPosition = "";
+    setFlash((f) => f + 1);
+  }, []);
+
+  useEffect(() => {
+    if (reduce) finish();
+  }, [reduce, finish]);
+
+  const next = useCallback(() => (cur < N - 1 ? go(cur + 1) : finish()), [cur, N, go, finish]);
+
+  // Every timer on a screen, exactly as their script sets them.
+  useEffect(() => {
+    if (reduce) return;
+    const timers: number[] = [];
+    if (cur === 0) {
+      timers.push(window.setTimeout(() => go(1), STAGE1_MS));
+    } else if (cur === N - 1) {
+      timers.push(window.setTimeout(finish, ENTER_MS));
+    } else {
+      timers.push(window.setTimeout(() => setShowNext(true), NEXT_DELAY[cur] ?? 265));
+    }
+    if (cur === 1) {
+      timers.push(window.setTimeout(() => setTitle([{ t: "Try" }, { t: "It" }, { t: "Here", b: true }, { t: "Now", b: true }]), TRY_AT));
+      timers.push(
+        window.setTimeout(() => {
+          bgRef.current = -BAND;
+          if (panoRef.current) panoRef.current.style.backgroundPosition = `0 0, ${-BAND}px 0`;
+          setInteractive(true);
+        }, HANDOVER_AT),
+      );
+    }
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur, reduce]);
+
+  // The slide out only lasts a beat.
+  useEffect(() => {
+    if (prev < 0) return;
+    const t = window.setTimeout(() => setPrev(-1), 600);
+    return () => clearTimeout(t);
+  }, [prev]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") finish();
+      else if (e.key === "ArrowRight" || e.key === "Enter") next();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [finish, next]);
+
+  useEffect(() => () => void (gotRef.current && clearTimeout(gotRef.current)), []);
+
+  // ── the pano, once the demo hands it over ──
+  const onDown = (e: React.PointerEvent) => {
+    if (!interactive) return;
+    setTitleHidden(true);
+    if (gotRef.current) clearTimeout(gotRef.current);
+    gotRef.current = window.setTimeout(() => {
+      setTitle([{ t: "You" }, { t: "Got", b: true }, { t: "It", b: true }]);
+      setTitleHidden(false);
+    }, GOT_IT_AT);
+    dragRef.current = { x: e.clientX, bg: bgRef.current };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is a nicety */
+    }
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    bgRef.current = dragRef.current.bg + (e.clientX - dragRef.current.x);
+    if (panoRef.current) panoRef.current.style.backgroundPosition = `0 0, ${bgRef.current}px 0`;
+  };
+  const endDrag = () => {
+    dragRef.current = null;
   };
 
-  // ── step one is live: the strip is really dragged ──
-  const stripRef = useRef<HTMLDivElement>(null);
-  const shiftRef = useRef(0);
-  const coachRef = useRef<DragCoach | null>(null);
-  useEffect(() => {
-    const el = stripRef.current;
-    if (!el || step.kind !== "drag") return;
-    let dragging = false;
-    let last0 = 0;
-    const along = (e: PointerEvent) => (stepAxis === "y" ? e.clientY : e.clientX);
-    const paint = () => {
-      const d = shiftRef.current;
-      if (stepAxis === "y") el.style.backgroundPositionY = `${d}px`;
-      else el.style.backgroundPositionX = `${d}px`;
-    };
-    const down = (e: PointerEvent) => {
-      dragging = true;
-      last0 = along(e);
-      el.setPointerCapture?.(e.pointerId);
-      setHeld(true);
-    };
-    const move = (e: PointerEvent) => {
-      if (!dragging) return;
-      e.preventDefault();
-      shiftRef.current += along(e) - last0;
-      last0 = along(e);
-      paint();
-      // Judged by the player's own rules, in the player's own pixels.
-      const c = (coachRef.current ||= createDragCoach(performance.now()));
-      if (c.update(shiftRef.current / DRIFT_PX, performance.now()).step === "done") setDone(true);
-    };
-    const up = () => {
-      dragging = false;
-    };
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointermove", move, { passive: false });
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
-    return () => {
-      el.removeEventListener("pointerdown", down);
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
-    };
-  }, [step.kind, stepAxis]);
+  if (reduce) return null;
 
-  return (
-    <div className={`r3d-tips${leaving ? " tt-out" : ""}`} role="dialog" aria-label="Quick tour tips">
-      <style>{CSS}</style>
+  const tipIndex = cur - 1;
+  const outro = cur === N - 1;
 
-      {/* The heading comes in word by word, and the half that carries the instruction shimmers. */}
-      <h2 className="tt-head" key={`h${i}`}>
-        <span className="tt-lead">
-          {step.lead.split(" ").map((w, n, a) => (
-            <span key={`${w}${n}`} className="tt-w" style={{ animationDelay: `${n * 0.075}s` }}>
-              {/* the space lives INSIDE the word, so the heading still reads as a sentence to
-                  anything that takes the text rather than the picture */}
-              {n < a.length - 1 ? `${w} ` : w}
-            </span>
-          ))}
-        </span>
-        <span className="tt-accent">
-          {step.accent.split(" ").map((w, n, a) => (
-            <span key={`${w}${n}`} className="tt-w tt-b" style={{ animationDelay: `${(step.lead.split(" ").length + n) * 0.075}s` }}>
-              {n < a.length - 1 ? `${w} ` : w}
-            </span>
-          ))}
-        </span>
-      </h2>
-
-      <div className="tt-art" key={`a${i}`}>
-        {step.kind === "drag" && (
-          <>
-            <div
-              className={`tt-strip${stepAxis === "y" ? " tt-vert" : ""}${held ? " tt-held" : ""}${done ? " tt-done" : ""}`}
-              ref={stripRef}
-              aria-hidden
-            >
-              <span className="tt-badge">{done ? "That's It" : roomName || "Drag"}</span>
-              <span className="tt-grab">
-                <span className="tt-hand">{HAND}</span>
-                <span className="tt-dragrow">
-                  <i>{stepAxis === "y" ? "⌃⌃" : "‹‹"}</i>
-                  <em>{done ? "You've Got It" : "DRAG"}</em>
-                  <i>{stepAxis === "y" ? "⌄⌄" : "››"}</i>
-                </span>
-              </span>
-            </div>
-            <p className="tt-note">{LEARN[stepAxis]} to Look Around</p>
-          </>
-        )}
-
-        {(step.kind === "turn" || step.kind === "turnback") && (
-          <div className="tt-dev" aria-hidden>
-            <span className={step.kind === "turn" ? "tt-turning" : "tt-turningback"}>
-              <Device monitor={false} wide={step.kind === "turnback"} />
-            </span>
-            <TurnArrow back={step.kind === "turnback"} />
-          </div>
-        )}
-
-        {step.kind === "pan" && (
-          <div className="tt-dev tt-stack" aria-hidden>
-            <span className="tt-screen">
-              <Device monitor={!touch} wide={touch} />
-            </span>
-            <span className="tt-lr">
-              <svg viewBox="0 0 120 20" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 10h96" />
-                <path d="M20 4l-8 6 8 6M100 4l8 6-8 6" />
-              </svg>
-              <span className="tt-slide tt-slide-x">{HAND}</span>
-            </span>
-          </div>
-        )}
-
-        {step.kind === "tilt" && (
-          <div className="tt-dev tt-stack" aria-hidden>
-            <span className="tt-screen">
-              <Device monitor={!touch} />
-            </span>
-            <span className="tt-ud">
-              <svg viewBox="0 0 20 90" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 10v70" />
-                <path d="M4 18l6-8 6 8M4 72l6 8 6-8" />
-              </svg>
-              <span className="tt-slide tt-slide-y">{HAND}</span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="tt-foot">
-        <button type="button" className="tt-next" onClick={() => (last ? close() : setI(i + 1))}>
-          {last ? "Enter Tour" : "Next"}
+  /** Next, the progress rail and the tick — their script moves this block into the live screen. */
+  const Ctl = (
+    <div className={`ctl${outro ? " outro" : ""}`} style={{ display: cur === 0 ? "none" : "flex" }}>
+      {!outro && (
+        <button type="button" className={`nextbtn${showNext ? " show" : ""}`} onClick={next}>
+          {cur === N - 2 ? "Enter Tour" : "Next"}
         </button>
-        <div className="tt-rail" aria-hidden>
-          {steps.map((s, n) => (
-            <span key={s.kind} className={`tt-node${n < i ? " tt-past" : ""}${n === i ? " tt-now" : ""}`} />
+      )}
+      {!outro && (
+        <div className="stepper show">
+          {kinds.map((k, i) => (
+            <span className="srow" key={k}>
+              {i > 0 && <span className={`sline${i <= tipIndex ? " done" : ""}`} />}
+              <span
+                className={`sdot${i < tipIndex ? " done" : i === tipIndex ? " now" : ""}`}
+                onClick={() => go(i + 1)}
+                role="button"
+                tabIndex={-1}
+                aria-label={`Tip ${i + 1}`}
+              />
+            </span>
           ))}
         </div>
-      </div>
+      )}
+      {outro && (
+        <div className="donecheck show" aria-hidden>
+          <svg viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="24" />
+            <path d="M15 27l8 8 15-16" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
 
-      <button type="button" className="tt-skip" onClick={close}>
+  const screens: React.ReactNode[] = [];
+  const stage = (body: React.ReactNode) => {
+    const n = screens.length;
+    screens.push(
+      <section className={`stage${n === cur ? " on" : ""}${n === prev && prev !== cur ? " leaving" : ""}`} key={n}>
+        {body}
+        {n === cur && Ctl}
+      </section>,
+    );
+  };
+
+  // beat 1 — quick tour tips
+  stage(
+    <>
+      <div className="t2">{words([{ t: "Quick" }, { t: "Tour" }, { t: "Tips", b: true }], 0.1, 0.1)}</div>
+      <div className="turn180">
+        <svg viewBox="0 0 200 130" fill="none" aria-hidden>
+          <defs>
+            <path id="tt-arc180" d="M 30 112 A 70 70 0 0 1 170 112" />
+          </defs>
+          <use href="#tt-arc180" stroke="#22d3ee" strokeWidth={3} strokeDasharray="6 8" opacity=".5" />
+          <circle r="6" fill="#a5f3fc">
+            <animateMotion dur="2.6s" repeatCount="indefinite" keyPoints="0;1;0" keyTimes="0;.5;1" calcMode="linear">
+              <mpath href="#tt-arc180" />
+            </animateMotion>
+          </circle>
+          <g className="phoneflip">
+            <rect x="72" y="70" width="56" height="28" rx="7" stroke="#a5f3fc" strokeWidth={3} fill="rgba(34,211,238,.08)" />
+            <circle cx="120" cy="84" r="2.5" fill="#a5f3fc" />
+          </g>
+        </svg>
+      </div>
+    </>,
+  );
+
+  for (const kind of kinds) {
+    if (kind === "drag") {
+      stage(
+        <>
+          <div className="t2 dragtitle" style={titleHidden ? { opacity: 0, visibility: "hidden", transition: "opacity .35s ease" } : undefined}>
+            {title ? words(title, 0.09, 0.08) : words([{ t: "Drag" }, { t: "To" }, { t: "Look", b: true }, { t: "Around", b: true }], 0.1, 0.1)}
+          </div>
+          <div
+            className={`viewer${interactive ? " interactive" : ""}`}
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            <div className="badge180">180&deg;</div>
+            <div className="pano" ref={panoRef} />
+            <HandCenter />
+            <div className="draghint">
+              <div className="dragrow">
+                <Chev />
+                <span>Drag</span>
+                <Chev />
+              </div>
+            </div>
+          </div>
+        </>,
+      );
+    } else if (kind === "horiz" || kind === "vert") {
+      const back = kind === "vert";
+      stage(
+        <>
+          <div className="t2">
+            {words(back ? [{ t: "For" }, { t: "Vertical" }, { t: "Views" }] : [{ t: "For" }, { t: "Horizontal" }, { t: "Views" }], 0.08, 0.05)}
+            <br />
+            {words(
+              back
+                ? [{ t: "Rotate", b: true }, { t: "Phone", b: true }, { t: "Back", b: true }]
+                : [{ t: "Rotate", b: true }, { t: "Phone", b: true }],
+              0.1,
+              0.45,
+            )}
+          </div>
+          <div className="rotphone">
+            <svg viewBox="0 0 120 120" fill="none" aria-hidden>
+              <g className={back ? "tiltback" : "tilt"}>
+                {back ? (
+                  <>
+                    <path d="M 102 60 A 42 42 0 0 0 18 60" stroke="#22d3ee" strokeWidth={3.5} strokeLinecap="round" fill="none" opacity=".85" />
+                    <path d="M10 58 L26 58 L18 70 Z" fill="#22d3ee" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M 18 60 A 42 42 0 0 1 102 60" stroke="#22d3ee" strokeWidth={3.5} strokeLinecap="round" fill="none" opacity=".85" />
+                    <path d="M94 56 L110 56 L102 68 Z" fill="#22d3ee" />
+                  </>
+                )}
+                <rect x="48" y="34" width="24" height="52" rx="6" stroke="#a5f3fc" strokeWidth={3} />
+                <circle cx="60" cy="78" r="2.5" fill="#a5f3fc" />
+              </g>
+            </svg>
+          </div>
+        </>,
+      );
+    } else if (kind === "pan") {
+      stage(
+        <>
+          <div className="t2">
+            {words([{ t: "Some" }, { t: "Views" }], 0.08, 0.05)}
+            <br />
+            {words([{ t: "Pan", b: true }, { t: "Left", b: true }, { t: "Right", b: true }], 0.08, 0.35)}
+          </div>
+          <div className="pananim">
+            <svg viewBox="0 0 120 90" fill="none" aria-hidden>
+              <rect x="34" y="14" width="52" height="24" rx="6" stroke="#a5f3fc" strokeWidth={3} />
+              <circle cx="78" cy="26" r="2.5" fill="#a5f3fc" />
+              <g className="lrslide">
+                <path d="M28 66 H92" stroke="#22d3ee" strokeWidth={3.5} strokeLinecap="round" />
+                <path d="M28 66 l11 -7 v14 Z" fill="#22d3ee" />
+                <path d="M92 66 l-11 -7 v14 Z" fill="#22d3ee" />
+                <g transform="translate(50.4,43) scale(0.8)">
+                  <HandGlyph />
+                </g>
+              </g>
+            </svg>
+          </div>
+        </>,
+      );
+    } else {
+      stage(
+        <>
+          <div className="t2">
+            {words([{ t: "Some" }, { t: "Views" }], 0.08, 0.05)}
+            <br />
+            {words([{ t: "Tilt", b: true }, { t: "Up", b: true }, { t: "Down", b: true }], 0.08, 0.35)}
+          </div>
+          <div className="tiltanim">
+            <svg viewBox="0 0 120 120" fill="none" aria-hidden>
+              <rect x="48" y="12" width="24" height="52" rx="6" stroke="#a5f3fc" strokeWidth={3} />
+              <circle cx="60" cy="56" r="2.5" fill="#a5f3fc" />
+              <g className="udslide">
+                <path d="M60 76 V104" stroke="#22d3ee" strokeWidth={3.5} strokeLinecap="round" />
+                <path d="M60 76 l-7 11 h14 Z" fill="#22d3ee" />
+                <path d="M60 104 l-7 -11 h14 Z" fill="#22d3ee" />
+                <g transform="translate(74,79) scale(1.05)">
+                  <HandGlyph />
+                </g>
+              </g>
+            </svg>
+          </div>
+        </>,
+      );
+    }
+  }
+
+  // the last beat — entering tour now
+  stage(<div className="t2">{words([{ t: "Entering" }, { t: "Tour" }, { t: "Now", b: true }], 0.07, 0.05)}</div>);
+
+  return (
+    <div className={`r3d-tips${touch ? "" : " tt-dk"}`} role="dialog" aria-label="Quick tour tips">
+      <style>{CSS}</style>
+      <div className="flash go" key={flash} />
+      <button type="button" className={`skip${cur === 0 ? "" : " show"}`} onClick={finish}>
         Skip Tips
       </button>
+      <div className="stagewrap">{screens}</div>
     </div>
   );
 }
 
+/* The client's own stylesheet, scoped under .r3d-tips and with the keyframes renamed so nothing
+   here can reach the player around it. The values are theirs. */
 const CSS = `
-.r3d-tips{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:clamp(20px,4.6vh,40px);padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));
-  background:radial-gradient(90% 60% at 50% 42%,rgba(13,20,32,.97),rgba(6,9,15,.985));
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  color:#eef2f8;font-family:inherit;text-align:center;animation:ttIn .42s ease both}
-.r3d-tips.tt-out{animation:ttOut .42s ease both;pointer-events:none}
-@keyframes ttIn{from{opacity:0}to{opacity:1}}
-@keyframes ttOut{from{opacity:1}to{opacity:0}}
+.r3d-tips{position:absolute;inset:0;z-index:40;overflow:hidden;
+  background:radial-gradient(ellipse 90% 70% at 50% 42%,#0e1626 0%,#0b0f19 62%,#070b13 100%);
+  color:#f2f7ff;-webkit-font-smoothing:antialiased;font-family:inherit}
+.r3d-tips *{box-sizing:border-box;margin:0;padding:0}
+.r3d-tips .stagewrap{position:relative;width:100%;height:100%}
+.r3d-tips .ctl{position:absolute;top:calc(50% + clamp(130px,24%,190px));left:0;right:0;
+  display:flex;flex-direction:column;align-items:center;gap:14px}
+.r3d-tips .ctl.outro{top:calc(50% + clamp(36px,8%,64px))}
 
-/* ── the heading: word by word, the instruction half shimmering ── */
-.tt-head{display:flex;flex-direction:column;gap:4px;margin:0;font-size:clamp(20px,5.2vmin,29px);font-weight:700;
-  letter-spacing:-.015em;line-height:1.22}
-.tt-lead,.tt-accent{display:block}
-.tt-w{display:inline-block;white-space:pre;opacity:0;animation:ttWordIn .5s cubic-bezier(.2,.7,.3,1) both}
-@keyframes ttWordIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
-.tt-b{color:var(--r3d-primary);background:linear-gradient(100deg,var(--r3d-primary) 20%,#eaffff 50%,var(--r3d-primary) 80%);
-  background-size:260% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  animation:ttWordIn .5s cubic-bezier(.2,.7,.3,1) both,ttShimmer 3.4s linear .6s infinite}
-@keyframes ttShimmer{from{background-position:140% 0}to{background-position:-140% 0}}
+.r3d-tips .stepper{display:flex;align-items:center;z-index:60;opacity:0;transition:opacity .45s ease}
+.r3d-tips .stepper.show{opacity:1}
+.r3d-tips .srow{display:flex;align-items:center}
+.r3d-tips .sdot{width:12px;height:12px;border-radius:50%;border:2px solid rgba(34,211,238,.4);
+  background:transparent;transition:all .3s ease;cursor:pointer;position:relative}
+.r3d-tips .sdot::after{content:'';position:absolute;inset:-8px}
+.r3d-tips .sdot.done{background:#22d3ee;border-color:#22d3ee;box-shadow:0 0 10px rgba(34,211,238,.7)}
+.r3d-tips .sdot.now{border-color:#22d3ee;box-shadow:0 0 10px rgba(34,211,238,.8);transform:scale(1.3)}
+.r3d-tips .sline{width:44px;height:2px;background:rgba(34,211,238,.25);transition:background .3s ease}
+.r3d-tips .sline.done{background:#22d3ee;box-shadow:0 0 8px rgba(34,211,238,.6)}
+.r3d-tips .donecheck{line-height:0;opacity:0;transition:opacity .45s ease}
+.r3d-tips .donecheck.show{opacity:1}
+.r3d-tips .donecheck svg{width:36px;height:36px;filter:drop-shadow(0 0 8px rgba(34,211,238,.6))}
+.r3d-tips .donecheck circle{fill:rgba(34,211,238,.08);stroke:#22d3ee;stroke-width:2.5;stroke-dasharray:151;stroke-dashoffset:151}
+.r3d-tips .donecheck path{fill:none;stroke:#22d3ee;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:36;stroke-dashoffset:36}
+.r3d-tips .donecheck.show svg{animation:ttPop .45s ease}
+.r3d-tips .donecheck.show circle{animation:ttDraw .5s ease forwards}
+.r3d-tips .donecheck.show path{animation:ttDraw .35s .35s ease forwards}
+@keyframes ttDraw{to{stroke-dashoffset:0}}
+@keyframes ttPop{0%{transform:scale(.5)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.r3d-tips .nextbtn{z-index:55;font-family:inherit;font-size:.85rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:#062a33;background:#22d3ee;border:none;padding:12px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 18px rgba(34,211,238,.45);opacity:0;pointer-events:none;transition:opacity .4s ease}
+.r3d-tips .nextbtn.show{opacity:1;pointer-events:auto}
+.r3d-tips .nextbtn:active{transform:scale(.96)}
 
-.tt-art{display:flex;flex-direction:column;align-items:center;gap:16px;min-height:clamp(150px,27vh,220px);justify-content:center;
-  animation:ttWordIn .5s .12s cubic-bezier(.2,.7,.3,1) both}
-.tt-note{margin:0;font-size:clamp(12px,3vmin,14px);font-weight:600;letter-spacing:.04em;color:#8da0b6}
+.r3d-tips .flash{position:absolute;inset:0;z-index:35;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse 62% 46% at 50% 50%,rgba(165,243,252,.85) 0%,rgba(34,211,238,.28) 52%,rgba(0,0,0,0) 76%)}
+.r3d-tips .flash.go{animation:ttFlash .7s ease-out}
+@keyframes ttFlash{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
 
-/* ── step one: a room reduced to its bands, and really dragged ── */
-.tt-strip{position:relative;width:min(430px,86vw);height:clamp(120px,21vh,170px);border-radius:16px;cursor:grab;touch-action:none;
-  border:1px solid rgba(125,211,252,.3);overflow:hidden;
-  background-image:repeating-linear-gradient(90deg,rgba(125,211,252,.04) 0 56px,rgba(125,211,252,.14) 56px 112px);
-  background-size:224px 100%;
-  box-shadow:0 0 70px -20px rgba(34,211,238,.75),inset 0 0 46px -16px rgba(34,211,238,.55)}
-.tt-strip.tt-vert{background-image:repeating-linear-gradient(0deg,rgba(125,211,252,.04) 0 56px,rgba(125,211,252,.14) 56px 112px);
-  background-size:100% 224px}
-.tt-strip.tt-held{cursor:grabbing;border-color:rgba(125,211,252,.5)}
-.tt-strip.tt-done{border-color:var(--r3d-primary)}
-.tt-badge{position:absolute;left:11px;top:11px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  padding:5px 12px;border-radius:999px;background:var(--r3d-primary);color:var(--r3d-accent-ink,#04121a);
-  font-size:11.5px;font-weight:700;letter-spacing:.02em}
-.tt-grab{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;
-  animation:ttHandSlide 3.2s ease-in-out infinite}
-.tt-strip.tt-held .tt-grab,.tt-strip.tt-done .tt-grab{animation:none}
-@keyframes ttHandSlide{0%,100%{transform:translate(-26px,-50%)}50%{transform:translate(26px,-50%)}}
-.tt-vert .tt-grab{animation-name:ttHandSlideY}
-@keyframes ttHandSlideY{0%,100%{transform:translate(0,calc(-50% - 20px))}50%{transform:translate(0,calc(-50% + 20px))}}
-.tt-hand{width:34px;height:34px;color:#fff;display:block;filter:drop-shadow(0 3px 10px rgba(0,0,0,.65))}
-.tt-hand svg{width:100%;height:100%}
-.tt-dragrow{display:flex;align-items:center;gap:9px;color:var(--r3d-primary);font-size:12px;font-weight:700;letter-spacing:.2em}
-.tt-dragrow i{font-style:normal;font-size:16px;opacity:.85}
-.tt-dragrow em{font-style:normal;color:#dbe6f2;letter-spacing:.16em}
+.r3d-tips .stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center;opacity:0;pointer-events:none;z-index:10;transform:translateX(100%);
+  transition:opacity .53s ease,transform .53s cubic-bezier(.3,.7,.3,1)}
+.r3d-tips .stage.on{opacity:1;pointer-events:auto;z-index:20;transform:translateX(0)}
+.r3d-tips .stage.leaving{opacity:0;transform:translateX(-100%);z-index:15}
+.r3d-tips .stage.leaving .w{animation:none;opacity:1;transform:none}
+.r3d-tips .stage.leaving .turn180 .phoneflip{animation:none;opacity:1}
+.r3d-tips .stage.on .dragtitle,.r3d-tips .stage.on .viewer{transform:translateY(-40px)}
 
-/* ── the device steps: line art that shows the move ── */
-.tt-dev{position:relative;display:grid;place-items:center;color:var(--r3d-primary);width:min(300px,76vw);height:clamp(140px,24vh,190px)}
-.tt-dev.tt-stack{display:flex;flex-direction:column;gap:12px;justify-content:center}
-.tt-dev svg{display:block;overflow:visible}
-.tt-screen svg,.tt-turning svg,.tt-turningback svg{width:clamp(50px,13vmin,70px);height:auto;color:#dbe6f2}
-.tt-turning{display:block;animation:ttTurn 3.2s ease-in-out infinite}
-.tt-turningback{display:block;animation:ttTurnBack 3.2s ease-in-out infinite}
-@keyframes ttTurn{0%,16%{transform:rotate(0)}44%,76%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
-@keyframes ttTurnBack{0%,16%{transform:rotate(-90deg)}44%,76%{transform:rotate(0)}100%{transform:rotate(-90deg)}}
-.tt-turnarrow{position:absolute;width:clamp(132px,34vmin,172px);height:auto;opacity:.95;pointer-events:none}
-.tt-turnarrow.tt-back{transform:scaleX(-1)}
-.tt-lr,.tt-ud{position:relative;display:grid;place-items:center;color:var(--r3d-primary)}
-.tt-lr svg{width:clamp(96px,26vmin,130px)}
-.tt-ud svg{height:clamp(66px,16vh,92px);width:auto}
-.tt-slide{position:absolute;width:26px;height:26px;color:#fff}
-.tt-slide svg{width:100%;height:100%}
-.tt-slide-x{animation:ttSlideX 2.6s ease-in-out infinite}
-.tt-slide-y{animation:ttSlideY 2.6s ease-in-out infinite}
-@keyframes ttSlideX{0%,100%{transform:translate(-30px,9px)}50%{transform:translate(30px,9px)}}
-@keyframes ttSlideY{0%,100%{transform:translate(16px,-24px)}50%{transform:translate(16px,24px)}}
+.r3d-tips .pananim{margin-top:4px;width:min(150px,40vw)}
+.r3d-tips .pananim svg{display:block;width:100%;height:auto;filter:drop-shadow(0 0 14px rgba(34,211,238,.4))}
+.r3d-tips .stage.on .pananim .lrslide{animation:ttLr 2.2s ease-in-out infinite}
+@keyframes ttLr{0%,100%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
+.r3d-tips .tiltanim{margin-top:4px;width:min(130px,36vw)}
+.r3d-tips .tiltanim svg{display:block;width:100%;height:auto;filter:drop-shadow(0 0 14px rgba(34,211,238,.4))}
+.r3d-tips .stage.on .tiltanim .udslide{animation:ttUd 2.2s ease-in-out infinite}
+@keyframes ttUd{0%,100%{transform:translateY(-7px)}50%{transform:translateY(7px)}}
 
-/* ── the way on, and how far along ── */
-.tt-foot{display:flex;flex-direction:column;align-items:center;gap:15px}
-.tt-next{appearance:none;border:0;cursor:pointer;font-family:inherit;padding:12px 38px;border-radius:999px;
-  background:var(--r3d-primary);color:var(--r3d-accent-ink,#04121a);font-size:13px;font-weight:700;letter-spacing:.1em;
-  text-transform:uppercase;box-shadow:0 0 34px -8px rgba(34,211,238,.9);transition:filter .2s,transform .12s}
-.tt-next:hover{filter:brightness(1.08)}
-.tt-next:active{transform:translateY(1px)}
-.tt-rail{display:flex;align-items:center;gap:0}
-.tt-node{width:9px;height:9px;border-radius:50%;border:1.6px solid rgba(125,211,252,.5);flex:none;transition:background .3s,box-shadow .3s}
-.tt-node + .tt-node{margin-left:34px;position:relative}
-.tt-node + .tt-node::before{content:"";position:absolute;right:100%;top:50%;width:34px;height:1.6px;margin-top:-.8px;
-  background:rgba(125,211,252,.3)}
-.tt-node.tt-past,.tt-node.tt-now{background:var(--r3d-primary);border-color:var(--r3d-primary)}
-.tt-node.tt-now{box-shadow:0 0 14px rgba(34,211,238,.95)}
-.tt-node.tt-past + .tt-node::before,.tt-node.tt-now + .tt-node::before{background:var(--r3d-primary)}
+.r3d-tips .w{display:inline-block;opacity:0;transform:translateY(14px);white-space:pre}
+.r3d-tips .stage.on .w{animation:ttWordIn .55s cubic-bezier(.2,.7,.3,1) var(--d,0s) forwards}
+@keyframes ttWordIn{to{opacity:1;transform:none}}
+.r3d-tips .t2{font-size:clamp(1.5rem,6.6vw,2.3rem);font-weight:800;letter-spacing:-0.015em;line-height:1.35;
+  text-shadow:0 0 26px rgba(34,211,238,.45)}
+.r3d-tips .t2 .b{background:linear-gradient(110deg,#67e8f9 20%,#ffffff 50%,#67e8f9 80%);background-size:220% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 12px rgba(34,211,238,.75),0 0 34px rgba(34,211,238,.3)}
+.r3d-tips .stage.on .w.b{animation:ttWordIn .55s cubic-bezier(.2,.7,.3,1) var(--d,0s) forwards,ttShimmer 2.2s linear infinite}
+@keyframes ttShimmer{to{background-position:-220% 0}}
 
-.tt-skip{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));
-  appearance:none;cursor:pointer;font-family:inherit;padding:10px 18px;border-radius:999px;font-size:11.5px;font-weight:700;
-  letter-spacing:.12em;text-transform:uppercase;color:#a9bbcd;background:rgba(125,211,252,.05);
-  border:1px solid rgba(125,211,252,.3)}
-.tt-skip:hover{color:#eef2f8;border-color:rgba(125,211,252,.55)}
+.r3d-tips .skip{position:absolute;bottom:30px;right:14px;z-index:55;font-family:inherit;font-size:.8rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:#d9f6fd;text-decoration:none;cursor:pointer;
+  background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.45);padding:10px 20px;border-radius:99px;
+  opacity:0;pointer-events:none;transition:opacity .45s ease}
+.r3d-tips .skip.show{opacity:1;pointer-events:auto}
+.r3d-tips .skip:hover{background:rgba(34,211,238,.22)}
 
-@media (prefers-reduced-motion:reduce){
-  .tt-w,.tt-b,.tt-art,.tt-grab,.tt-turning,.tt-turningback,.tt-slide{animation:none;opacity:1}
-  .tt-b{-webkit-text-fill-color:var(--r3d-primary)}
-  .r3d-tips,.r3d-tips.tt-out{animation-duration:.01s}
-}
+.r3d-tips .viewer{margin-top:4px;width:min(520px,88vw);border-radius:18px;overflow:hidden;position:relative;
+  border:1px solid rgba(34,211,238,.35);box-shadow:0 0 44px rgba(34,211,238,.22)}
+.r3d-tips .pano{height:clamp(140px,32vw,200px);
+  background:linear-gradient(180deg,rgba(34,211,238,.10) 0%,transparent 30%),
+    repeating-linear-gradient(90deg,#123043 0 60px,#16405a 60px 110px,#0f2a3d 110px 170px,#1a4a63 170px 210px,#123043 210px 280px);
+  background-size:100% 100%,560px 100%}
+.r3d-tips .stage.on .pano{animation:ttPanDrag 1.84s ease-in-out infinite}
+@keyframes ttPanDrag{0%,100%{background-position:0 0,-69px 0}50%{background-position:0 0,69px 0}}
+.r3d-tips .badge180{position:absolute;top:12px;left:12px;font-size:.72rem;font-weight:800;letter-spacing:.14em;
+  color:#062a33;background:#22d3ee;border-radius:99px;padding:5px 12px}
+.r3d-tips .draghint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;
+  color:#a5f3fc;font-weight:800;font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.r3d-tips .dragrow{display:flex;align-items:center;gap:14px}
+.r3d-tips .dragrow svg{width:26px;height:18px}
+.r3d-tips .stage.on .draghint{animation:ttDragHint 1.84s ease-in-out infinite}
+.r3d-tips .handcenter{position:absolute;left:50%;top:50%;width:46px;height:46px;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 3px 12px rgba(0,0,0,.65));opacity:0}
+.r3d-tips .stage.on .handcenter{opacity:1;animation:ttHandSlide 1.84s ease-in-out infinite}
+@keyframes ttHandSlide{0%,100%{transform:translate(-200%,-50%)}50%{transform:translate(100%,-50%)}}
+@keyframes ttDragHint{0%,100%{transform:translateX(-62%)}50%{transform:translateX(-38%)}}
+.r3d-tips .viewer.interactive{cursor:grab;touch-action:none}
+.r3d-tips .viewer.interactive .pano{animation:none}
+
+.r3d-tips .turn180{margin-top:12px;width:min(220px,60vw);perspective:500px}
+.r3d-tips .turn180 svg{display:block;width:100%;height:auto;filter:drop-shadow(0 0 12px rgba(34,211,238,.35))}
+.r3d-tips .turn180 .phoneflip{transform-box:fill-box;transform-origin:center;opacity:0}
+.r3d-tips .stage.on .turn180 .phoneflip{opacity:1;animation:ttSway180 3s ease-in-out infinite}
+@keyframes ttSway180{0%,100%{transform:rotateY(-68deg)}50%{transform:rotateY(68deg)}}
+
+.r3d-tips .rotphone{margin-top:4px;width:min(150px,40vw);opacity:0}
+.r3d-tips .stage.on .rotphone{opacity:1}
+.r3d-tips .rotphone svg{display:block;width:100%;height:auto;filter:drop-shadow(0 0 14px rgba(34,211,238,.4))}
+.r3d-tips .rotphone .tilt{transform-box:view-box;transform-origin:60px 60px}
+.r3d-tips .stage.on .rotphone .tilt{animation:ttTilt 1.38s cubic-bezier(.65,0,.35,1) .645s both}
+@keyframes ttTilt{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
+.r3d-tips .rotphone .tiltback{transform-box:view-box;transform-origin:60px 60px}
+.r3d-tips .stage.on .rotphone .tiltback{animation:ttTiltBack 1.38s cubic-bezier(.65,0,.35,1) .645s both}
+@keyframes ttTiltBack{from{transform:rotate(90deg)}to{transform:rotate(0deg)}}
+
+/* the desktop file: a wider viewer and a longer band, everything else the same */
+.r3d-tips.tt-dk .viewer{width:min(640px,88vw)}
+.r3d-tips.tt-dk .pano{height:140px;background-size:100% 100%,840px 100%}
+.r3d-tips.tt-dk .stage.on .pano{animation:ttPanDragDk 1.84s ease-in-out infinite}
+@keyframes ttPanDragDk{0%,100%{background-position:0 0,-100px 0}50%{background-position:0 0,100px 0}}
 `;
