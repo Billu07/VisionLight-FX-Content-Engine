@@ -271,27 +271,27 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The `.r3d-stops` "7/10" panel is hidden on any coarse pointer (it lay over the frame) and KEPT on
     desktop, where the band above the footage holds it. Portrait drifts and desktop are untouched —
     that is the acceptance test, and v4-* in ui-shots asserts it.
-  - **The first-run coach** (2026-10-02, client: "we make the user drag, back and forth... he drags left
-    to right, then right to left, then proceeds, so all learned"): a visitor's first drift TEACHES the
-    gesture by having them perform it, rather than playing a demonstration at them. `rotation3d/dragCoach.ts`
-    holds the rules — pure: fed the scrub position (0..1 along the drift's OWN axis, since `dirSign` has
-    already turned the gesture the right way round) it returns the step, the progress and whether to nudge.
-    SpinViewer owns the card, the storage and the placement. Forward through 30% of the drift → "Now Drag
-    Back" (the arrow turns round, following the same per-direction rules as the resting cue) → back 22%
-    from the furthest point they reached → "That's It", and it stands down a beat later. **Skip** ends it
-    at any time, and both endings write `drift-coach-done` to localStorage: once per browser, never on the
-    next drift. It is forgiving by design — a visitor who pulls the drift the "wrong" way first still
-    completes the first leg, and one who carries on forward during the second leg is measured back from
-    wherever they got to.
-    The auto-demo that used to BE the lesson (`startIntro`, still there) is now the **nudge**: it plays
-    when a step has had no progress for 3.4s, and `coach.rebase()` runs when it ends — so a demonstration
-    can never tick off the step the visitor was asked to do themselves. It keeps its reduced-motion guard;
-    the coach itself still runs there, because it is a conversation, not an animation.
-    The card stands in the band between the footage and the buttons, clamped **above** the button row:
-    a portrait clip filling a phone puts the frame's bottom edge BELOW that row, so "the band" can be
-    nothing, and Skip landing on Prev/Next is the one thing that must not happen. The resting cue hides
-    while it runs (one hand, one place) and comes back after. Verified by driving real touch drags in
-    headless Chrome (16 checks) over the rules' own 14.
+  - **The first-run tips** (2026-10-05, client, with a guide of their own to match): a visitor meets
+    the gestures on **their own screen before the tour**, `rotation3d/TourTips.tsx` — not on a card over
+    the footage. That card is gone: it covered a drift's own title and caption, which is what the client
+    flagged ("our one that literally covers text in a drift"). Shape taken from the guide they sent: one
+    gesture per step, something to try it on, **Next**, dots, and **Skip Tips** at any point.
+    Three steps on a phone, two on a desktop — there is no phone to turn there: **Try It Here Now** (a
+    strip of bands you really drag, which is where the client's earlier "drag back and forth, so all
+    learned" now lives — `dragCoach.ts` still judges it, in the same pixels as the player), **Turn Your
+    Phone**, **Prev · Menu · Next**. It teaches only what this player does: no pan or tilt, which the
+    reference has and a drift does not — one axis, and promising two is a lie the first room exposes.
+    Gated by `tipsSeen()` (`drift-tips-seen`, once per browser) and shown only for a TOUR drift in a real
+    player (`driftMode && flowNav && introHint`, never the hero or a landing). `.r3d-tips` is in
+    `isControl`, so while it is up the drift behind cannot be dragged AND the strip keeps the pointer the
+    stage would otherwise capture — that one line is the difference between the strip working and not.
+    The hand demo (`startIntro`) is back to what it was before the coach: one wordless "this moves" on
+    the first drift ever, its own `drift-intro-seen` key, skipped for anyone who has just been shown the
+    tips. Verified by driving the screen with real touch: 16 checks.
+  - **Superseded, for history** (2026-10-02): the client asked for a coach that made the visitor drag
+    forward and back inside the player before moving on. It shipped, then the card's placement became the
+    problem — over the footage there is nowhere it does not cover something. The lesson survived; the
+    place changed.
   - **The player's top-left mark** (2026-10-02): a TOUR drift with no brand logo shows drift.li's own
     mark (the icon from frontend/public/drift/icon.svg, inlined — ink tile, white "d", cyan dot) instead of
     the old circular arrow, which meant nothing. A BRAND drift keeps the neutral gradient square: its page

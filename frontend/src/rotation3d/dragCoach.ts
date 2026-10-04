@@ -8,7 +8,10 @@
  *
  * Pure on purpose: it is handed the scrub position (0..1 of the drift, along the drift's
  * OWN axis — `dirSign` has already turned the gesture the right way round) and the clock,
- * and says what to show. SpinViewer owns the DOM, the storage and the nudge.
+ * and says what to show. Since 2026-10-05 the caller is `TourTips`, where the lesson moved:
+ * the strip there is dragged in the same pixels as the player, so what it measures is what
+ * the real thing will feel like. The card this used to drive, inside the player, is gone —
+ * over the footage there was nowhere it did not cover something.
  */
 
 export type CoachStep = "forward" | "back" | "done";
