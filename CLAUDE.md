@@ -373,7 +373,18 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     visitor's FIRST swipe decides it: whichever way they swipe, the drift goes forward, and that reading
     then holds for the rest of the visit so nothing reverses mid-tour. **Lock** keeps the creator's own
     mapping for everyone. The decision lives in `rotation3d/cameraAuto.ts` — module scope, so it survives
-    every drift→drift swap and dies with the tab; nothing is stored on the visitor's device. In SpinViewer
+    every drift→drift swap and dies with the tab; nothing is stored on the visitor's device.
+    **What is remembered is the habit relative to the ARROW**, not to the shoot (fixed 2026-10-06, user:
+    "in the clips that has tilt direction set up, the drag towards the arrow is inverted"): did they drag
+    TOWARD the arrow, or away from it. Keying it to the shoot looked right and was not, because the
+    arrow's direction is NOT a fixed function of the shoot — a pan shows it on the left edge pointing
+    LEFT whichever way the room runs (the 2026-10-05 call), so on an LTR clip it is against the forward
+    drag and on an RTL clip it is with it, while a tilt always points the way the room runs. A visitor
+    following the arrow was therefore taught one relation on their first drift and handed the opposite on
+    the next one of a different kind. Reproduced on LTR→TTB, LTR→BTT **and LTR→RTL** — it was never a
+    tilt-only bug. `arrowSign` is which way the arrow leans on THIS drift's drag axis (0 when an admin
+    points it off-axis, where there is no relation to read: such a drift neither follows the habit nor
+    sets it), and `dirSign` is `arrowHabit() * arrowSign`. In SpinViewer
     `dirSign` is therefore a **`let`** (`baseDirSign` is the shoot's own), set at the moment the drag's
     axis locks at 6px — before a single frame has scrubbed, so the deciding gesture already moves the
     right way. The drag, the progress rail and the drift→drift slide all follow it; the guide arrow does

@@ -1,7 +1,7 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { isInAppBrowser, isApple } from "./inAppBrowser";
-import { cameraFlip, decideCameraFlip } from "./cameraAuto";
+import { arrowHabit, noteArrowHabit } from "./cameraAuto";
 import TourTips, { tipsSeen, tipsForced } from "./TourTips";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -451,6 +451,12 @@ export default function SpinViewer({
       ? (picked as Point)
       : vertical ? (driftDirection === "TTB" ? "DOWN" : "UP") : "LEFT";
     const guidePoint = (): Point => (helperBack ? OPPOSITE[guideFirst] : guideFirst);
+    // Which way the arrow leans along THIS drift's drag axis: +1 right or down, -1 left or up.
+    // 0 when an admin has pointed it off-axis (an up arrow on a pan, say) — there is no relation
+    // to read there, so such a drift neither follows the visitor's habit nor sets it.
+    const arrowSign: 1 | -1 | 0 = vertical
+      ? guideFirst === "DOWN" ? 1 : guideFirst === "UP" ? -1 : 0
+      : guideFirst === "RIGHT" ? 1 : guideFirst === "LEFT" ? -1 : 0;
     const setGuidePoint = () => {
       const el = hintRef.current;
       if (!guideCue || !el) return;
@@ -463,8 +469,13 @@ export default function SpinViewer({
     // drag, the progress rail and the drift→drift slide, all of which should follow that
     // decision the moment it is made. The guide arrow does NOT — First Direction is the
     // creator's hint about where the room opens, not an instruction to swipe that way.
+    // Auto honours the habit the visitor showed on their first drag, expressed against the ARROW:
+    // toward it, or away from it. So `dirSign` is whichever gesture their habit asks for on THIS
+    // drift's arrow — which is what keeps a mixed tour coherent, where keying the habit to the
+    // shoot did not (see cameraAuto.ts). Locked, off-axis, or not yet decided → the shoot's own.
     const baseDirSign = driftMode && (driftDirection === "RTL" || driftDirection === "BTT") ? -1 : 1;
-    let dirSign = cameraLock ? baseDirSign : (cameraFlip() || 1) * baseDirSign;
+    let dirSign =
+      !cameraLock && arrowSign && arrowHabit() ? arrowHabit() * arrowSign : baseDirSign;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     // Loop off: clamp the drag between the first and last frame (no wrap).
@@ -1531,10 +1542,12 @@ export default function SpinViewer({
           // Auto: this is the first swipe of the visit, so it goes FORWARD whichever way it
           // went, and every later drift follows the same reading. Decided here, at the moment
           // the axis locks, so the very gesture that decides it already moves the right way —
-          // 6px of travel, before a single frame has been scrubbed.
-          if (driftMode && !cameraLock && !cameraFlip()) {
+          // 6px of travel, before a single frame has been scrubbed. What is recorded is the
+          // gesture's relation to the ARROW, since that is the only thing on screen the visitor
+          // can be responding to, and the only reading that survives a tour of mixed kinds.
+          if (driftMode && !cameraLock && arrowSign && !arrowHabit()) {
             const g: 1 | -1 = (vertical ? tdy : tdx) >= 0 ? 1 : -1;
-            decideCameraFlip((g * baseDirSign) as 1 | -1);
+            noteArrowHabit(g === arrowSign ? 1 : -1);
             dirSign = g;
           }
           try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
