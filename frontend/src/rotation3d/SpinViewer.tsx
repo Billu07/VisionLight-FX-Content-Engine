@@ -303,6 +303,12 @@ export default function SpinViewer({
   // Tour drifts: the helper is a hand icon + arrow (no "Drag to drift" text) unless
   // the drift carries its own helper copy.
   const iconCue = driftMode && !!flowNav && !helperStart && !helperEnd;
+  // A TOUR drift guides with one arrow standing inside the frame against the edge it points
+  // at, and a hand in the middle of the first drift for a beat (client, 2026-10-06). The old
+  // under-frame column (hand + copy + arrow) and the back-and-forth demonstration are both
+  // gone. Brand drifts, the hero takeover and Rotation3D keep the column — do NOT widen this
+  // without re-checking them.
+  const guideCue = driftMode && !!flowNav;
   const playerBrand = getPlayerBranding();
   const lightBg = isLightColor(background);
   // Left on drift.li's ground (the default for a tour drift) → the player carries the
@@ -469,6 +475,7 @@ export default function SpinViewer({
     let wideClip = false;
     let corners = false;
     let frameTop = -1;
+    let frameBot = -1;
     let cueBot = -1;
     // The ground beside the footage, measured while the drift is at REST. Zooming grows the
     // footage and would shrink the chrome away with it — the client watched Menu disappear as
@@ -494,9 +501,41 @@ export default function SpinViewer({
       !!(document.fullscreenElement || (document as any).webkitFullscreenElement) ||
       stage.classList.contains("r3d-pseudo-fs");
 
+    // A tour drift's arrow stands INSIDE the frame, against the edge it points at (client,
+    // 2026-10-06): the vertical middle of the left or right edge for a pan, the horizontal
+    // middle of the bottom or top edge for a tilt. Edge and direction are ONE decision here —
+    // the arrow is always on the edge it points at — which is what keeps the 2026-10-05
+    // arrangement intact: forward is the left edge pointing left for a pan (and the bottom
+    // edge pointing down for a top-to-bottom tilt), the way back is the opposite edge.
+    const placeGuide = () => {
+      const el = hintRef.current;
+      if (!el || frameRect.w <= 0) return;
+      const stageW = cv.width / DPR, stageH = cv.height / DPR;
+      const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
+      const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
+      const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
+      const PAD = 12, INSET = 10;
+      let left: number, top: number;
+      if (vertical) {
+        // TTB points down to begin with, BTT up; the way back is the other end.
+        const atBottom = (driftDirection === "TTB") !== helperBack;
+        left = fx + fw / 2 - w / 2;
+        top = atBottom ? fy + fh - h - INSET : fy + INSET;
+      } else {
+        left = helperBack ? fx + fw - w - INSET : fx + INSET;
+        top = fy + fh / 2 - h / 2;
+      }
+      // A frame that fills the screen has its own edges off it, so clamp to the screen.
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+      el.style.left = Math.round(Math.max(PAD, Math.min(stageW - w - PAD, left))) + "px";
+      el.style.top = Math.round(Math.max(PAD, Math.min(stageH - h - PAD, top))) + "px";
+      el.style.transform = "none";
+    };
     const placeHelperX = () => {
       const el = hintRef.current;
       if (!driftMode || !el || frameRect.w <= 0) return;
+      if (guideCue) { placeGuide(); return; }
       const stageW = cv.width / DPR;
       const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
       // Filling the screen, the frame's own edges are off it, so the cue would sit flush in
@@ -558,6 +597,9 @@ export default function SpinViewer({
     // The ARROW + TEXT always stay; only the HAND runs the show/hide sequence.
     let helperPhase = 0; // 0 start-shown, 1 hidden, 2 end-shown, 3 done
     let atEnd = false;
+    // Set once the visitor has been to the far end and come back: on a tour drift the arrow
+    // has nothing left to teach, so it stands down and is never re-armed on this drift.
+    let guideDone = false;
     const hideHand = () => handRef.current?.classList.add("r3d-gone");
     const showHand = () => handRef.current?.classList.remove("r3d-gone");
     const setHeadState = (end: boolean) => {
@@ -581,7 +623,9 @@ export default function SpinViewer({
     // which is declared further down this effect (TDZ crash), and the anchor is
     // re-placed every frame from draw() anyway.
     if (driftMode) {
-      hintRef.current?.classList.remove("r3d-back");
+      // ...and an arrow a PREVIOUS stop retired for good comes back for this one: the class
+      // lives on the DOM, which one mounted SpinViewer carries across every swap.
+      hintRef.current?.classList.remove("r3d-back", "r3d-gone");
       if (helperTextRef.current) helperTextRef.current.textContent = fwdHelper;
       setHeadState(false);
       showHand();
@@ -597,16 +641,16 @@ export default function SpinViewer({
     attentionRef.current = attn;
 
     // --- one-time intro gesture ("show, don't tell") ---
-    // On a visitor's FIRST drift, a finger drags across the frame while the content
-    // scrubs in sync, then eases back — so they realise it's draggable. Runs once
-    // ever (localStorage) and cancels the instant they touch it.
+    // On a visitor's FIRST drift a hand appears in the MIDDLE of the frame, sways along the
+    // drift's axis and fades for good — 1.5s all told (client, 2026-10-06). It says "this
+    // moves"; the arrow against the frame's edge says which way. It no longer drags the
+    // footage back and forth: that demonstration is what the client asked to have removed,
+    // and doing the gesture FOR the visitor is also what kept stealing the scrub from them.
+    // Once ever (localStorage), and it cancels the instant they touch the drift.
     let introActive = false;
     let userTookOver = false; // touched before / during the demo
     let introStart = 0;
-    let introRange = 0;
-    const INTRO_IN = 380, INTRO_OUT = 820, INTRO_HOLD = 240, INTRO_BACK = 720, INTRO_FADE = 300;
-    const INTRO_TOTAL = INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK + INTRO_FADE;
-    const introEase = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    const INTRO_MS = 1500, INTRO_IN = 220, INTRO_FADE = 360;
     const endIntro = () => {
       if (!introActive) return;
       introActive = false;
@@ -614,13 +658,11 @@ export default function SpinViewer({
       // The demo animates the hand's opacity inline — clear it, or the hand stays on screen.
       if (introHandRef.current) introHandRef.current.style.opacity = "";
       stage.classList.remove("r3d-introing");
-      yaw = 0; // back to the start frame
-      yawVel = 0;
       dirty = true;
     };
-    // A hand drags across the first drift a visitor ever opens, once ever. It used to be the
-    // lesson, then the coach's nudge; with the lesson now on its own screen before the tour
-    // (TourTips) it is back to what it always was - one wordless "this moves".
+    // A hand stands in the middle of the first drift a visitor ever opens, once ever. It used
+    // to be the lesson, then the coach's nudge; with the lesson now on its own screen before
+    // the tour (TourTips) it is one wordless "this moves", and nothing more.
     startIntroRef.current = () => startIntro();
     const startIntro = () => {
       if (introActive || userTookOver || !driftMode || !introHint || FRAMES < 4) return;
@@ -636,7 +678,6 @@ export default function SpinViewer({
       } catch {
         /* private mode / blocked storage - still show it this once */
       }
-      introRange = endYaw * 0.45; // demo ~45% of the drift (not the full reveal)
       introStart = performance.now();
       introActive = true;
       introHandRef.current?.classList.add("r3d-intro-on");
@@ -971,13 +1012,21 @@ export default function SpinViewer({
         if (zoom <= 1.02 || baseSide < 0) baseSide = sideGap;
         stage.style.setProperty("--r3d-side", Math.round(baseSide) + "px");
       }
-      // Where the footage starts, so the fullscreen button sits just above it rather than in the
-      // far corner of an empty screen (client's refine1.jpeg).
+      // Where the footage starts and ends: the fullscreen button sits just above its top rather
+      // than in the far corner of an empty screen (client's refine1.jpeg), and the turn-phone
+      // pill hangs off its bottom. The two are tracked SEPARATELY — a phone held sideways draws
+      // the frame full height, so its top rounds to 0 both before and after the first image
+      // arrives, and gating the bottom on a change of top left --r3d-framebot stuck at the 0 of
+      // that first empty draw (found while probing the in-frame guide, 2026-10-06).
       const topCss = Math.round(frameRect.y / DPR);
+      const botCss = Math.round((frameRect.y + frameRect.h) / DPR);
       if (topCss !== frameTop) {
         frameTop = topCss;
         stage.style.setProperty("--r3d-frametop", topCss + "px");
-        stage.style.setProperty("--r3d-framebot", Math.round((frameRect.y + frameRect.h) / DPR) + "px");
+      }
+      if (botCss !== frameBot) {
+        frameBot = botCss;
+        stage.style.setProperty("--r3d-framebot", botCss + "px");
       }
 
       // Drift on mobile: the canvas frame is vertically centered but the headline
@@ -1007,7 +1056,18 @@ export default function SpinViewer({
       // bottom (the real frame rect when drawn; the box half-height otherwise —
       // the old code used `scale`, i.e. half the true height, so the arrow landed
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
-      if (immersive && !bandMode && driftMode && hintRef.current) {
+      // A tour drift's guide stands inside the frame (placeGuide), so none of the
+      // under-frame column's placement below applies to it — and nothing sits under the
+      // frame any more, so the "turn your phone" pill goes back to hanging off the frame's
+      // own bottom edge rather than off the cue (--r3d-cuebot stays unset).
+      if (guideCue && hintRef.current) {
+        placeGuide();
+        if (!hintRevealed && realMode && frameRect.w > 0) {
+          hintRevealed = true;
+          hintRef.current.classList.remove("r3d-hint-init");
+        }
+        if (cueBot >= 0) { cueBot = -1; stage.style.removeProperty("--r3d-cuebot"); }
+      } else if (immersive && !bandMode && driftMode && hintRef.current) {
         // No visible bottom edge to hang from: the helper sits where a player's controls
         // sit — just above the buttons — and the cue keeps its natural place under the hand.
         const handH = handRef.current?.offsetHeight || 28;
@@ -1271,7 +1331,7 @@ export default function SpinViewer({
       // Drift: the END frame is the trigger — dissolve headline/description 1 → 2
       // and bring the helper back (reverse). Revert at the start. CSS handles the fade.
       if (driftMode) {
-        if (nav >= 0.92 && !atEnd) {
+        if (nav >= 0.92 && !atEnd && !guideDone) {
           atEnd = true;
           setHeadState(true);
           helperBack = true; syncHelper(); // arrow + text flip to reverse (always visible)
@@ -1279,43 +1339,26 @@ export default function SpinViewer({
         } else if (nav <= 0.08 && atEnd) {
           atEnd = false;
           setHeadState(false);
-          helperBack = false; syncHelper(); // arrow + text flip back to forward
+          if (guideCue) {
+            // They have taken the drift to its far end and brought it back, so they know the
+            // gesture: the arrow goes for good (client, 2026-10-06). It keeps the edge it
+            // finished on — only its opacity goes, so nothing jumps on the way out.
+            guideDone = true;
+            hintRef.current?.classList.add("r3d-gone");
+          } else {
+            helperBack = false; syncHelper(); // arrow + text flip back to forward
+          }
         }
       }
     };
 
     const tick = () => {
       if (!alive) return;
-      // The one-time intro owns the scrub while it plays; physics resumes after.
-      let introHandProg = -1;
-      let introAlpha = 1;
-      if (introActive) {
-        const t = performance.now() - introStart;
-        if (t >= INTRO_TOTAL) {
-          endIntro();
-        } else {
-          let scrubK = 0;
-          if (t < INTRO_IN) {
-            introAlpha = t / INTRO_IN; // fade the finger in over the start frame
-          } else if (t < INTRO_IN + INTRO_OUT) {
-            scrubK = introEase((t - INTRO_IN) / INTRO_OUT); // drag forward
-          } else if (t < INTRO_IN + INTRO_OUT + INTRO_HOLD) {
-            scrubK = 1; // brief hold at the peek
-          } else if (t < INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK) {
-            scrubK = 1 - introEase((t - INTRO_IN - INTRO_OUT - INTRO_HOLD) / INTRO_BACK); // ease back
-          } else {
-            introAlpha = 1 - (t - INTRO_IN - INTRO_OUT - INTRO_HOLD - INTRO_BACK) / INTRO_FADE; // release
-          }
-          yaw = scrubK * introRange;
-          introHandProg = scrubK;
-          dirty = true;
-        }
-      }
-      if (!introActive) {
-        if (idleSpin) yaw += spin * 0.004;
-        else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
-        clampScrub();
-      }
+      // The hand is decorative now, so the drift's physics is never taken away from the
+      // visitor — a drag landing mid-demonstration used to fight it for the scrub.
+      if (idleSpin) yaw += spin * 0.004;
+      else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
+      clampScrub();
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
@@ -1346,15 +1389,20 @@ export default function SpinViewer({
         draw();
         lastYaw = yaw; lastZoom = zoom; lastPX = panX; lastPY = panY; dirty = false;
       }
-      // Move the intro finger across the frame in sync with the scrub.
-      if (introHandProg >= 0 && introHandRef.current && frameRect.w > 0) {
+      // The hand stands in the MIDDLE of the frame and sways along the drift's axis (the
+      // sway is CSS, keyed to the direction class) — in over a fifth of a second, out over
+      // the last third, gone at 1.5s.
+      if (introActive && introHandRef.current && frameRect.w > 0) {
+        const t = performance.now() - introStart;
         const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
         const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
-        // The demo finger travels the way the footage pans (and in reverse for RTL/BTT).
-        const along = dirSign < 0 ? 0.7 - 0.4 * introHandProg : 0.3 + 0.4 * introHandProg;
-        introHandRef.current.style.left = (vertical ? fx + fw * 0.5 : fx + along * fw) + "px";
-        introHandRef.current.style.top = (vertical ? fy + along * fh : fy + fh * 0.52) + "px";
-        introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, introAlpha)));
+        const a = t < INTRO_IN ? t / INTRO_IN
+          : t > INTRO_MS - INTRO_FADE ? (INTRO_MS - t) / INTRO_FADE
+          : 1;
+        introHandRef.current.style.left = fx + fw * 0.5 + "px";
+        introHandRef.current.style.top = fy + fh * 0.5 + "px";
+        introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, a)));
+        if (t >= INTRO_MS) endIntro();
       }
       // Insights: the frame on screen, and whether the visitor has taken over from the intro.
       if (attn) attn.sample(((Math.round(yaw / (TWO_PI / FRAMES)) % FRAMES) + FRAMES) % FRAMES, interacted && !introActive);
@@ -2219,7 +2267,7 @@ export default function SpinViewer({
         <div className="r3d-track"><div className="r3d-fill" ref={fillRef} /></div>
       </div>
 
-      <div className={`r3d-hint ${iconCue ? "r3d-hint-icon" : ""}`} ref={hintRef}>
+      <div className={`r3d-hint ${iconCue ? "r3d-hint-icon" : ""} ${guideCue ? "r3d-guide" : ""}`} ref={hintRef}>
         {driftMode ? (
           <>
             <div className="r3d-drift-hand" ref={handRef} aria-hidden>
@@ -2602,6 +2650,17 @@ const R3D_CSS = `
 @keyframes r3darrownudgev{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
 @keyframes r3darrownudgevback{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
+/* A TOUR drift's guide (client, 2026-10-06): the column's hand is gone - the big hand in the
+   middle of the first drift does that job - so what is left is the arrow, plus the drift's own
+   helper copy beside it when an admin wrote one. placeGuide() sets top/left inline, which beats
+   every bottom/left rule above it, and clears the transform so the sideways and hero layouts
+   cannot pull it off its edge. Which edge, and which way it points, is unchanged. */
+.r3d-hint.r3d-guide{flex-direction:row;align-items:center;gap:0;opacity:.96}
+.r3d-hint.r3d-guide .r3d-drift-hand,.r3d-hint.r3d-guide .r3d-cue-hand{display:none}
+.r3d-hint.r3d-guide .r3d-drift-cue{margin-top:0!important}
+.r3d-hint.r3d-guide .r3d-drift-arrow svg{width:clamp(26px,7vmin,34px);height:clamp(26px,7vmin,34px)}
+/* The hand in the middle is not a second resting cue, so it no longer hides this one. */
+.r3d-introing .r3d-hint.r3d-guide:not(.r3d-gone){opacity:.96!important}
 /* One-time first-visit drag demo — a finger (with a touch ripple) drags across
    the frame while the content scrubs. Position + opacity are driven from the RAF
    loop; the ring pulses only while the demo is on. */
@@ -2610,6 +2669,14 @@ const R3D_CSS = `
 .r3d-intro svg{width:clamp(30px,8vmin,40px);height:clamp(30px,8vmin,40px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.7))}
 .r3d-intro-ring{position:absolute;width:clamp(46px,12vmin,60px);height:clamp(46px,12vmin,60px);border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.55);box-shadow:0 0 18px rgba(255,255,255,.25)}
 .r3d-intro.r3d-intro-on .r3d-intro-ring{animation:r3dintropulse 1.15s ease-in-out infinite}
+/* It sways where it stands - side to side for a pan, up and down for a tilt. The keyframes
+   carry the -50% centring with them, so the ring travels with the hand instead of being left
+   behind by it. */
+.r3d-intro.r3d-intro-on{animation:r3dintrosway 1.15s ease-in-out infinite}
+.r3d-dir-ttb .r3d-intro.r3d-intro-on,.r3d-dir-btt .r3d-intro.r3d-intro-on{animation-name:r3dintroswayv}
+@keyframes r3dintrosway{0%,100%{transform:translate(calc(-50% - 13px),-50%)}50%{transform:translate(calc(-50% + 13px),-50%)}}
+@keyframes r3dintroswayv{0%,100%{transform:translate(-50%,calc(-50% - 13px))}50%{transform:translate(-50%,calc(-50% + 13px))}}
+@media (prefers-reduced-motion:reduce){.r3d-intro.r3d-intro-on{animation:none}}
 @keyframes r3dintropulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.08);opacity:.95}}
 /* during the demo, hide the resting hint so there's just the one moving finger */
 .r3d-introing .r3d-hint{opacity:0!important}

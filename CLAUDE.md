@@ -310,6 +310,35 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     forward and back inside the player before moving on. It shipped, then the card's placement became the
     problem — over the footage there is nowhere it does not cover something. The lesson survived; the
     place changed.
+  - **A tour drift guides with ONE arrow, inside the frame** (2026-10-06, client; ref02/ref03/ref04) —
+    this SUPERSEDES every description of the under-frame drag cue above, for tour drifts only. The old
+    column (sway hand + copy + arrow) is gone; `guideCue` (`driftMode && flowNav`) puts `r3d-guide` on
+    the hint and `placeGuide()` stands it INSIDE the frame against the edge it points at: the vertical
+    middle of the left or right edge for a pan, the horizontal middle of the bottom or top edge for a
+    tilt, 10px in, clamped 12px off the screen for a frame that bleeds past it. Edge and direction are
+    now ONE decision — the arrow always stands on the edge it points at — which is what keeps the
+    2026-10-05 arrangement the user asked twice to preserve: forward is the LEFT edge pointing left for
+    a pan (and the BOTTOM edge pointing down for a TTB tilt), the way back is the opposite edge. Both
+    horizontal directions read the same; `.r3d-dir-rtl` has no overrides left. **Lifecycle**: it opens
+    forward, turns round at the far end (nav ≥ 0.92) and, once the visitor brings the drift back to the
+    start, goes for good (`guideDone` + `r3d-gone`, never re-armed on that drift) — the far end cannot
+    bring it back. The next stop gets its own: `r3d-gone` is cleared on mount beside `r3d-back`, because
+    one SpinViewer carries the DOM across every swap. Nothing sits under the frame any more, so
+    `--r3d-cuebot` is never published and the "turn your phone" pill hangs off `--r3d-framebot` again.
+    Brand drifts, the hero takeover and Rotation3D keep the column — do NOT widen `guideCue`.
+  - **And ONE hand, in the middle, once** (2026-10-06, client): the first drift a visitor ever opens
+    stands a hand in the MIDDLE of the frame for 1.5s, swaying along the drift's axis (`r3dintrosway` /
+    `r3dintroswayv`, keyframes that carry the -50% centring so the ring travels with the hand), then
+    fades for good. It no longer DRAGS the footage: "the other hand animation ... for the first back and
+    forth, that one can be removed". `startIntro` therefore never touches `yaw`, and tick()'s physics is
+    no longer wrapped in `if (!introActive)` — a drag landing mid-demonstration used to fight it for the
+    scrub. Still once ever (`drift-intro-seen`), still started by the tips on their way out
+    (`startIntroRef`) so it plays on the drift the visitor landed on, not the next one.
+  - **`--r3d-framebot` is tracked separately from `--r3d-frametop`** (2026-10-06): both used to be
+    written only when the TOP changed. A phone held sideways draws the frame full height, so its top
+    rounds to 0 both before and after the first image arrives — and `--r3d-framebot` stayed at the 0 of
+    that first empty draw, for the whole visit. Found while probing the in-frame guide; it matters more
+    now that the turn-phone pill has no `--r3d-cuebot` to fall back from.
   - **The player's top-left mark** (2026-10-02): a TOUR drift with no brand logo shows drift.li's own
     mark (the icon from frontend/public/drift/icon.svg, inlined — ink tile, white "d", cyan dot) instead of
     the old circular arrow, which meant nothing. A BRAND drift keeps the neutral gradient square: its page
