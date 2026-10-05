@@ -2530,12 +2530,13 @@ const R3D_CSS = `
    on the leading (swipe-direction) side of the text. */
 .r3d-drift .r3d-hint{opacity:.96;flex-direction:column;align-items:flex-start;gap:7px}
 .r3d-drift .r3d-hint.r3d-back{align-items:flex-end}
-/* The hand leads and the arrow follows. Swapping the two was tried on 2026-10-05 and taken
-   straight back out — the client's note was a mistake on their side, so leave this alone unless
-   someone asks twice. Which EDGE of the frame the pair sits on is a different thing entirely and
-   is decided in placeHelperX. */
-.r3d-drift-cue{display:flex;align-items:center;gap:9px}
-.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
+/* The arrow leads and the hand follows — which is the order a right-to-left drift has always
+   had, and since 2026-10-05 what a left-to-right one has too (client, after a first attempt that
+   swapped BOTH directions and had to be taken back out: this time only the base rules move, and
+   the .r3d-dir-rtl pair below is deliberately left alone so RTL renders exactly as before).
+   Which EDGE of the frame the pair sits on is a different thing entirely — see placeHelperX. */
+.r3d-drift-cue{display:flex;align-items:center;gap:9px;flex-direction:row-reverse}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
 /* Direction-aware helper: RTL mirrors the LTR arrangement (hand on the right, arrow
    before the text) and swaps back at the end; a side-placed helper (vertical drifts
    beside the frame) stacks hand → text → arrow, centred. */

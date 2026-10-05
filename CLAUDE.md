@@ -332,13 +332,16 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     and after: cue at 57 of 390 upright, 14–66 sideways). Vertical drifts stay centred upright.
     A consequence worth knowing: horizontal drifts now put the cue in the SAME place whichever
     direction they run. The only thing direction still changes there is the order of the two
-    glyphs inside the cue (`.r3d-dir-rtl .r3d-drift-cue` is `row-reverse`), so LTR reads hand then
-    arrow and RTL reads arrow then hand.
-    **Which way round**: the HAND leads and the ARROW follows, as it always has. Swapping the two
-    was asked for on 2026-10-05, shipped, and taken straight back out the same day — the note had
-    been a mistake on the client's side ("the flip was a mistake apparently, please swap back").
-    Leave `.r3d-drift-cue` alone unless someone asks twice. It is a separate thing from the edge
-    above, which was right and stayed.
+    glyphs inside the cue — and since 2026-10-05 that matches too, so the cue now looks the same
+    for both horizontal directions. Direction still decides the drag itself, and the vertical
+    drifts, which are untouched by any of this.
+    **Which way round**: the ARROW leads and the HAND follows. A right-to-left drift has always
+    read that way; a left-to-right one joined it on 2026-10-05. Getting there took three passes —
+    both directions were swapped, that was taken back out as a mistake, and then only LTR was
+    swapped — so the lesson is in the shape of the rules: the BASE pair carries the order and the
+    `.r3d-dir-rtl` pair is left alone, which is what keeps RTL byte-identical (measured before and
+    after: arrow 24, hand 46). Changing the base rules alone is how to move LTR without touching
+    RTL. It is a separate thing from the edge above.
   - **The cue on a phone held SIDEWAYS** (2026-10-05, client) — `placeHelperX` and the hint's
     vertical placement both branch on `corners` before anything else:
     · a **vertical** drift (TTB/BTT) used to strand it in the middle of the screen, so it goes to
