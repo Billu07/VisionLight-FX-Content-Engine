@@ -332,8 +332,20 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     fades for good. It no longer DRAGS the footage: "the other hand animation ... for the first back and
     forth, that one can be removed". `startIntro` therefore never touches `yaw`, and tick()'s physics is
     no longer wrapped in `if (!introActive)` — a drag landing mid-demonstration used to fight it for the
-    scrub. Still once ever (`drift-intro-seen`), still started by the tips on their way out
-    (`startIntroRef`) so it plays on the drift the visitor landed on, not the next one.
+    scrub. Still started by the tips on their way out (`startIntroRef`) so it plays on the drift the
+    visitor landed on, not the next one.
+    **When it plays** (fixed 2026-10-06, after the user reported "I only see arrow now from the start"):
+    the hand was never removed — it was gated on `drift-intro-seen` in localStorage, ONCE EVER PER
+    BROWSER, a key set in every browser any of us had ever opened a drift in. Nobody who had used the
+    product could see it again, which is indistinguishable from it being gone. The gate is now the module
+    `Set` **`handShownFor`**, keyed by the flow: **one hand per TOUR per page session**, which is the
+    client's own wording ("The hand only shows up middle screen for the first drift of the tour. Then
+    it's just arrows."), writes nothing to the visitor's device, and can actually be looked at again.
+    It also fires from BOTH reveal paths now, with no delay: the moment the loader lifts (it used to wait
+    another 200ms after the loader's 420ms sweep) **and** on the warm path, where a drift whose frames
+    were already in reveals with no loader at all — a tour opened from its own pathway prefetches and
+    warms its first stop, so that drift had nothing to hang the hand off and simply never played it.
+    The gate makes the second call a no-op on a swap, so a later stop still gets none.
   - **`--r3d-framebot` is tracked separately from `--r3d-frametop`** (2026-10-06): both used to be
     written only when the TOP changed. A phone held sideways draws the frame full height, so its top
     rounds to 0 both before and after the first image arrives — and `--r3d-framebot` stayed at the 0 of

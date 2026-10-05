@@ -204,6 +204,11 @@ const FILL_MAX_MISMATCH = 1;
  * the offer survives a re-render of the same one and never follows the visitor to the next.
  */
 let fsOfferedFor: string | null = null;
+// Which tours have already had their one hand this page session. Keyed by the flow, because the
+// client asked for it on "the first drift of the tour" - a visitor who opens a second tour meets
+// it again there, and one who carries on through this tour does not. Module scope, so it survives
+// every drift -> drift swap and dies with the tab: nothing is written to the visitor's device.
+const handShownFor = new Set<string>();
 
 const isLightColor = (bg?: string | null): boolean => {
   if (!bg) return false; // empty → default dark studio gradient
@@ -681,7 +686,7 @@ export default function SpinViewer({
     // moves"; the arrow against the frame's edge says which way. It no longer drags the
     // footage back and forth: that demonstration is what the client asked to have removed,
     // and doing the gesture FOR the visitor is also what kept stealing the scrub from them.
-    // Once ever (localStorage), and it cancels the instant they touch the drift.
+    // Once per tour (see handShownFor), and it cancels the instant they touch the drift.
     let introActive = false;
     let userTookOver = false; // touched before / during the demo
     let introStart = 0;
@@ -695,9 +700,9 @@ export default function SpinViewer({
       stage.classList.remove("r3d-introing");
       dirty = true;
     };
-    // A hand stands in the middle of the first drift a visitor ever opens, once ever. It used
-    // to be the lesson, then the coach's nudge; with the lesson now on its own screen before
-    // the tour (TourTips) it is one wordless "this moves", and nothing more.
+    // A hand stands in the middle of the first drift a visitor opens in a tour. It used to be
+    // the lesson, then the coach's nudge; with the lesson now on its own screen before the tour
+    // (TourTips) it is one wordless "this moves", and nothing more.
     startIntroRef.current = () => startIntro();
     const startIntro = () => {
       if (introActive || userTookOver || !driftMode || !introHint || FRAMES < 4) return;
@@ -707,12 +712,13 @@ export default function SpinViewer({
       // nobody and the visitor would meet it on their SECOND drift instead (client's ref05,
       // 2026-10-06). It is started again when the tips close — see startIntroRef.
       if (tipsRef.current) return;
-      try {
-        if (localStorage.getItem("drift-intro-seen")) return;
-        localStorage.setItem("drift-intro-seen", "1");
-      } catch {
-        /* private mode / blocked storage - still show it this once */
-      }
+      // One per tour. It used to be one per BROWSER (localStorage "drift-intro-seen"), which
+      // meant anyone who had ever opened a drift could never see it again - the user reported it
+      // as "I only see arrow now from the start" (2026-10-06), and they were right that it never
+      // played; it had simply been spent months ago.
+      const tourKey = flowNav?.id || (realMode && urls ? urls[0] : "") || "";
+      if (handShownFor.has(tourKey)) return;
+      handShownFor.add(tourKey);
       introStart = performance.now();
       introActive = true;
       introHandRef.current?.classList.add("r3d-intro-on");
@@ -1924,9 +1930,10 @@ export default function SpinViewer({
         } else {
           loaderRef.current?.classList.add("r3d-gone");
           if (!hero) stage.focus({ preventScroll: true });
-          // Sooner: the loader now lifts on the coarse ring rather than the last frame, so
-          // half a second of stillness after it read as nothing happening (client, 2026-09-24).
-          window.setTimeout(startIntro, 200); // the one-time first-visit "this moves"
+          // The hand arrives WITH the drift, not a beat after it (client, 2026-10-06: "as soon
+          // as someone lands on the first drift, not on the second drift or delayed"). It fades
+          // in over the lifting loader, which is what makes it feel like part of landing.
+          startIntro();
         }
       };
       requestAnimationFrame(sweep);
@@ -2046,8 +2053,14 @@ export default function SpinViewer({
     const inT = shift(4);
     const EASE = "cubic-bezier(.2,.7,.2,1)";
     if (instant || isSwap) {
-      if (framesAreIn) loaderRef.current?.classList.add("r3d-gone");
-      else loaderRef.current?.classList.remove("r3d-gone"); // still loading — show the progress
+      if (framesAreIn) {
+        loaderRef.current?.classList.add("r3d-gone");
+        // A drift whose frames were already warm never shows a loader, so the hand had nothing
+        // to hang off and simply never played — which is how a tour opened from its own pathway
+        // (which prefetches and warms the first stop) could land with no hand at all. The gate
+        // is per tour, so a swap to a later stop is still refused here.
+        startIntro();
+      } else loaderRef.current?.classList.remove("r3d-gone"); // still loading — show the progress
       let crossfaded = false;
       if (isSwap && xfadeRef.current) {
         // Crossfade: snapshot the OUTGOING frame (still on the canvas — before fit()
