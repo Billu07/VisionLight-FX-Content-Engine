@@ -1342,6 +1342,7 @@ router.patch(
       if (f === false) return res.status(400).json({ error: "First direction must be LEFT, RIGHT, UP or DOWN" });
       data.firstDirection = f;
     }
+    if (typeof body.cameraLocked === "boolean") data.cameraLocked = body.cameraLocked;
     if ("ctaPlacement" in body) {
       const p = parseCtaPlacement(body.ctaPlacement);
       if (!p) return res.status(400).json({ error: "Button placement must be CENTER, CENTER_REV, LEFT, RIGHT, SPLIT or SPLIT_REV" });

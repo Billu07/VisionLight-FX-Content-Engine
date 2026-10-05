@@ -389,6 +389,7 @@ const stepProductSelect = {
   loopEnabled: true,
   driftDirection: true,
   firstDirection: true,
+  cameraLocked: true,
   ctaPlacement: true,
   thumbnailUrl: true,
   ctaPrimary: true,
@@ -443,6 +444,8 @@ export function serializeStepProduct(p: any) {
     driftDirection: (p.driftDirection || "LTR") as string,
     // null = derived from the shoot, which is what every drift made before 2026-10-06 does.
     firstDirection: (p.firstDirection ?? null) as string | null,
+    // false = Auto: the visitor's first swipe decides which way a drag scrubs forward.
+    cameraLocked: !!p.cameraLocked,
     ctaPlacement: (p.ctaPlacement || "CENTER") as string,
     frameCount: (p.spin?.frameCount ?? frames.length) as number,
     thumb: (p.thumbnailUrl || small[p.defaultFrame] || small[0] || null) as string | null,

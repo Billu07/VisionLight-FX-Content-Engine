@@ -183,6 +183,8 @@ export const TOUR_STYLES = `
 /* First Direction is picked by icon alone (client, 2026-10-06), so those buttons have no caption
    to stand on: the height goes back into the glyph and the footprint turns square. */
 .t-seg-icons .t-seg-btn{font-size:20px;min-width:46px;padding:9px 10px}
+/* Two word options sitting on one line, no caption under them. */
+.t-seg-wide .t-seg-btn{font-size:13px;font-weight:650;min-width:72px;padding:8px 14px}
 /* One quiet line under a control, saying what the pick means. */
 .t-hintline{display:block;margin-top:6px;font-size:11.5px;line-height:1.45}
 .t-chips{display:flex;flex-wrap:wrap;gap:6px}

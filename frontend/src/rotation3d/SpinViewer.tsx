@@ -1,6 +1,7 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { isInAppBrowser, isApple } from "./inAppBrowser";
+import { cameraFlip, decideCameraFlip } from "./cameraAuto";
 import TourTips, { tipsSeen, tipsForced } from "./TourTips";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -171,6 +172,8 @@ export type SpinViewerProps = {
   driftDirection?: "LTR" | "RTL" | "TTB" | "BTT";
   /** which way the guide arrow points FIRST ("First Direction"); null/absent = derived from the shoot */
   firstDirection?: "LEFT" | "RIGHT" | "UP" | "DOWN" | null;
+  /** Camera Control: false = Auto (the visitor's first swipe decides the mapping), true = Lock */
+  cameraLock?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -294,6 +297,7 @@ export default function SpinViewer({
   loopScrub = true,
   driftDirection = "LTR",
   firstDirection = null,
+  cameraLock = false,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   // The tips meet a visitor before their first TOUR drift, on their own screen - never over
@@ -448,7 +452,14 @@ export default function SpinViewer({
       const p = guidePoint().toLowerCase();
       for (const k of ["left", "right", "up", "down"]) el.classList.toggle("r3d-point-" + k, k === p);
     };
-    const dirSign = driftMode && (driftDirection === "RTL" || driftDirection === "BTT") ? -1 : 1;
+    // How the clip was shot decides which way a drag scrubs forward — unless the drift is left
+    // on Auto, where the visitor's FIRST swipe decides it instead and holds for the visit
+    // (client, 2026-10-06; see cameraAuto.ts for why). So this is a `let`: it is read by the
+    // drag, the progress rail and the drift→drift slide, all of which should follow that
+    // decision the moment it is made. The guide arrow does NOT — First Direction is the
+    // creator's hint about where the room opens, not an instruction to swipe that way.
+    const baseDirSign = driftMode && (driftDirection === "RTL" || driftDirection === "BTT") ? -1 : 1;
+    let dirSign = cameraLock ? baseDirSign : (cameraFlip() || 1) * baseDirSign;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     // Loop off: clamp the drag between the first and last frame (no wrap).
@@ -1295,19 +1306,26 @@ export default function SpinViewer({
         // Full bleed: the frame's own edges are off the screen, so the rail rides the
         // screen's edge instead — the way a video player's progress bar does. It is drawn
         // on the canvas, so it survives a tap that puts the rest of the chrome away.
+        // Filling the screen, the rail rides the SCREEN's edge, and FLUSH against it (client,
+        // 2026-10-06; ref08, ref09). It used to stop 10px short on every side, which on a
+        // pillarboxed clip is 10px ON the footage for a pan and a hair off the buttons for a
+        // tilt — both of which the client marked up. The 10px still decides where the rail
+        // STARTS and ENDS along its length, so its round caps keep off the corners; only the
+        // edge it lies on moved.
         const inset = 10 * DPR;
-        const rail =
-          immersive && !bandMode
-            ? { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }
-            : frameRect; // banded: the frame's own edge is visible again, so the rail rides it
+        const edge = 2 * DPR; // half the stroke, so the line sits wholly on screen
+        const fill = immersive && !bandMode;
+        const rail = fill
+          ? { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }
+          : frameRect; // banded: the frame's own edge is visible again, so the rail rides it
         const fx0 = rail.x, fy0 = rail.y, fw0 = rail.w, fh0 = rail.h;
         let sx: number, sy: number, ex: number, ey: number;
         if (vertical) {
-          sx = ex = fx0 + fw0;
+          sx = ex = fill ? W - edge : fx0 + fw0;
           sy = dirSign > 0 ? fy0 : fy0 + fh0;
           ey = dirSign > 0 ? fy0 + fh0 : fy0;
         } else {
-          sy = ey = fy0 + fh0;
+          sy = ey = fill ? H - edge : fy0 + fh0;
           sx = dirSign > 0 ? fx0 : fx0 + fw0;
           ex = dirSign > 0 ? fx0 + fw0 : fx0;
         }
@@ -1504,6 +1522,15 @@ export default function SpinViewer({
         if (Math.abs(tdx) < 6 && Math.abs(tdy) < 6) { lastX = e.clientX; lastY = e.clientY; lastT = now; return; }
         if (vertical ? Math.abs(tdy) >= Math.abs(tdx) : Math.abs(tdx) >= Math.abs(tdy)) {
           axis = "rotate";
+          // Auto: this is the first swipe of the visit, so it goes FORWARD whichever way it
+          // went, and every later drift follows the same reading. Decided here, at the moment
+          // the axis locks, so the very gesture that decides it already moves the right way —
+          // 6px of travel, before a single frame has been scrubbed.
+          if (driftMode && !cameraLock && !cameraFlip()) {
+            const g: 1 | -1 = (vertical ? tdy : tdx) >= 0 ? 1 : -1;
+            decideCameraFlip((g * baseDirSign) as 1 | -1);
+            dirSign = g;
+          }
           try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
           stage.classList.add("r3d-grabbing");
           engage();
@@ -2819,14 +2846,19 @@ const R3D_CSS = `
    clear of the picture, and the TYPE scales with whatever is left. So it is as large as the room
    allows on a generous clip and still lands beside the footage on a tight one - a 16:9 clip on a
    19.5:9 phone leaves about 75px, which a fixed size cannot fit. */
-/* All three the same width, so Menu lines up with Next (client, 2026-10-06) — and that width is
-   the ground beside the footage less a 12px gap, so no clip or screen can push them onto the
-   picture. Less thick than they were: the client wanted the height taken down. */
+/* ONE width for everything in the ground beside the footage — Prev, Menu, Next and the +/- pair
+   — so the column reads as one column (client, 2026-10-06). It is the ground less a 12px gap, so
+   no clip or screen can push a button onto the picture, CAPPED at the ground a 16:9 clip would
+   leave: a portrait clip pillarboxes to a third of the screen either side, and sizing from that
+   gave buttons half the screen wide (the client's ref07 — "the button size should be same as
+   landscape in that fullscreen screen"). The cap can never make a button wider than the ground,
+   because the measured ground is still the other half of the min(). */
+.r3d-stage.r3d-corners{--r3d-navw:min(calc(var(--r3d-side,96px) - 12px),max(56px,calc((100vw - 177.8vh) / 2 - 12px)))}
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
   white-space:nowrap;overflow:hidden;
-  width:calc(var(--r3d-side,96px) - 12px);
+  width:var(--r3d-navw);
   padding:clamp(8px,2.4vmin,12px) clamp(6px,1.6vmin,11px);
-  font-size:min(clamp(13px,3.4vmin,18px),calc(var(--r3d-side,96px) * 0.2))}
+  font-size:min(clamp(13px,3.4vmin,18px),calc(var(--r3d-navw,96px) * 0.25))}
 /* The corner itself. Menu used to sit one icon's height down, under the fullscreen button; on a
    phone held sideways that button is never there — the turn already filled the screen — so the
    corner is Menu's (client, 2026-10-03). */
@@ -2945,8 +2977,13 @@ const R3D_CSS = `
 /* Halfway between Menu and Next for height (client, 2026-10-06). Menu's bottom is its top inset
    plus one button, Next's top is 81% less one button — the button height cancels, so the midpoint
    is simply half of (the top inset + 81%), and the column is centred on it. */
-.r3d-stage.r3d-corners .r3d-zoomcol{display:flex;bottom:auto;right:12px;
+/* On the same centre line as Menu and Next, not pushed out to the screen's edge, and a touch
+   bigger (client, 2026-10-06): it takes their width and centres the two keys inside it. */
+.r3d-stage.r3d-corners .r3d-zoomcol{display:flex;bottom:auto;right:8px;
+  width:var(--r3d-navw);align-items:center;
   top:calc(40.5% + max(7px,env(safe-area-inset-top) / 2));transform:translateY(-50%)}
+.r3d-stage.r3d-corners .r3d-zoomcol .r3d-iconbtn{width:clamp(34px,9.8vmin,43px);height:clamp(34px,9.8vmin,43px);
+  font-size:clamp(16px,4.9vmin,21px)}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 /* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,

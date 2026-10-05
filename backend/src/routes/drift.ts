@@ -1112,6 +1112,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   loopEnabled: p.loopEnabled,
   driftDirection: p.driftDirection || "LTR",
   firstDirection: p.firstDirection || null,
+  cameraLocked: !!p.cameraLocked,
   ctaPlacement: p.ctaPlacement || "CENTER",
   // A tour/flow stop: the player sizes it uniformly (no "fill the screen when
   // there's no headline"), so every stop of a path reads the same.

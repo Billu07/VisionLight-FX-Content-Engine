@@ -137,6 +137,7 @@ function StepCard({
   const [bg, setBg] = useState(p?.background || "");
   const [direction, setDirection] = useState(p?.driftDirection || "LTR");
   const [first, setFirst] = useState(p?.firstDirection || "");
+  const [locked, setLocked] = useState(!!p?.cameraLocked);
   const [saving, setSaving] = useState(false);
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,19 +145,21 @@ function StepCard({
 
   // Re-sync a field from the server ONLY while it isn't being edited locally (the poll
   // and every relink refresh the server copy; typing must never be thrown away).
-  const serverRef = useRef({ name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "" });
+  const serverRef = useRef({ name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "", locked: !!p?.cameraLocked });
   useEffect(() => {
-    const next = { name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "" };
+    const next = { name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "", locked: !!p?.cameraLocked };
     const prev = serverRef.current;
     setName((v) => (v === prev.name ? next.name : v));
     setBg((v) => (v === prev.bg ? next.bg : v));
     setDirection((v) => (v === prev.direction ? next.direction : v));
     setFirst((v) => (v === prev.first ? next.first : v));
+    setLocked((v) => (v === prev.locked ? next.locked : v));
     serverRef.current = next;
-  }, [p?.name, p?.background, p?.driftDirection, p?.firstDirection]);
+  }, [p?.name, p?.background, p?.driftDirection, p?.firstDirection, p?.cameraLocked]);
 
   const dirty = name !== (p?.name || "") || bg !== (p?.background || "")
-    || direction !== (p?.driftDirection || "LTR") || first !== (p?.firstDirection || "");
+    || direction !== (p?.driftDirection || "LTR") || first !== (p?.firstDirection || "")
+    || locked !== !!p?.cameraLocked;
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give This Drift a Name");
@@ -168,6 +171,7 @@ function StepCard({
         driftDirection: direction,
         // "" means derive it from the shoot, which is what the server stores as null.
         firstDirection: first || null,
+        cameraLocked: locked,
       });
       onChanged(r.data.flow);
       notify.success("Drift Saved");
@@ -427,6 +431,30 @@ function StepCard({
               ))}
             </div>
             <small className="t-hintline d-faint">How the Clip Was Shot — It Sets the Way a Drag Moves the Room.</small>
+            <div className="t-seg t-seg-wide" role="radiogroup" aria-label="Camera control response" style={{ marginTop: 8 }}>
+              {[
+                { on: false, label: "Auto", title: "The Visitor's First Swipe Decides, for Their Whole Visit" },
+                { on: true, label: "Lock", title: "Everyone Gets the Shoot's Own Direction" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={locked === o.on}
+                  className={`t-seg-btn ${locked === o.on ? "on" : ""}`}
+                  onClick={() => setLocked(o.on)}
+                  title={o.title}
+                  disabled={readOnly}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <small className="t-hintline d-faint">
+              {locked
+                ? "Locked — Everyone Drags the Way the Camera Went."
+                : "Auto — Whichever Way a Visitor Swipes First Takes Them Forward."}
+            </small>
           </div>
         </div>
 

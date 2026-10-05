@@ -354,8 +354,35 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     The player reads it into `guideFirst` and puts `r3d-point-{left,right,up,down}` on the hint
     (`setGuidePoint`, called from `syncHelper` and on mount); `placeGuide` takes the EDGE from the same
     value, because the arrow always stands on the edge it points at. The `.r3d-dir-*` arrow rules are
-    untouched and still serve brand drifts, which keep the old column. **Still owed**: Camera Control's
-    Auto / Lock (the visitor's first swipe deciding the response for the whole tour) — not built yet.
+    untouched and still serve brand drifts, which keep the old column.
+    **Auto / Lock** (2026-10-06, `DriftProduct.cameraLocked`, default false = Auto): visitors do not agree
+    about which way a drag should move a room — half expect to push it the way the camera went, half to
+    pull it back — so whichever a creator picks, the other half drag the wrong way first. On **Auto** the
+    visitor's FIRST swipe decides it: whichever way they swipe, the drift goes forward, and that reading
+    then holds for the rest of the visit so nothing reverses mid-tour. **Lock** keeps the creator's own
+    mapping for everyone. The decision lives in `rotation3d/cameraAuto.ts` — module scope, so it survives
+    every drift→drift swap and dies with the tab; nothing is stored on the visitor's device. In SpinViewer
+    `dirSign` is therefore a **`let`** (`baseDirSign` is the shoot's own), set at the moment the drag's
+    axis locks at 6px — before a single frame has scrubbed, so the deciding gesture already moves the
+    right way. The drag, the progress rail and the drift→drift slide all follow it; the guide arrow does
+    NOT, because First Direction is a hint about where the room opens, not an instruction to swipe.
+  - **The progress rail lies ON the screen's edge** (2026-10-06, client; ref08, ref09): filling the
+    screen it used to stop 10px short on every side, which on a pillarboxed clip put it 10px up ON the
+    footage for a pan and a hair off the buttons for a tilt. The 10px still decides where the rail STARTS
+    and ENDS along its length (its round caps keep off the corners); only the edge it lies on moved, to
+    `H - 2*DPR` for a pan and `W - 2*DPR` for a tilt — half the stroke, so the line sits wholly on screen.
+    Banded and framed layouts are unchanged: there the frame's own edge is visible and the rail rides it.
+  - **One width for everything beside the footage** (2026-10-06, client; ref07): `--r3d-navw` on
+    `.r3d-stage.r3d-corners` is the ground less a 12px gap, CAPPED at the ground a 16:9 clip would leave
+    (`(100vw - 177.8vh) / 2 - 12px`, floor 56px). A portrait clip pillarboxes to a third of the screen
+    either side, and sizing from that gave buttons half the screen wide — "the button size should be same
+    as landscape in that fullscreen screen". The cap can never make a button WIDER than the ground,
+    because the measured ground is still the other half of the `min()`; a screen with no ground resolves
+    negative, the declaration is dropped and the default stands, exactly as before. Prev, Menu, Next and
+    the +/- column all take that one width, so the +/- pair now shares their centre line instead of being
+    pushed to the screen's edge, and its keys are a touch bigger (`clamp(34px,9.8vmin,43px)`, 35 → 38 on a
+    390px-tall phone). Measured: a portrait clip's buttons are 63px with 312px of ground, the same 63px a
+    landscape clip gets from 75px.
   - **The player's top-left mark** (2026-10-02): a TOUR drift with no brand logo shows drift.li's own
     mark (the icon from frontend/public/drift/icon.svg, inlined — ink tile, white "d", cyan dot) instead of
     the old circular arrow, which meant nothing. A BRAND drift keeps the neutral gradient square: its page
@@ -467,7 +494,9 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   `authUserId` (Supabase), `maxProjects`, `isDemo`.
 - `DriftProduct`: `driftDirection` (LTR|RTL|TTB|BTT = **Camera Control**, how the clip was shot — the
   drag axis and which way a drag scrubs forward) + `firstDirection` (LEFT|RIGHT|UP|DOWN|null =
-  **First Direction**, which way the guide arrow points first; null = derived). Also: manifest
+  **First Direction**, which way the guide arrow points first; null = derived) + `cameraLocked`
+  (false = **Auto**, the visitor's first swipe decides which way a drag scrubs forward, for their visit;
+  true = **Lock**). Also: manifest
   (`frames[]`, `frameCount`, `defaultFrame`), optional
   `secondManifest` (2-clip loop), `ctaPrimary`/`ctaSecondary` (JSON, drift links),
   captions, `status`, `slug`, org association, per-product toggles (`hideTitle`,

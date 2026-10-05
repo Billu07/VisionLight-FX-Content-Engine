@@ -18,6 +18,8 @@ export type StepProduct = {
   driftDirection: string;
   /** null = the arrow's first direction is derived from driftDirection */
   firstDirection?: string | null;
+  /** false = Auto: the visitor's first swipe decides which way a drag scrubs forward */
+  cameraLocked?: boolean;
   ctaPlacement: string;
   frameCount: number;
   thumb: string | null;

@@ -221,6 +221,7 @@ export default function UnbrandedTour() {
       loopScrub={p.loopEnabled ?? false}
       driftDirection={p.driftDirection}
       firstDirection={p.firstDirection}
+      cameraLock={!!p.cameraLocked}
       driftMode
       captions={view.captions}
       pins={view.pins}
