@@ -508,7 +508,7 @@ export default function SpinViewer({
         if (vertical) {
           el.style.left = "auto";
           el.style.right = Math.max(10, stageW - (fx + fw) + 14) + "px";
-        } else if (helperBack === dirSign < 0) {
+        } else if (helperBack) {
           el.style.left = "auto";
           el.style.right = Math.max(8, stageW - (fx + fw) - hintW - 10) + "px";
         } else {
@@ -522,16 +522,17 @@ export default function SpinViewer({
         const hintW = el.offsetWidth || 120;
         el.style.right = "auto";
         el.style.left = Math.max(inset, Math.min(stageW - hintW - inset, fx + fw / 2 - hintW / 2)) + "px";
-      } else if (helperBack === dirSign < 0) {
-        // The hand waits at the edge the drag is HEADING FOR, not the one it starts from
-        // (client, 2026-10-05) — so a left-to-right drift carries it to the right, and a
-        // right-to-left drift to the left. On the way back it crosses to the other edge for
-        // the same reason.
-        // forward on LTR, or back on RTL → the frame's RIGHT edge
+      } else if (helperBack) {
+        // The cue opens at the frame's LEFT edge whichever way the drift runs, and crosses to
+        // the right for the way back (client, 2026-10-05: a left-to-right drift moved to "the
+        // other edge from where we have now", and a right-to-left one was already here and was
+        // not to change "a single thing"). The arrow goes with it and always points OUT of the
+        // frame, so the pair reads as "there is more room that way".
+        // the way back → the frame's RIGHT edge
         el.style.left = "auto";
         el.style.right = Math.max(rightInset, stageW - (fx + fw)) + "px";
       } else {
-        // back on LTR, or forward on RTL → the frame's LEFT edge
+        // the way forward → the frame's LEFT edge
         el.style.right = "auto";
         el.style.left = Math.max(inset, fx) + "px";
       }
@@ -2553,23 +2554,24 @@ const R3D_CSS = `
 /* hand is centred over the cue's text (the column's width = the cue), not the frame */
 .r3d-drift-hand{align-self:center;width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:clamp(17px,5vmin,22px);height:clamp(17px,5vmin,22px)}
-.r3d-drift-arrow{display:inline-flex;align-items:center;color:#22d3ee;flex:none;animation:r3darrownudge 1.4s ease-in-out infinite}
-.r3d-drift .r3d-hint.r3d-back .r3d-drift-arrow{animation:r3darrownudgeback 1.4s ease-in-out infinite}
+/* The arrow points OUT of the frame, on whichever edge the cue is sitting (client, 2026-10-05).
+   Going forward that edge is the left one, so it points and nudges left; coming back it is the
+   right one. The same for both horizontal directions now — a right-to-left drift was already
+   drawn this way, which is why none of this changes it. */
+.r3d-drift-arrow{display:inline-flex;align-items:center;color:#22d3ee;flex:none;animation:r3darrownudgeback 1.4s ease-in-out infinite}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-arrow{animation:r3darrownudge 1.4s ease-in-out infinite}
 .r3d-drift-arrow svg{width:clamp(20px,6vmin,26px);height:clamp(20px,6vmin,26px);filter:drop-shadow(0 1px 3px rgba(0,0,0,.9));transition:transform .25s}
 @keyframes r3darrownudge{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
 @keyframes r3darrownudgeback{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
 @media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none!important}}
-.r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
+.r3d-hint .r3d-drift-arrow svg{transform:scaleX(-1)}
+.r3d-hint.r3d-back .r3d-drift-arrow svg{transform:none}
 /* Drift direction (per drift): which way the footage pans. LTR = drag right to go
    forward, arrow →. RTL flips it; TTB/BTT move the whole cue to the vertical axis. */
-.r3d-dir-rtl .r3d-hint .r3d-drift-arrow svg{transform:scaleX(-1)}
-.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:none}
 .r3d-dir-ttb .r3d-hint .r3d-drift-arrow svg{transform:rotate(90deg)}
 .r3d-dir-ttb .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:rotate(-90deg)}
 .r3d-dir-btt .r3d-hint .r3d-drift-arrow svg{transform:rotate(-90deg)}
 .r3d-dir-btt .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:rotate(90deg)}
-.r3d-drift.r3d-dir-rtl .r3d-hint .r3d-drift-arrow{animation-name:r3darrownudgeback}
-.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudge}
 .r3d-drift.r3d-dir-ttb .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgev}
 .r3d-drift.r3d-dir-btt .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgevback}
 .r3d-dir-ttb .r3d-drift-hand,.r3d-dir-btt .r3d-drift-hand{animation-name:r3dswayv}

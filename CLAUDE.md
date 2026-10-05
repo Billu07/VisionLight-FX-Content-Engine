@@ -322,12 +322,18 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     its chrome because that lives beside the footage, not over it.
   - **The drag cue: which edge, and which way round** (2026-10-05, client). Two separate things,
     asked for one after the other, so keep them apart when reading the code.
-    **Which edge**: the cue sits at the edge the drag is HEADING FOR, not the one it starts from —
-    a left-to-right drift carries it to the right of the frame, a right-to-left drift to the left,
-    and at the end of a drift the cue turns round and crosses over. One condition in
-    `placeHelperX()`, derived from the same `dirSign` the drag itself uses, so changing a drift's
-    direction in the builder moves the cue with it (measured on a 390px phone: LTR 287, RTL 57,
-    vertical centred, and 57 again on the return leg). Vertical drifts stay centred upright.
+    **Which edge**: the cue opens at the frame's **LEFT** edge whichever way a horizontal drift
+    runs, and crosses to the right for the way back — and the **arrow always points OUT of the
+    frame**, so it reads as "there is more room that way" rather than as an instruction to drag
+    that way. The condition in `placeHelperX()` is simply `helperBack`; it used to key off
+    `dirSign` as well, until the client moved a left-to-right drift to "the other edge from where
+    we have now" and told us a right-to-left one must not change "a single thing" — which it does
+    not: every rule resolves to exactly what RTL was already drawing (measured identically before
+    and after: cue at 57 of 390 upright, 14–66 sideways). Vertical drifts stay centred upright.
+    A consequence worth knowing: horizontal drifts now put the cue in the SAME place whichever
+    direction they run. The only thing direction still changes there is the order of the two
+    glyphs inside the cue (`.r3d-dir-rtl .r3d-drift-cue` is `row-reverse`), so LTR reads hand then
+    arrow and RTL reads arrow then hand.
     **Which way round**: the HAND leads and the ARROW follows, as it always has. Swapping the two
     was asked for on 2026-10-05, shipped, and taken straight back out the same day — the note had
     been a mistake on the client's side ("the flip was a mistake apparently, please swap back").
