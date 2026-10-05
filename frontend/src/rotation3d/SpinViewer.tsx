@@ -497,6 +497,27 @@ export default function SpinViewer({
       const zoomShowing = !!zoom && zoom.offsetParent !== null;
       const inset = immersive ? 26 : 8;
       const rightInset = immersive && zoomShowing ? 72 : inset;
+      // A phone held sideways (client, 2026-10-05). A drift dragged UP AND DOWN had its cue
+      // stranded in the middle of the screen, so it goes to the bottom-right corner of the
+      // footage; one dragged left and right had its cue ON the footage, so it steps off it
+      // into the ground beside the frame — the side it is heading for, where the Prev or Next
+      // button already is. The ground is narrow beside a landscape clip and wide beside a
+      // portrait one; "just outside the frame" is the same instruction either way.
+      if (corners) {
+        const hintW = el.offsetWidth || 120;
+        if (vertical) {
+          el.style.left = "auto";
+          el.style.right = Math.max(10, stageW - (fx + fw) + 14) + "px";
+        } else if (helperBack === dirSign < 0) {
+          el.style.left = "auto";
+          el.style.right = Math.max(8, stageW - (fx + fw) - hintW - 10) + "px";
+        } else {
+          el.style.right = "auto";
+          el.style.left = Math.max(8, fx - hintW - 10) + "px";
+        }
+        el.style.transform = "none";
+        return;
+      }
       if (vertical) {
         const hintW = el.offsetWidth || 120;
         el.style.right = "auto";
@@ -983,7 +1004,14 @@ export default function SpinViewer({
         // the buttons if a screen is ever too short to hold both.
         const underFrame = wideClip && !corners && realMode && frameRect.h > 0;
         let topPx: number;
-        if (underFrame) {
+        if (corners && realMode && frameRect.h > 0) {
+          // Sideways: level with the bottom of the footage for a vertical drift, and under the
+          // Prev/Next row (they stand at bottom:38%) for a horizontal one.
+          const hintH = hintRef.current.offsetHeight || handH + 7 + cueH;
+          topPx = vertical
+            ? Math.max(12, (frameRect.y + frameRect.h) / DPR - hintH - 16)
+            : Math.max(12, Math.min(stageH - hintH - 10, stageH * 0.62 + 12));
+        } else if (underFrame) {
           const frameBottomCss = (frameRect.y + frameRect.h) / DPR;
           const hintH = hintRef.current.offsetHeight || handH + 7 + cueH;
           const roomFor = ctasRef.current?.offsetTop || stageH - 120;
@@ -2501,15 +2529,17 @@ const R3D_CSS = `
    on the leading (swipe-direction) side of the text. */
 .r3d-drift .r3d-hint{opacity:.96;flex-direction:column;align-items:flex-start;gap:7px}
 .r3d-drift .r3d-hint.r3d-back{align-items:flex-end}
-.r3d-drift-cue{display:flex;align-items:center;gap:9px}
-.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
+/* The arrow leads and the hand follows (client, 2026-10-05) — they simply swapped places;
+   which EDGE of the frame the pair sits on is decided in placeHelperX and is unchanged. */
+.r3d-drift-cue{display:flex;align-items:center;gap:9px;flex-direction:row-reverse}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
 /* Direction-aware helper: RTL mirrors the LTR arrangement (hand on the right, arrow
    before the text) and swaps back at the end; a side-placed helper (vertical drifts
    beside the frame) stacks hand → text → arrow, centred. */
 .r3d-drift.r3d-dir-rtl .r3d-hint{align-items:flex-end}
 .r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back{align-items:flex-start}
-.r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row-reverse}
-.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
+.r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row}
+.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
 .r3d-drift.r3d-dir-ttb .r3d-hint,.r3d-drift.r3d-dir-btt .r3d-hint,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back{align-items:center}
 .r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */
@@ -2662,9 +2692,12 @@ const R3D_CSS = `
    19.5:9 phone leaves about 75px, which a fixed size cannot fit. */
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
   white-space:nowrap;overflow:hidden;
-  max-width:calc(var(--r3d-side,96px) - 18px);
-  padding:clamp(9px,2.6vmin,13px) clamp(8px,2vmin,14px);
-  font-size:min(clamp(12px,2.8vmin,16px),calc(var(--r3d-side,96px) * 0.17))}
+  /* A little bigger (client, 2026-10-05) and still sized BY the ground, so no clip or screen can
+     push them onto the picture: the width is that ground less a 12px gap, and the type is capped
+     at a fifth of it. */
+  max-width:calc(var(--r3d-side,96px) - 12px);
+  padding:clamp(11px,3.2vmin,15px) clamp(7px,1.9vmin,13px);
+  font-size:min(clamp(13px,3.4vmin,18px),calc(var(--r3d-side,96px) * 0.2))}
 /* The corner itself. Menu used to sit one icon's height down, under the fullscreen button; on a
    phone held sideways that button is never there — the turn already filled the screen — so the
    corner is Menu's (client, 2026-10-03). */

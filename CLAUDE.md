@@ -257,7 +257,9 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     for it. It applies to ANY clip on a sideways phone since 2026-10-02, portrait included: a portrait
     clip used to stack them down the right-hand side (`r3d-siderail`) and the two should match. Buttons
     are sized FROM `--r3d-side` — the ground beside the footage, measured every frame in draw() —
-    width and type both: the max-width is that ground less 18px and the font is capped at 0.17 of it,
+    width and type both: the max-width is that ground less 12px and the font is capped at a fifth of it
+    (raised from 18px/0.17 on 2026-10-05 — the client wanted them a little bigger; measured 55x40 at
+    12px → 59x47 at 13.3px, still clear of the picture on both sides),
     so each button is as large as the room allows and never lies on the picture. A fixed size cannot
     do this: a 16:9 clip on a 19.5:9 phone leaves about 75px, and the 104px floor an earlier pass put
     under the max-width is exactly what pushed them back onto the footage (client, 2026-10-02: "part
@@ -318,10 +320,29 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     (`r3d-bare` is dead). It still fades while DRAGGING, but only for a portrait drift on a touch screen
     (`@media (pointer: coarse){ .r3d-immersive:not(.r3d-wide).r3d-grabbing … }`) — a landscape drift keeps
     its chrome because that lives beside the footage, not over it.
-  - **The drag hand waits at the far edge** (2026-10-05, client): the helper sits at the edge the
-    drag is HEADING FOR, not the one it starts from — a left-to-right drift carries it to the right
-    of the frame, a right-to-left drift to the left, and on the way back it crosses over. One
-    condition in `placeHelperX()`; vertical drifts stay centred, as they always were.
+  - **The drag cue: which edge, and which way round** (2026-10-05, client). Two separate things,
+    asked for one after the other, so keep them apart when reading the code.
+    **Which edge**: the cue sits at the edge the drag is HEADING FOR, not the one it starts from —
+    a left-to-right drift carries it to the right of the frame, a right-to-left drift to the left,
+    and at the end of a drift the cue turns round and crosses over. One condition in
+    `placeHelperX()`, derived from the same `dirSign` the drag itself uses, so changing a drift's
+    direction in the builder moves the cue with it (measured on a 390px phone: LTR 287, RTL 57,
+    vertical centred, and 57 again on the return leg). Vertical drifts stay centred upright.
+    **Which way round**: within the cue the ARROW leads and the HAND follows — they simply swapped
+    places (`.r3d-drift-cue` is `row-reverse` by default now, and the `r3d-back` / `r3d-dir-rtl`
+    rules are inverted to match). That is a different request from the edge one; the client had to
+    say "changing the edge was fine, just change the position of hand with the position of arrow".
+  - **The cue on a phone held SIDEWAYS** (2026-10-05, client) — `placeHelperX` and the hint's
+    vertical placement both branch on `corners` before anything else:
+    · a **vertical** drift (TTB/BTT) used to strand it in the middle of the screen, so it goes to
+      the **bottom-right corner of the footage**, 14px inside the frame's right edge and 16px above
+      its bottom;
+    · a **horizontal** drift had it lying ON the footage, so it steps **off the picture into the
+      ground** on the side it is heading for, and sits **under the Prev/Next row** (those stand at
+      `bottom:38%`, so the cue goes to `0.62 × height + 12`). The ground is narrow beside a
+      landscape clip and wide beside a portrait one — "just outside the frame" covers both, and the
+      portrait case lands near the frame rather than out at the screen edge (measured: ground
+      312px, frame ends 532, cue starts 541).
   - **The player follows the device; it never turns the drift itself** (2026-09-23, client: "we don't
     want to make them turn their phone. It needs to respond only IF they turn their phone"). An earlier
     pass rotated the stage a quarter turn for a landscape drift on an upright phone — that is REMOVED,
