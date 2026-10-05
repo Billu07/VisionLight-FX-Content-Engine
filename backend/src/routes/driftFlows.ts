@@ -8,7 +8,7 @@ import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
 import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
-import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
+import { parseCtaPlacement, parseDirection, parseFirstDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
 import { MAX_PINS, ensurePinTrack, pinFrames, sanitizePins, serializePin } from "../services/driftPins";
@@ -1336,6 +1336,11 @@ router.patch(
       const d = parseDirection(body.driftDirection);
       if (!d) return res.status(400).json({ error: "Direction must be LTR, RTL, TTB or BTT" });
       data.driftDirection = d;
+    }
+    if ("firstDirection" in body) {
+      const f = parseFirstDirection(body.firstDirection);
+      if (f === false) return res.status(400).json({ error: "First direction must be LEFT, RIGHT, UP or DOWN" });
+      data.firstDirection = f;
     }
     if ("ctaPlacement" in body) {
       const p = parseCtaPlacement(body.ctaPlacement);

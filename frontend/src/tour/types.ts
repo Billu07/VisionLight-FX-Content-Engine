@@ -16,6 +16,8 @@ export type StepProduct = {
   defaultFrame: number;
   loopEnabled: boolean;
   driftDirection: string;
+  /** null = the arrow's first direction is derived from driftDirection */
+  firstDirection?: string | null;
   ctaPlacement: string;
   frameCount: number;
   thumb: string | null;

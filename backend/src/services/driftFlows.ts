@@ -388,6 +388,7 @@ const stepProductSelect = {
   defaultFrame: true,
   loopEnabled: true,
   driftDirection: true,
+  firstDirection: true,
   ctaPlacement: true,
   thumbnailUrl: true,
   ctaPrimary: true,
@@ -440,6 +441,8 @@ export function serializeStepProduct(p: any) {
     defaultFrame: (p.defaultFrame ?? 0) as number,
     loopEnabled: !!p.loopEnabled,
     driftDirection: (p.driftDirection || "LTR") as string,
+    // null = derived from the shoot, which is what every drift made before 2026-10-06 does.
+    firstDirection: (p.firstDirection ?? null) as string | null,
     ctaPlacement: (p.ctaPlacement || "CENTER") as string,
     frameCount: (p.spin?.frameCount ?? frames.length) as number,
     thumb: (p.thumbnailUrl || small[p.defaultFrame] || small[0] || null) as string | null,

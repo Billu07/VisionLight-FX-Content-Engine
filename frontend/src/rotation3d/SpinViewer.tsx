@@ -167,7 +167,10 @@ export type SpinViewerProps = {
   loopScrub?: boolean;
   /** Drift: which way the footage pans. Sets the drag axis and the helper arrow:
    * LTR (default) drag right = forward, RTL drag left, TTB drag down, BTT drag up. */
+  /** how the clip was SHOT ("Camera Control"): the drag axis, and which way a drag scrubs forward */
   driftDirection?: "LTR" | "RTL" | "TTB" | "BTT";
+  /** which way the guide arrow points FIRST ("First Direction"); null/absent = derived from the shoot */
+  firstDirection?: "LEFT" | "RIGHT" | "UP" | "DOWN" | null;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -290,6 +293,7 @@ export default function SpinViewer({
   attention = null,
   loopScrub = true,
   driftDirection = "LTR",
+  firstDirection = null,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   // The tips meet a visitor before their first TOUR drift, on their own screen - never over
@@ -425,6 +429,25 @@ export default function SpinViewer({
     // Drift direction: vertical footage scrubs on dy, and RTL/BTT flip the sign so
     // dragging the way the camera moved always goes forward.
     const vertical = driftMode && (driftDirection === "TTB" || driftDirection === "BTT");
+    // Which way the guide arrow points on its OPENING leg. Two totally different settings, in
+    // the client's own words (2026-10-06): the shoot decides how a drag scrubs, and this decides
+    // where the arrow starts - "First direction I pick right arrow. Camera control it depends
+    // how it was shot." Unset, it is derived the way it always was (a pan opens pointing left,
+    // a tilt along its own axis), so no drift made before today moves. The far-end leg is simply
+    // the opposite, and the arrow stands on whichever edge it points at - see placeGuide.
+    const OPPOSITE = { LEFT: "RIGHT", RIGHT: "LEFT", UP: "DOWN", DOWN: "UP" } as const;
+    type Point = keyof typeof OPPOSITE;
+    const picked = String(firstDirection || "").toUpperCase();
+    const guideFirst: Point = picked in OPPOSITE
+      ? (picked as Point)
+      : vertical ? (driftDirection === "TTB" ? "DOWN" : "UP") : "LEFT";
+    const guidePoint = (): Point => (helperBack ? OPPOSITE[guideFirst] : guideFirst);
+    const setGuidePoint = () => {
+      const el = hintRef.current;
+      if (!guideCue || !el) return;
+      const p = guidePoint().toLowerCase();
+      for (const k of ["left", "right", "up", "down"]) el.classList.toggle("r3d-point-" + k, k === p);
+    };
     const dirSign = driftMode && (driftDirection === "RTL" || driftDirection === "BTT") ? -1 : 1;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
@@ -515,14 +538,13 @@ export default function SpinViewer({
       const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
       const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
       const PAD = 12, INSET = 10;
+      const point = guidePoint();
       let left: number, top: number;
-      if (vertical) {
-        // TTB points down to begin with, BTT up; the way back is the other end.
-        const atBottom = (driftDirection === "TTB") !== helperBack;
+      if (point === "UP" || point === "DOWN") {
         left = fx + fw / 2 - w / 2;
-        top = atBottom ? fy + fh - h - INSET : fy + INSET;
+        top = point === "DOWN" ? fy + fh - h - INSET : fy + INSET;
       } else {
-        left = helperBack ? fx + fw - w - INSET : fx + INSET;
+        left = point === "RIGHT" ? fx + fw - w - INSET : fx + INSET;
         top = fy + fh / 2 - h / 2;
       }
       // A frame that fills the screen has its own edges off it, so clamp to the screen.
@@ -589,6 +611,7 @@ export default function SpinViewer({
     };
     const syncHelper = () => {
       hintRef.current?.classList.toggle("r3d-back", helperBack);
+      setGuidePoint();
       if (helperTextRef.current) helperTextRef.current.textContent = helperBack ? backHelper : fwdHelper;
       placeHelperX();
     };
@@ -626,6 +649,7 @@ export default function SpinViewer({
       // ...and an arrow a PREVIOUS stop retired for good comes back for this one: the class
       // lives on the DOM, which one mounted SpinViewer carries across every swap.
       hintRef.current?.classList.remove("r3d-back", "r3d-gone");
+      setGuidePoint();
       if (helperTextRef.current) helperTextRef.current.textContent = fwdHelper;
       setHeadState(false);
       showHand();
@@ -2659,6 +2683,18 @@ const R3D_CSS = `
 .r3d-hint.r3d-guide .r3d-drift-hand,.r3d-hint.r3d-guide .r3d-cue-hand{display:none}
 .r3d-hint.r3d-guide .r3d-drift-cue{margin-top:0!important}
 .r3d-hint.r3d-guide .r3d-drift-arrow svg{width:clamp(26px,7vmin,34px);height:clamp(26px,7vmin,34px)}
+/* Which way it points is the drift's First Direction, not its shoot (client, 2026-10-06), so
+   the guide takes it from a class the player sets rather than from the .r3d-dir-* rules above -
+   those still serve brand drifts, which keep the old column. The nudge goes the same way, and
+   both beat the .r3d-dir-* rules on specificity. */
+.r3d-hint.r3d-guide.r3d-point-right .r3d-drift-arrow svg{transform:none}
+.r3d-hint.r3d-guide.r3d-point-left .r3d-drift-arrow svg{transform:scaleX(-1)}
+.r3d-hint.r3d-guide.r3d-point-down .r3d-drift-arrow svg{transform:rotate(90deg)}
+.r3d-hint.r3d-guide.r3d-point-up .r3d-drift-arrow svg{transform:rotate(-90deg)}
+.r3d-drift .r3d-hint.r3d-guide.r3d-point-right .r3d-drift-arrow{animation-name:r3darrownudge}
+.r3d-drift .r3d-hint.r3d-guide.r3d-point-left .r3d-drift-arrow{animation-name:r3darrownudgeback}
+.r3d-drift .r3d-hint.r3d-guide.r3d-point-down .r3d-drift-arrow{animation-name:r3darrownudgev}
+.r3d-drift .r3d-hint.r3d-guide.r3d-point-up .r3d-drift-arrow{animation-name:r3darrownudgevback}
 /* The hand in the middle is not a second resting cue, so it no longer hides this one. */
 .r3d-introing .r3d-hint.r3d-guide:not(.r3d-gone){opacity:.96!important}
 /* One-time first-visit drag demo — a finger (with a touch ripple) drags across

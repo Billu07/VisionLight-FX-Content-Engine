@@ -22,11 +22,23 @@ import { TOUR_PAGE_STYLES } from "./tourPageStyles";
  * preview of the selected drift. A page Viewer gets the same view without the controls.
  */
 
-const DIRECTIONS = [
-  { value: "LTR", glyph: "→", short: "L→R", title: "Left to Right — The Camera Pans Right" },
-  { value: "RTL", glyph: "←", short: "R→L", title: "Right to Left" },
-  { value: "TTB", glyph: "↓", short: "T→B", title: "Top to Bottom" },
-  { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to Top" },
+// Two settings, not one (client, 2026-10-06). CAMERA CONTROL is how the clip was shot — it is
+// the long-standing driftDirection under its proper name, so every drift already made keeps the
+// drag it has. FIRST DIRECTION is which way the guide arrow points first, picked on its own:
+// "First direction I pick right arrow. Camera control it depends how it was shot."
+const CAMERA_CONTROL = [
+  { value: "LTR", glyph: "→", short: "Right Pan", title: "The Camera Panned Right" },
+  { value: "RTL", glyph: "←", short: "Left Pan", title: "The Camera Panned Left" },
+  { value: "TTB", glyph: "↓", short: "Down Tilt", title: "The Camera Tilted Down" },
+  { value: "BTT", glyph: "↑", short: "Up Tilt", title: "The Camera Tilted Up" },
+] as const;
+// Icons only, by the client's instruction — the words live on the title/aria-label and in the
+// line under the row, never on the buttons.
+const FIRST_DIRECTIONS = [
+  { value: "LEFT", glyph: "←", title: "The Arrow Points Left First" },
+  { value: "RIGHT", glyph: "→", title: "The Arrow Points Right First" },
+  { value: "UP", glyph: "↑", title: "The Arrow Points Up First" },
+  { value: "DOWN", glyph: "↓", title: "The Arrow Points Down First" },
 ] as const;
 const COVER_LABELS = ["Start", "Middle", "End"];
 /** A tour drift plays on drift.li's dark ground until its creator picks a colour. */
@@ -36,7 +48,7 @@ const cleanupText = (c: NonNullable<NonNullable<FlowStep["product"]>["cleanup"]>
   [
     c.trimmedS > 0 ? `Trimmed ${c.trimmedS}s of Still Footage` : "",
     c.steadied ? "Steadied the Shake" : "",
-    c.direction ? `Direction Set from the Footage (${DIRECTIONS.find((d) => d.value === c.direction)?.glyph ?? c.direction})` : "",
+    c.direction ? `Direction Set from the Footage (${CAMERA_CONTROL.find((d) => d.value === c.direction)?.glyph ?? c.direction})` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -124,6 +136,7 @@ function StepCard({
   const [name, setName] = useState(p?.name || "");
   const [bg, setBg] = useState(p?.background || "");
   const [direction, setDirection] = useState(p?.driftDirection || "LTR");
+  const [first, setFirst] = useState(p?.firstDirection || "");
   const [saving, setSaving] = useState(false);
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -131,17 +144,19 @@ function StepCard({
 
   // Re-sync a field from the server ONLY while it isn't being edited locally (the poll
   // and every relink refresh the server copy; typing must never be thrown away).
-  const serverRef = useRef({ name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR" });
+  const serverRef = useRef({ name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "" });
   useEffect(() => {
-    const next = { name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR" };
+    const next = { name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR", first: p?.firstDirection || "" };
     const prev = serverRef.current;
     setName((v) => (v === prev.name ? next.name : v));
     setBg((v) => (v === prev.bg ? next.bg : v));
     setDirection((v) => (v === prev.direction ? next.direction : v));
+    setFirst((v) => (v === prev.first ? next.first : v));
     serverRef.current = next;
-  }, [p?.name, p?.background, p?.driftDirection]);
+  }, [p?.name, p?.background, p?.driftDirection, p?.firstDirection]);
 
-  const dirty = name !== (p?.name || "") || bg !== (p?.background || "") || direction !== (p?.driftDirection || "LTR");
+  const dirty = name !== (p?.name || "") || bg !== (p?.background || "")
+    || direction !== (p?.driftDirection || "LTR") || first !== (p?.firstDirection || "");
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give This Drift a Name");
@@ -151,6 +166,8 @@ function StepCard({
         name: name.trim(),
         background: bg,
         driftDirection: direction,
+        // "" means derive it from the shoot, which is what the server stores as null.
+        firstDirection: first || null,
       });
       onChanged(r.data.flow);
       notify.success("Drift Saved");
@@ -365,9 +382,35 @@ function StepCard({
             </div>
           </div>
           <div className="t-field">
-            <label className="d-label">Drift Direction</label>
-            <div className="t-seg" role="radiogroup" aria-label="Drift direction">
-              {DIRECTIONS.map((d) => (
+            <label className="d-label">First Direction</label>
+            <div className="t-seg t-seg-icons" role="radiogroup" aria-label="First direction">
+              {FIRST_DIRECTIONS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={first === d.value}
+                  className={`t-seg-btn ${first === d.value ? "on" : ""}`}
+                  /* Pressing the chosen one again hands it back to the camera control. */
+                  onClick={() => setFirst(first === d.value ? "" : d.value)}
+                  title={d.title}
+                  aria-label={d.title}
+                  disabled={readOnly}
+                >
+                  {d.glyph}
+                </button>
+              ))}
+            </div>
+            <small className="t-hintline d-faint">
+              {first
+                ? `${FIRST_DIRECTIONS.find((d) => d.value === first)?.title}. Press It Again for Auto.`
+                : "Auto — The Arrow Follows the Camera Control."}
+            </small>
+          </div>
+          <div className="t-field">
+            <label className="d-label">Camera Control</label>
+            <div className="t-seg" role="radiogroup" aria-label="Camera control">
+              {CAMERA_CONTROL.map((d) => (
                 <button
                   key={d.value}
                   type="button"
@@ -383,6 +426,7 @@ function StepCard({
                 </button>
               ))}
             </div>
+            <small className="t-hintline d-faint">How the Clip Was Shot — It Sets the Way a Drag Moves the Room.</small>
           </div>
         </div>
 

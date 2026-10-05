@@ -180,6 +180,11 @@ export const TOUR_STYLES = `
 .t-seg-btn small{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .t-seg-btn:hover{color:var(--text)}
 .t-seg-btn.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow-sm)}
+/* First Direction is picked by icon alone (client, 2026-10-06), so those buttons have no caption
+   to stand on: the height goes back into the glyph and the footprint turns square. */
+.t-seg-icons .t-seg-btn{font-size:20px;min-width:46px;padding:9px 10px}
+/* One quiet line under a control, saying what the pick means. */
+.t-hintline{display:block;margin-top:6px;font-size:11.5px;line-height:1.45}
 .t-chips{display:flex;flex-wrap:wrap;gap:6px}
 .t-chip-btn{appearance:none;cursor:pointer;font:inherit;font-size:12px;font-weight:650;padding:7px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);transition:all .16s}
 .t-chip-btn:hover{color:var(--text);border-color:var(--border-strong)}

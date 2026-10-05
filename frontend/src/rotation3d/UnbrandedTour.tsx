@@ -220,6 +220,7 @@ export default function UnbrandedTour() {
       helperEnd={p.helperEnd}
       loopScrub={p.loopEnabled ?? false}
       driftDirection={p.driftDirection}
+      firstDirection={p.firstDirection}
       driftMode
       captions={view.captions}
       pins={view.pins}

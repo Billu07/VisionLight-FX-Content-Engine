@@ -407,6 +407,7 @@ export default function Rotation3DPlayer() {
       enableLoop={drift ? false : getPlayerBranding().loopByDefault}
       loopScrub={drift ? p.loopEnabled ?? false : true}
       driftDirection={drift ? p.driftDirection : undefined}
+      firstDirection={drift ? p.firstDirection : undefined}
       driftMode={drift}
       captions={view.captions}
       pins={view.pins}

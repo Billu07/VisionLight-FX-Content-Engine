@@ -527,7 +527,8 @@ model DriftProduct {
   status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
   defaultFrame    Int      @default(0)
   loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle
-  driftDirection  String   @default("LTR") // LTR | RTL | TTB | BTT — which way the footage pans; sets the drag axis + helper arrow
+  driftDirection  String   @default("LTR") // LTR | RTL | TTB | BTT — how the clip was SHOT ("Camera Control"); sets the drag axis + which way the drag scrubs forward
+  firstDirection  String?  // LEFT | RIGHT | UP | DOWN — which way the guide arrow points FIRST ("First Direction"), independent of the shoot; null = derived from driftDirection
   ctaPlacement    String   @default("CENTER") // CENTER | LEFT | RIGHT | SPLIT | SPLIT_REV — where the buttons sit in the player
   hideLogo        Boolean  @default(false) // hide the brand logo in the platform player (not just embed)
   hideName        Boolean  @default(false) // hide the brand/profile name in the platform player

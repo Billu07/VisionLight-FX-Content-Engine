@@ -132,6 +132,17 @@ export const parseDirection = (v: unknown): string | null => {
   return DRIFT_DIRECTIONS.has(s) ? s : null;
 };
 
+// "First Direction" (client, 2026-10-06): which way the guide arrow points FIRST. A separate
+// setting from the shoot — "First direction I pick right arrow. Camera control it depends how
+// it was shot" — so it is read on its own and an empty value means "derive it", which is what
+// every drift made before today does.
+const FIRST_DIRECTIONS = new Set(["LEFT", "RIGHT", "UP", "DOWN"]);
+export const parseFirstDirection = (v: unknown): string | null | false => {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).trim().toUpperCase();
+  return FIRST_DIRECTIONS.has(s) ? s : false;
+};
+
 // Where the CTA row sits in the player (per drift). SPLIT = one button at each
 // edge with the primary (Next) on the right; SPLIT_REV puts it on the left.
 const CTA_PLACEMENTS = new Set(["CENTER", "CENTER_REV", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"]);
@@ -1100,6 +1111,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
   driftDirection: p.driftDirection || "LTR",
+  firstDirection: p.firstDirection || null,
   ctaPlacement: p.ctaPlacement || "CENTER",
   // A tour/flow stop: the player sizes it uniformly (no "fill the screen when
   // there's no headline"), so every stop of a path reads the same.

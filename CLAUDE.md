@@ -339,6 +339,23 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     rounds to 0 both before and after the first image arrives — and `--r3d-framebot` stayed at the 0 of
     that first empty draw, for the whole visit. Found while probing the in-frame guide; it matters more
     now that the turn-phone pill has no `--r3d-cuebot` to fall back from.
+  - **First Direction and Camera Control are TWO settings** (2026-10-06, client; needs `prisma db push`) —
+    "It's not camera control vs first direction... They are 2 totally different settings", and in the
+    builder "our first direction on top in the selection and camera control second".
+    **Camera Control** is how the clip was SHOT — Right Pan / Left Pan / Down Tilt / Up Tilt. It IS the
+    long-standing `driftDirection` under its proper name (LTR has always meant "the camera pans right";
+    the old tooltip said so), so the four values and every drift's drag are unchanged — only the words
+    and the position in the form. It still sets the drag axis and which way a drag scrubs forward.
+    **First Direction** is NEW (`DriftProduct.firstDirection`, nullable LEFT|RIGHT|UP|DOWN): which way
+    the guide arrow points first, picked on its own, icons only, no words on the buttons — "First
+    direction I pick right arrow. Camera control it depends how it was shot. I will pick right or left
+    pan." Null = derived as before (a pan opens pointing left, a tilt along its own axis), so nothing
+    already built moves until a creator picks; pressing the chosen icon again hands it back to Auto.
+    The player reads it into `guideFirst` and puts `r3d-point-{left,right,up,down}` on the hint
+    (`setGuidePoint`, called from `syncHelper` and on mount); `placeGuide` takes the EDGE from the same
+    value, because the arrow always stands on the edge it points at. The `.r3d-dir-*` arrow rules are
+    untouched and still serve brand drifts, which keep the old column. **Still owed**: Camera Control's
+    Auto / Lock (the visitor's first swipe deciding the response for the whole tour) — not built yet.
   - **The player's top-left mark** (2026-10-02): a TOUR drift with no brand logo shows drift.li's own
     mark (the icon from frontend/public/drift/icon.svg, inlined — ink tile, white "d", cyan dot) instead of
     the old circular arrow, which meant nothing. A BRAND drift keeps the neutral gradient square: its page
@@ -448,7 +465,10 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   brand via its ADMIN `User.email`.
 - `User`: `email`, `name`, `role` (USER/ADMIN/SUPERADMIN), `view`, `organizationId`,
   `authUserId` (Supabase), `maxProjects`, `isDemo`.
-- `DriftProduct`: manifest (`frames[]`, `frameCount`, `defaultFrame`), optional
+- `DriftProduct`: `driftDirection` (LTR|RTL|TTB|BTT = **Camera Control**, how the clip was shot — the
+  drag axis and which way a drag scrubs forward) + `firstDirection` (LEFT|RIGHT|UP|DOWN|null =
+  **First Direction**, which way the guide arrow points first; null = derived). Also: manifest
+  (`frames[]`, `frameCount`, `defaultFrame`), optional
   `secondManifest` (2-clip loop), `ctaPrimary`/`ctaSecondary` (JSON, drift links),
   captions, `status`, `slug`, org association, per-product toggles (`hideTitle`,
   `mobileZoom`, `loopEnabled`, …).
