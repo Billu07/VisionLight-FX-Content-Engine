@@ -2529,17 +2529,19 @@ const R3D_CSS = `
    on the leading (swipe-direction) side of the text. */
 .r3d-drift .r3d-hint{opacity:.96;flex-direction:column;align-items:flex-start;gap:7px}
 .r3d-drift .r3d-hint.r3d-back{align-items:flex-end}
-/* The arrow leads and the hand follows (client, 2026-10-05) — they simply swapped places;
-   which EDGE of the frame the pair sits on is decided in placeHelperX and is unchanged. */
-.r3d-drift-cue{display:flex;align-items:center;gap:9px;flex-direction:row-reverse}
-.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
+/* The hand leads and the arrow follows. Swapping the two was tried on 2026-10-05 and taken
+   straight back out — the client's note was a mistake on their side, so leave this alone unless
+   someone asks twice. Which EDGE of the frame the pair sits on is a different thing entirely and
+   is decided in placeHelperX. */
+.r3d-drift-cue{display:flex;align-items:center;gap:9px}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
 /* Direction-aware helper: RTL mirrors the LTR arrangement (hand on the right, arrow
    before the text) and swaps back at the end; a side-placed helper (vertical drifts
    beside the frame) stacks hand → text → arrow, centred. */
 .r3d-drift.r3d-dir-rtl .r3d-hint{align-items:flex-end}
 .r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back{align-items:flex-start}
-.r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row}
-.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
+.r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row-reverse}
+.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
 .r3d-drift.r3d-dir-ttb .r3d-hint,.r3d-drift.r3d-dir-btt .r3d-hint,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back{align-items:center}
 .r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */

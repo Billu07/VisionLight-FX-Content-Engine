@@ -328,10 +328,11 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `placeHelperX()`, derived from the same `dirSign` the drag itself uses, so changing a drift's
     direction in the builder moves the cue with it (measured on a 390px phone: LTR 287, RTL 57,
     vertical centred, and 57 again on the return leg). Vertical drifts stay centred upright.
-    **Which way round**: within the cue the ARROW leads and the HAND follows — they simply swapped
-    places (`.r3d-drift-cue` is `row-reverse` by default now, and the `r3d-back` / `r3d-dir-rtl`
-    rules are inverted to match). That is a different request from the edge one; the client had to
-    say "changing the edge was fine, just change the position of hand with the position of arrow".
+    **Which way round**: the HAND leads and the ARROW follows, as it always has. Swapping the two
+    was asked for on 2026-10-05, shipped, and taken straight back out the same day — the note had
+    been a mistake on the client's side ("the flip was a mistake apparently, please swap back").
+    Leave `.r3d-drift-cue` alone unless someone asks twice. It is a separate thing from the edge
+    above, which was right and stayed.
   - **The cue on a phone held SIDEWAYS** (2026-10-05, client) — `placeHelperX` and the hint's
     vertical placement both branch on `corners` before anything else:
     · a **vertical** drift (TTB/BTT) used to strand it in the middle of the screen, so it goes to
