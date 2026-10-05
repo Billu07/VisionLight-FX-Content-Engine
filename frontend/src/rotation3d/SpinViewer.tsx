@@ -692,16 +692,26 @@ export default function SpinViewer({
     attentionRef.current = attn;
 
     // --- one-time intro gesture ("show, don't tell") ---
-    // On a visitor's FIRST drift a hand appears in the MIDDLE of the frame, sways along the
-    // drift's axis and fades for good — 1.5s all told (client, 2026-10-06). It says "this
-    // moves"; the arrow against the frame's edge says which way. It no longer drags the
-    // footage back and forth: that demonstration is what the client asked to have removed,
-    // and doing the gesture FOR the visitor is also what kept stealing the scrub from them.
+    // On a visitor's FIRST drift of a tour a hand appears in the MIDDLE of the frame, carries
+    // the footage a little way along the drift's axis, brings it back and fades — "it was good
+    // when the preview welcome hand moved the frame a little back and forth" (client,
+    // 2026-10-06). A LITTLE: an eighth of the drift, where the demo this replaces took nearly
+    // half of it. It says "this moves"; the arrow against the frame's edge says which way.
     // Once per tour (see handShownFor), and it cancels the instant they touch the drift.
     let introActive = false;
     let userTookOver = false; // touched before / during the demo
     let introStart = 0;
-    const INTRO_MS = 1500, INTRO_IN = 220, INTRO_FADE = 360;
+    let introRange = 0;
+    let introK = 0;   // 0..1 along the demo's travel, shared by the scrub and the finger
+    let introA = 1;   // the finger's opacity
+    const INTRO_IN = 200, INTRO_OUT = 520, INTRO_HOLD = 160, INTRO_BACK = 520, INTRO_FADE = 260;
+    const INTRO_MS = INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK + INTRO_FADE;
+    const introEase = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    // Which way the finger travels. Toward the ARROW, because that is what the visitor reads and
+    // what Auto will honour whichever way they then drag. A LOCKED drift has one true answer, so
+    // there it goes the way that drift actually scrubs forward — a demo must never teach a
+    // gesture the player is going to refuse.
+    const introSign = cameraLock ? baseDirSign : arrowSign || baseDirSign;
     const endIntro = () => {
       if (!introActive) return;
       introActive = false;
@@ -709,6 +719,9 @@ export default function SpinViewer({
       // The demo animates the hand's opacity inline — clear it, or the hand stays on screen.
       if (introHandRef.current) introHandRef.current.style.opacity = "";
       stage.classList.remove("r3d-introing");
+      // yaw is left alone on purpose. Run to the end, the back-swing has already returned it to
+      // the start; cut short by a touch, it belongs to the visitor now and snapping it back is
+      // the yank the old demo used to give.
       dirty = true;
     };
     // A hand stands in the middle of the first drift a visitor opens in a tour. It used to be
@@ -730,6 +743,7 @@ export default function SpinViewer({
       const tourKey = flowNav?.id || (realMode && urls ? urls[0] : "") || "";
       if (handShownFor.has(tourKey)) return;
       handShownFor.add(tourKey);
+      introRange = endYaw * 0.13; // a little way in, and back
       introStart = performance.now();
       introActive = true;
       introHandRef.current?.classList.add("r3d-intro-on");
@@ -1413,11 +1427,29 @@ export default function SpinViewer({
 
     const tick = () => {
       if (!alive) return;
-      // The hand is decorative now, so the drift's physics is never taken away from the
-      // visitor — a drag landing mid-demonstration used to fight it for the scrub.
-      if (idleSpin) yaw += spin * 0.004;
-      else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
-      clampScrub();
+      // While the welcome demo plays it owns the scrub — it is carrying the footage, which is
+      // the whole point of it. A touch ends it first (onDown calls endIntro), so a drag can
+      // never find itself fighting the demo for the same frames.
+      introK = 0; introA = 1;
+      if (introActive) {
+        const et = performance.now() - introStart;
+        if (et >= INTRO_MS) endIntro();
+        else {
+          if (et < INTRO_IN) introA = et / INTRO_IN;
+          else if (et < INTRO_IN + INTRO_OUT) introK = introEase((et - INTRO_IN) / INTRO_OUT);
+          else if (et < INTRO_IN + INTRO_OUT + INTRO_HOLD) introK = 1;
+          else if (et < INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK)
+            introK = 1 - introEase((et - INTRO_IN - INTRO_OUT - INTRO_HOLD) / INTRO_BACK);
+          else introA = 1 - (et - INTRO_IN - INTRO_OUT - INTRO_HOLD - INTRO_BACK) / INTRO_FADE;
+          yaw = introK * introRange;
+          dirty = true;
+        }
+      }
+      if (!introActive) {
+        if (idleSpin) yaw += spin * 0.004;
+        else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
+        clampScrub();
+      }
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
@@ -1448,20 +1480,17 @@ export default function SpinViewer({
         draw();
         lastYaw = yaw; lastZoom = zoom; lastPX = panX; lastPY = panY; dirty = false;
       }
-      // The hand stands in the MIDDLE of the frame and sways along the drift's axis (the
-      // sway is CSS, keyed to the direction class) — in over a fifth of a second, out over
-      // the last third, gone at 1.5s.
+      // The finger starts in the MIDDLE of the frame and carries the footage a little way with
+      // it — the same k that drives the scrub drives its travel, so the two are locked together
+      // and there is no frame of daylight between the hand and the room it is moving.
       if (introActive && introHandRef.current && frameRect.w > 0) {
-        const t = performance.now() - introStart;
         const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
         const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
-        const a = t < INTRO_IN ? t / INTRO_IN
-          : t > INTRO_MS - INTRO_FADE ? (INTRO_MS - t) / INTRO_FADE
-          : 1;
-        introHandRef.current.style.left = fx + fw * 0.5 + "px";
-        introHandRef.current.style.top = fy + fh * 0.5 + "px";
-        introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, a)));
-        if (t >= INTRO_MS) endIntro();
+        const amp = Math.min((vertical ? fh : fw) * 0.1, 46);
+        const off = introK * amp * introSign;
+        introHandRef.current.style.left = fx + fw * 0.5 + (vertical ? 0 : off) + "px";
+        introHandRef.current.style.top = fy + fh * 0.5 + (vertical ? off : 0) + "px";
+        introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, introA)));
       }
       // Insights: the frame on screen, and whether the visitor has taken over from the intro.
       if (attn) attn.sample(((Math.round(yaw / (TWO_PI / FRAMES)) % FRAMES) + FRAMES) % FRAMES, interacted && !introActive);
@@ -2061,9 +2090,15 @@ export default function SpinViewer({
     const reduceMotion = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const slideOn = isSwap && !!flowNav && !!travel && !reduceMotion;
     const shift = (pct: number) =>
-      !slideOn || !travel ? "" : travel.vertical ? `translate3d(0,${pct * travel.sign}%,0)` : `translate3d(${pct * travel.sign}%,0,0)`;
-    const outT = shift(-6);
-    const inT = shift(4);
+      !slideOn || !travel || !pct ? "" : travel.vertical ? `translate3d(0,${pct * travel.sign}%,0)` : `translate3d(${pct * travel.sign}%,0,0)`;
+    // The directional handoff is OFF (client, 2026-10-06). Measured off their own capture: at
+    // every drift change the picture arrived ~34px to one side and eased into place over 420ms,
+    // alternating side with the outgoing drift's direction — which is exactly "a frame glitch at
+    // the start of a load then resets the frame to starting spot". The frames were never wrong;
+    // it was our own animation. The crossfade stays, so a handoff now looks like what a page
+    // reload has always looked like. Put -6 / 4 back here to restore the slide.
+    const outT = shift(0);
+    const inT = shift(0);
     const EASE = "cubic-bezier(.2,.7,.2,1)";
     if (instant || isSwap) {
       if (framesAreIn) {
@@ -2758,14 +2793,9 @@ const R3D_CSS = `
 .r3d-intro svg{width:clamp(30px,8vmin,40px);height:clamp(30px,8vmin,40px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.7))}
 .r3d-intro-ring{position:absolute;width:clamp(46px,12vmin,60px);height:clamp(46px,12vmin,60px);border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.55);box-shadow:0 0 18px rgba(255,255,255,.25)}
 .r3d-intro.r3d-intro-on .r3d-intro-ring{animation:r3dintropulse 1.15s ease-in-out infinite}
-/* It sways where it stands - side to side for a pan, up and down for a tilt. The keyframes
-   carry the -50% centring with them, so the ring travels with the hand instead of being left
-   behind by it. */
-.r3d-intro.r3d-intro-on{animation:r3dintrosway 1.15s ease-in-out infinite}
-.r3d-dir-ttb .r3d-intro.r3d-intro-on,.r3d-dir-btt .r3d-intro.r3d-intro-on{animation-name:r3dintroswayv}
-@keyframes r3dintrosway{0%,100%{transform:translate(calc(-50% - 13px),-50%)}50%{transform:translate(calc(-50% + 13px),-50%)}}
-@keyframes r3dintroswayv{0%,100%{transform:translate(-50%,calc(-50% - 13px))}50%{transform:translate(-50%,calc(-50% + 13px))}}
-@media (prefers-reduced-motion:reduce){.r3d-intro.r3d-intro-on{animation:none}}
+/* No sway on the spot: since 2026-10-06 the finger TRAVELS, carrying the footage with it, and
+   draw() places it every frame — a keyframe animation on top would fight that and double the
+   motion. Only the ring still pulses. */
 @keyframes r3dintropulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.08);opacity:.95}}
 /* during the demo, hide the resting hint so there's just the one moving finger */
 .r3d-introing .r3d-hint{opacity:0!important}

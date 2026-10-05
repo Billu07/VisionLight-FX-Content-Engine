@@ -326,13 +326,20 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     one SpinViewer carries the DOM across every swap. Nothing sits under the frame any more, so
     `--r3d-cuebot` is never published and the "turn your phone" pill hangs off `--r3d-framebot` again.
     Brand drifts, the hero takeover and Rotation3D keep the column — do NOT widen `guideCue`.
-  - **And ONE hand, in the middle, once** (2026-10-06, client): the first drift a visitor ever opens
-    stands a hand in the MIDDLE of the frame for 1.5s, swaying along the drift's axis (`r3dintrosway` /
-    `r3dintroswayv`, keyframes that carry the -50% centring so the ring travels with the hand), then
-    fades for good. It no longer DRAGS the footage: "the other hand animation ... for the first back and
-    forth, that one can be removed". `startIntro` therefore never touches `yaw`, and tick()'s physics is
-    no longer wrapped in `if (!introActive)` — a drag landing mid-demonstration used to fight it for the
-    scrub. Still started by the tips on their way out (`startIntroRef`) so it plays on the drift the
+  - **And ONE hand, in the middle, carrying the frame a little** (2026-10-06, client): the first drift
+    a visitor opens in a tour stands a hand in the MIDDLE of the frame, carries the footage a little way
+    along the drift's axis, brings it back and fades. **A LITTLE**: `introRange = endYaw * 0.13`, where
+    the old demo took 0.45 of the drift. It went through a wordless no-scrub version for half a day —
+    the client had asked for "the other hand animation ... for the first back and forth" to be removed,
+    which turned out to mean the small hand in the under-frame CUE, not this one: "it was good when the
+    preview welcome hand moved the frame a little back and forth". So the scrub is back. One `introK`
+    drives both the `yaw` and the finger's travel, so there is never a frame of daylight between the
+    hand and the room it is moving, and the CSS sway is gone (it would double the motion). Which way it
+    travels: toward the ARROW, since that is what a visitor reads and what Auto honours whichever way
+    they then drag — except on a LOCKED drift, which has one true answer, so there it goes the way that
+    drift actually scrubs forward. `endIntro` leaves `yaw` alone: run to the end the back-swing has
+    already returned it, and cut short by a touch it belongs to the visitor, where the old demo's
+    unconditional reset was a yank. Still started by the tips on their way out (`startIntroRef`) so it plays on the drift the
     visitor landed on, not the next one.
     **When it plays** (fixed 2026-10-06, after the user reported "I only see arrow now from the start"):
     the hand was never removed — it was gated on `drift-intro-seen` in localStorage, ONCE EVER PER
@@ -559,8 +566,14 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`flowNavPayload` in `routes/drift.ts`: the flow's viewable stops in order + this drift's `index`;
   null for brand drifts / other routes). `Rotation3DPlayer` passes it as `flowNav` → `SpinViewer`
   renders the progress dots top-middle (`.r3d-stops`), the page · tour · drift title lines, the
-  hand-icon helper cue and "Tour Powered by", and slides drift→drift along the OUTGOING drift's
-  direction (`prevDirRef`). (The end-of-tour card was removed in Tour v2 — tours loop.) Everything is gated on `flowNav`, so brand drifts are
+  hand-icon helper cue and "Tour Powered by". The drift→drift handoff is a CROSSFADE ONLY since
+  2026-10-06 — the directional slide is off (`outT`/`inT` are `shift(0)`; put -6 / 4 back to
+  restore it). The client called it "a frame glitch at the start of a load then resets the frame
+  to starting spot", and measuring their own capture (ref09.mp4) proved them right about what
+  they were seeing: at every stop the picture's own left edge arrived ~34px to one side and eased
+  into place over 420ms, alternating side with `prevDirRef`, while the drawn rect's size never
+  changed. No frame was ever wrong — it was our animation. `prevDirRef` and `travel` are kept, so
+  the slide is two numbers away. (The end-of-tour card was removed in Tour v2 — tours loop.) Everything is gated on `flowNav`, so brand drifts are
   untouched. Builder: `RouteInk` (TourBuilder) draws the rail as an inked route from the items'
   pin positions (`:scope > .t-route-item`, pin centre = offsetTop + 33); `ShareSheet.tsx` is the
   publish moment (link + copy + QR via `qrcode-generator` + system share), also behind "Share".
