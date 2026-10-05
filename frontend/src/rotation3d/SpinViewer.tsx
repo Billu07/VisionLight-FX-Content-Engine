@@ -337,6 +337,9 @@ export default function SpinViewer({
   const poweredRef = useRef<HTMLElement>(null);
   const legalRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
+  // The effect publishes its one-time "this moves" demo here so the tips can start it the
+  // moment they close, on the first drift rather than the next one.
+  const startIntroRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -467,8 +470,15 @@ export default function SpinViewer({
     let corners = false;
     let frameTop = -1;
     let cueBot = -1;
-    // A new drift starts without the offer; the flag below decides whether it earns it.
-    stage.classList.remove("r3d-fsfirst");
+    // The ground beside the footage, measured while the drift is at REST. Zooming grows the
+    // footage and would shrink the chrome away with it — the client watched Menu disappear as
+    // they pinched (2026-10-06) — so the buttons keep the size they had before the zoom.
+    let baseSide = -1;
+    // A new drift starts without the last one's shape on it. These classes are toggled only
+     // when the measured value CHANGES, and the flags above reset to false on every mount — so a
+     // portrait room opened after a landscape one kept `r3d-wide` and was told to turn the phone
+     // (client's ref06, 2026-10-06). Clearing them here is what makes the flags true again.
+    stage.classList.remove("r3d-fsfirst", "r3d-wide", "r3d-corners");
     // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
     // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
     if (isInAppBrowser()) stage.classList.add("r3d-inapp");
@@ -611,11 +621,14 @@ export default function SpinViewer({
     // A hand drags across the first drift a visitor ever opens, once ever. It used to be the
     // lesson, then the coach's nudge; with the lesson now on its own screen before the tour
     // (TourTips) it is back to what it always was - one wordless "this moves".
+    startIntroRef.current = () => startIntro();
     const startIntro = () => {
       if (introActive || userTookOver || !driftMode || !introHint || FRAMES < 4) return;
       // Respect reduced-motion: skip the auto-demo (the cue under the frame still guides).
       if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
-      // Someone who has just been shown the tips does not need it demonstrated as well.
+      // While the tips are up the drift is only loading behind them; the demo would play to
+      // nobody and the visitor would meet it on their SECOND drift instead (client's ref05,
+      // 2026-10-06). It is started again when the tips close — see startIntroRef.
       if (tipsRef.current) return;
       try {
         if (localStorage.getItem("drift-intro-seen")) return;
@@ -953,8 +966,11 @@ export default function SpinViewer({
         stage.classList.toggle("r3d-corners", wantCorners);
       }
       // How much ground there is beside the footage, so the corner buttons can be sized to it and
-      // kept off the picture (client: "too close to frame ... there's room").
-      if (wantCorners) stage.style.setProperty("--r3d-side", Math.round(sideGap) + "px");
+      // kept off the picture (client: "too close to frame ... there's room"). Taken at rest only.
+      if (wantCorners) {
+        if (zoom <= 1.02 || baseSide < 0) baseSide = sideGap;
+        stage.style.setProperty("--r3d-side", Math.round(baseSide) + "px");
+      }
       // Where the footage starts, so the fullscreen button sits just above it rather than in the
       // far corner of an empty screen (client's refine1.jpeg).
       const topCss = Math.round(frameRect.y / DPR);
@@ -1007,11 +1023,12 @@ export default function SpinViewer({
         let topPx: number;
         if (corners && realMode && frameRect.h > 0) {
           // Sideways: level with the bottom of the footage for a vertical drift, and under the
-          // Prev/Next row (they stand at bottom:38%) for a horizontal one.
+          // Prev/Next row for a horizontal one — they stand at bottom:19% since 2026-10-06, so
+          // the row's own bottom edge is at 81% of the height.
           const hintH = hintRef.current.offsetHeight || handH + 7 + cueH;
           topPx = vertical
             ? Math.max(12, (frameRect.y + frameRect.h) / DPR - hintH - 16)
-            : Math.max(12, Math.min(stageH - hintH - 10, stageH * 0.62 + 12));
+            : Math.max(12, Math.min(stageH - hintH - 8, stageH * 0.81 + 10));
         } else if (underFrame) {
           const frameBottomCss = (frameRect.y + frameRect.h) / DPR;
           const hintH = hintRef.current.offsetHeight || handH + 7 + cueH;
@@ -2261,7 +2278,11 @@ export default function SpinViewer({
       {tips && (
         <TourTips
           touch={typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)")?.matches ?? false)}
-          onDone={() => setTips(false)}
+          onDone={() => {
+            setTips(false);
+            // Straight into the demonstration on the drift they have just landed on.
+            window.setTimeout(() => startIntroRef.current?.(), 60);
+          }}
         />
       )}
 
@@ -2695,13 +2716,13 @@ const R3D_CSS = `
    clear of the picture, and the TYPE scales with whatever is left. So it is as large as the room
    allows on a generous clip and still lands beside the footage on a tight one - a 16:9 clip on a
    19.5:9 phone leaves about 75px, which a fixed size cannot fit. */
+/* All three the same width, so Menu lines up with Next (client, 2026-10-06) — and that width is
+   the ground beside the footage less a 12px gap, so no clip or screen can push them onto the
+   picture. Less thick than they were: the client wanted the height taken down. */
 .r3d-corners .r3d-ctas.r3d-tournav .r3d-cta{position:absolute;pointer-events:auto;min-width:0;flex:none;
   white-space:nowrap;overflow:hidden;
-  /* A little bigger (client, 2026-10-05) and still sized BY the ground, so no clip or screen can
-     push them onto the picture: the width is that ground less a 12px gap, and the type is capped
-     at a fifth of it. */
-  max-width:calc(var(--r3d-side,96px) - 12px);
-  padding:clamp(11px,3.2vmin,15px) clamp(7px,1.9vmin,13px);
+  width:calc(var(--r3d-side,96px) - 12px);
+  padding:clamp(8px,2.4vmin,12px) clamp(6px,1.6vmin,11px);
   font-size:min(clamp(13px,3.4vmin,18px),calc(var(--r3d-side,96px) * 0.2))}
 /* The corner itself. Menu used to sit one icon's height down, under the fullscreen button; on a
    phone held sideways that button is never there — the turn already filled the screen — so the
@@ -2714,8 +2735,9 @@ const R3D_CSS = `
    2026-10-03: "take the next and prev button almost to the halfway of the frame from the
    bottom"). A share of the height rather than a fixed distance, so it holds its place on any
    screen. */
-.r3d-corners .r3d-nav-prev{bottom:38%;left:8px}
-.r3d-corners .r3d-nav-next{bottom:38%;right:8px}
+/* Lower than halfway — the positions the client drew on ref01 (2026-10-06). */
+.r3d-corners .r3d-nav-prev{bottom:19%;left:8px}
+.r3d-corners .r3d-nav-next{bottom:19%;right:8px}
 /* The branding stacks here: the mark, then the page, the tour and the drift under it (the
    client's own sketch, 2026-10-03). Side by side it ran a long way across the top of the room;
    stacked it keeps to the corner. The lines already cut themselves off with an ellipsis. */
@@ -2817,8 +2839,11 @@ const R3D_CSS = `
 /* Directly under Menu, not in the bottom corner (client, 2026-10-03). One icon's height plus a
    gap below Menu's top, and the same right edge, so the three read as one column down the ground
    beside the footage. */
+/* Halfway between Menu and Next for height (client, 2026-10-06). Menu's bottom is its top inset
+   plus one button, Next's top is 81% less one button — the button height cancels, so the midpoint
+   is simply half of (the top inset + 81%), and the column is centred on it. */
 .r3d-stage.r3d-corners .r3d-zoomcol{display:flex;bottom:auto;right:12px;
-  top:calc(max(14px,env(safe-area-inset-top)) + clamp(34px,9.5vmin,44px) + 12px)}
+  top:calc(40.5% + max(7px,env(safe-area-inset-top) / 2));transform:translateY(-50%)}
 /* Filling the screen, the footage IS the background — the ground never shows. (Not when
    it is pillarboxed: there the ground is exactly what the buttons sit on.) */
 /* Edge to edge, the footage covers the wash, so it only costs a paint — EXCEPT on a phone,

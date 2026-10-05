@@ -320,7 +320,9 @@ function StepCard({
               </span>
             )}
             {p?.playerPath && isReady(status) && (
-              <a className="d-btn ghost sm" href={p.playerPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+              /* Same window, not a new one (client, 2026-10-06): a builder is a place you step out
+                 of and come back to, and a new tab per drift piles them up. */
+              <a className="d-btn ghost sm" href={p.playerPath} style={{ textDecoration: "none" }}>
                 Open
               </a>
             )}
@@ -992,7 +994,7 @@ export default function TourBuilder({
           {/* Pressed after every upload, to go and look at the drift just made — so it reads at
               a glance. Soft rather than filled: the filled one in this row is Publish or Share. */}
           {flow.entryPath && (
-            <a className="d-btn soft t-start" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <a className="d-btn soft t-start" href={flow.entryPath} style={{ textDecoration: "none" }}>
               ▶ Start Tour
             </a>
           )}
