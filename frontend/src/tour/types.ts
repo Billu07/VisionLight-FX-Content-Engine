@@ -205,8 +205,9 @@ export type PublicFlow = {
   hidden: boolean;
   /** the site's demo tour or the page's own "View Demo" (only on the pathway endpoint) */
   isDemo?: boolean;
-  /** saved to the Drift channel: who made it (their page) */
-  credit?: { name: string; path: string | null } | null;
+  /** saved to the Drift channel: who made it (their page). `show:false` = one of our own
+   *  pages filmed it, so there is nobody to credit; it is still a feature either way. */
+  credit?: { name: string; path: string | null; show?: boolean } | null;
   pageSlug: string | null;
   pageName: string | null;
   pagePath: string | null;

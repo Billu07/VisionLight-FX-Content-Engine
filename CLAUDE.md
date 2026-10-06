@@ -895,6 +895,14 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
   (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
+- **The pathway shows the tour's cover photo** (2026-10-07, client): beside the title on a desktop,
+  stacked above it under 560px, with a small expand button on its top-left corner — the client's own
+  suggestion. The whole thumbnail opens it full screen (`.tpw-lightbox`), closed by the X, a click anywhere,
+  or Escape. The picture is `flow.coverUrl || flow.thumb`, so a tour with no cover of its own shows its first
+  drift's frame. The overlay is **portalled into `.drift-ui.d-page`**: `.tpw` is a `.t-rise` section, those
+  animate, an animating element is a containing block, and a `position:fixed` overlay inside one covers the
+  section instead of the page — which is exactly what it did before the portal (seen in the shot).
+  EnquirySheet portals for the same reason.
 - **Every landing's hero is one centred column on a phone** (2026-09-29, client): below each page's own split
   point — 1024px for the product landings and the home, 960px for /tour — the kicker, headline, lead, tags and
   CTAs centre, which is what /path (`layout="stack"`) has always looked like at every width. Desktop is

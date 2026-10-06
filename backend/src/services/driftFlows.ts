@@ -133,6 +133,19 @@ export const publicCredit = (settings: unknown): { name: string; path: string | 
   return c ? { name: c.pageName, path: c.pageSlug ? pagePublicPath(c.pageSlug) : null } : null;
 };
 
+/** Is the page that filmed a featured tour one of OURS? A page with a superadmin on it is the
+ *  platform's own, and crediting ourselves on our own channel says nothing (client, 2026-10-07:
+ *  "if that drift is from the picdrift account, we don't need that credit card"). Asked per
+ *  pathway load rather than stamped at save time, so entries made before today behave too. */
+export const creditIsOurs = async (pageId: string | null | undefined): Promise<boolean> => {
+  if (!pageId) return false;
+  const su = await prisma.user.findFirst({
+    where: { organizationId: pageId, role: "SUPERADMIN" },
+    select: { id: true },
+  });
+  return !!su;
+};
+
 /** A tour drift's background until its creator picks one: drift.li's own dark ground. */
 export const TOUR_DEFAULT_BACKGROUND = "#0d1119";
 

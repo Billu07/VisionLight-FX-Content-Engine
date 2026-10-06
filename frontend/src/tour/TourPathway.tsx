@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import type { Page, PublicFlow } from "./types";
@@ -50,6 +51,28 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   // Featured on the Drift channel: the tour is someone else's, and the credit says whose. The
   // page's own name, logo and contact belong to a page that owns its tours, not to this one.
   const featured = !!flow.credit;
+  // The tour's cover photo: the creator's own if they set one, else the first drift's frame.
+  const cover = flow.coverUrl || flow.thumb || null;
+  const [big, setBig] = useState(false);
+  // Escape closes the cover, like any other overlay on these pages.
+  useEffect(() => {
+    if (!big) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setBig(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [big]);
+  // The full-screen cover has to leave this section: a .t-rise block animates, which makes it a
+  // containing block, and a position:fixed overlay inside one covers the section instead of the
+  // page. EnquirySheet portals into the page root for the same reason.
+  const coverHost = typeof document !== "undefined" ? document.querySelector(".drift-ui.d-page") : null;
+  const coverLightbox = (
+    <div className="tpw-lightbox" role="dialog" aria-modal="true" aria-label="Cover photo" onClick={() => setBig(false)}>
+      <img src={cover || ""} alt={flow.title || flow.name} />
+      <button type="button" className="tpw-lightbox-x" onClick={() => setBig(false)} aria-label="Close">
+        ✕
+      </button>
+    </div>
+  );
   return (
     <div className={`tpw t-rise ${featured ? "tpw-featured" : ""}`}>
       {/* A demo tour carries no page branding or messages — it stands on its own — but it still
@@ -68,7 +91,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
               ← {page.name} Tours
             </Link>
             <span className="t-inline">
-              {flow.credit &&
+              {flow.credit && flow.credit.show !== false &&
                 (flow.credit.path ? (
                   <Link className="d-btn sm tpw-credit" to={flow.credit.path} title={`See more from ${flow.credit.name}`}>
                     Captured by <b>{flow.credit.name}</b>
@@ -91,8 +114,25 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
       {/* No kind line here: the header already reads "drift.li TOUR", the way back reads
           "Drift Tours", and the tour's own name is the next thing on the page. A fourth
           "tour" in the same corner is what the client saw (issue33, 2026-09-26). */}
-      <h1 className="tpw-title">{flow.title || flow.name}</h1>
-      {flow.description && <p className="tpw-desc">{flow.description}</p>}
+      <div className="tpw-head">
+        {cover && (
+          /* The cover photo beside the title, with the expand button on it (client, 2026-10-07).
+             The whole thumbnail opens it, and the button is there to say that it does. */
+          <button type="button" className="tpw-cover" onClick={() => setBig(true)} title="See the Cover Photo" aria-label="See the cover photo">
+            <img src={cover} alt="" />
+            <span className="tpw-cover-btn" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
+            </span>
+          </button>
+        )}
+        <div className="tpw-head-text">
+          <h1 className="tpw-title">{flow.title || flow.name}</h1>
+          {flow.description && <p className="tpw-desc">{flow.description}</p>}
+        </div>
+      </div>
+      {cover && big && (coverHost ? createPortal(coverLightbox, coverHost) : coverLightbox)}
 
       <ol className="tpw-rail">
         {first && (

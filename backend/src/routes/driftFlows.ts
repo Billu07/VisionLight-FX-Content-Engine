@@ -76,6 +76,8 @@ import {
   uniqueFlowSlug,
   type CreatorCta,
   type FlowKind,
+  creditIsOurs,
+  creditOf,
 } from "../services/driftFlows";
 
 // Creator API for drift flows (drift.li/tour | view | memory | path).
@@ -1063,9 +1065,18 @@ router.get("/api/drift/public/pages/:page/flows/:slug", async (req: Authenticate
   if (!flow) return res.status(404).json({ error: "Not found", page: serializePage(org) });
   const shown = await resolveFeature(flow);
   if (!shown) return res.status(404).json({ error: "Not found", page: serializePage(org) });
-  // A demo (the site's, or this page's own "View Demo") is shown without the page's back link.
-  const isDemo = flow.isDemo || pageSettingsOf(org).demoFlowId === flow.id;
-  res.json({ page: serializePage(org), flow: { ...serializePublicFlow(shown), isDemo } });
+  // Only the SITE's demo is shown stripped of the page's branding, with its way back pointing at
+  // drift.li's own channel. A creator's own "View Demo" pick is just one of THEIR tours: it used
+  // to take the same treatment, so their own menu lost their name and offered "← Drift Tours"
+  // (client, 2026-10-07: "that tour is not a drift tour, that is my account's tour").
+  const isDemo = !!flow.isDemo;
+  const pub = serializePublicFlow(shown);
+  // A tour one of our own pages filmed carries no "Captured by" — see creditIsOurs. The page id
+  // comes from the stored credit rather than the public one, which has no business carrying it.
+  const credit = pub.credit && (await creditIsOurs(creditOf(shown.settings)?.pageId))
+    ? { ...pub.credit, show: false }
+    : pub.credit;
+  res.json({ page: serializePage(org), flow: { ...pub, credit, isDemo } });
 });
 
 // ───────────────────────────── steps ─────────────────────────────

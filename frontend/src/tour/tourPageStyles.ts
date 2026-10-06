@@ -92,6 +92,30 @@ export const TOUR_PAGE_STYLES = `
 .tpw-brand img{width:34px;height:34px;border-radius:10px;object-fit:contain;background:var(--surface);border:1px solid var(--border);padding:4px}
 .tpw-title{margin:4px 0 0;font-size:clamp(28px,5.4vw,44px);line-height:1.04;letter-spacing:-.03em;font-weight:800;color:var(--text);overflow-wrap:anywhere}
 .tpw-desc{margin:10px 0 0;color:var(--muted);font-size:15px;line-height:1.55}
+/* The cover photo beside the title (client, 2026-10-07). It stacks above it on a phone, where
+   there is no room for a column beside a headline that already wraps. */
+.tpw-head{display:flex;align-items:flex-start;gap:16px;margin-top:4px}
+.tpw-head-text{min-width:0;flex:1}
+.tpw-head .tpw-title{margin-top:0}
+.tpw-cover{position:relative;flex:none;width:clamp(104px,22vw,148px);aspect-ratio:4/3;padding:0;border-radius:14px;overflow:hidden;
+  border:1px solid var(--border);background:var(--surface-3);cursor:zoom-in;box-shadow:var(--shadow-sm);transition:border-color .16s,transform .2s}
+.tpw-cover:hover{border-color:var(--accent-border);transform:translateY(-2px)}
+.tpw-cover img{width:100%;height:100%;object-fit:cover;display:block}
+/* Top left of the thumbnail, which is where the client asked for it. */
+.tpw-cover-btn{position:absolute;left:7px;top:7px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  color:#fff;background:rgba(11,15,25,.6);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px)}
+.tpw-cover-btn svg{width:14px;height:14px}
+.tpw-lightbox{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;
+  background:rgba(6,9,16,.92);backdrop-filter:blur(6px);cursor:zoom-out;animation:tpwfade .18s ease}
+.tpw-lightbox img{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.tpw-lightbox-x{position:absolute;right:16px;top:16px;width:40px;height:40px;border-radius:12px;font-size:17px;line-height:1;
+  color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);cursor:pointer}
+.tpw-lightbox-x:hover{background:rgba(255,255,255,.2)}
+@keyframes tpwfade{from{opacity:0}to{opacity:1}}
+@media(max-width:560px){
+  .tpw-head{flex-direction:column;gap:12px}
+  .tpw-cover{width:100%;max-width:280px;aspect-ratio:16/10}
+}
 .tpw-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 .tpw-rail{list-style:none;margin:24px 0 0;padding:0 0 0 50px;position:relative;display:grid;gap:12px}
 .tpw-rail::before{content:"";position:absolute;left:18px;top:28px;bottom:36px;width:2px;border-radius:2px;background:var(--accent);opacity:.4}
