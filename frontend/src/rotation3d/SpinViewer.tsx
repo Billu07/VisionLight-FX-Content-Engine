@@ -203,7 +203,10 @@ const FILL_MAX_MISMATCH = 1;
  * does the asking, since turning the phone fills the screen by itself. Keyed to the drift, so
  * the offer survives a re-render of the same one and never follows the visitor to the next.
  */
-let fsOfferedFor: string | null = null;
+// 2026-10-07: the fullscreen button used to be offered on the FIRST landscape drift of a visit
+// and never again, so a visitor met it once and then had no way back out of fullscreen (client).
+// It is now on every landscape drift that can use it — see the [data-fs] rules — and this flag is
+// gone. `r3d-fsfirst` is no longer set by anything.
 // Which tours have already had their one hand this page session. Keyed by the flow, because the
 // client asked for it on "the first drift of the tour" - a visitor who opens a second tour meets
 // it again there, and one who carries on through this tour does not. Module scope, so it survives
@@ -535,7 +538,7 @@ export default function SpinViewer({
      // when the measured value CHANGES, and the flags above reset to false on every mount — so a
      // portrait room opened after a landscape one kept `r3d-wide` and was told to turn the phone
      // (client's ref06, 2026-10-06). Clearing them here is what makes the flags true again.
-    stage.classList.remove("r3d-fsfirst", "r3d-wide", "r3d-corners");
+    stage.classList.remove("r3d-wide", "r3d-corners");
     // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
     // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
     if (isInAppBrowser()) stage.classList.add("r3d-inapp");
@@ -581,6 +584,25 @@ export default function SpinViewer({
       el.style.top = Math.round(Math.max(PAD, Math.min(stageH - h - PAD, top))) + "px";
       el.style.transform = "none";
     };
+    // A TOUR drift fills the screen, so the document under it has nothing to scroll — and a
+    // scrollable document under a fixed, full-screen overlay is what makes iOS Safari land a
+    // touch somewhere other than where it painted the thing you aimed at (client, 2026-10-07:
+    // "the button touch is all shifted up" with tabs open). Locking it also takes away the last
+    // route to pull-to-refresh. Restored on unmount, so a brand drift in a scrolling page and
+    // the builder's preview are untouched.
+    const lockDoc = driftMode && !!flowNav && !hero && !landing;
+    const docEl = document.documentElement;
+    const prevDoc = lockDoc
+      ? { ovf: docEl.style.overflow, osb: docEl.style.overscrollBehavior,
+          bovf: document.body.style.overflow, bosb: document.body.style.overscrollBehavior }
+      : null;
+    if (lockDoc) {
+      docEl.style.overflow = "hidden";
+      docEl.style.overscrollBehavior = "none";
+      document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "none";
+    }
+
     const placeHelperX = () => {
       const el = hintRef.current;
       if (!driftMode || !el || frameRect.w <= 0) return;
@@ -682,7 +704,7 @@ export default function SpinViewer({
       showHand();
     }
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
-    let touchZoomed = false;
+    let touchAction = "";
     let scrimHidden = false;
     let interacted = false;
     let raf = 0;
@@ -744,8 +766,11 @@ export default function SpinViewer({
       if (handShownFor.has(tourKey)) return;
       handShownFor.add(tourKey);
       introRange = endYaw * 0.13; // a little way in, and back
-      introStart = performance.now();
+      // ARMED, not started: the clock begins on the first frame there is actually something to
+      // carry (see tick), so a cold open does not spend the demo's life on an empty canvas.
+      introStart = 0;
       introActive = true;
+      if (introHandRef.current) introHandRef.current.style.opacity = "0";
       introHandRef.current?.classList.add("r3d-intro-on");
       stage.classList.add("r3d-introing"); // hides the resting hint during the demo
     };
@@ -1061,12 +1086,6 @@ export default function SpinViewer({
         wideClip = wantWide;
         stage.classList.toggle("r3d-wide", wantWide);
         syncFsIcon();
-        // Taught once: the first landscape drift shows the button, the rest rely on the hint.
-        const driftKey = (realMode && urls ? urls[0] : "") || "";
-        if (wantWide && (fsOfferedFor === null || fsOfferedFor === driftKey)) {
-          fsOfferedFor = driftKey;
-          stage.classList.add("r3d-fsfirst");
-        }
       }
       if (wantCorners !== corners) {
         corners = wantCorners;
@@ -1431,7 +1450,8 @@ export default function SpinViewer({
       // the whole point of it. A touch ends it first (onDown calls endIntro), so a drag can
       // never find itself fighting the demo for the same frames.
       introK = 0; introA = 1;
-      if (introActive) {
+      if (introActive && !introStart && frameRect.w > 0) introStart = performance.now();
+      if (introActive && introStart) {
         const et = performance.now() - introStart;
         if (et >= INTRO_MS) endIntro();
         else {
@@ -1456,10 +1476,16 @@ export default function SpinViewer({
       panY += (panTY - panY) * 0.2;
       // At rest, let the browser scroll the page vertically (touch-action pan-y);
       // once zoomed in, capture all gestures so drag can pan to inspect.
-      const zoomedNow = zoomTarget > 1.05;
-      if (zoomedNow !== touchZoomed) {
-        touchZoomed = zoomedNow;
-        stage.style.touchAction = zoomedNow ? "none" : "pan-y";
+      // A TILT drift takes the vertical axis for itself (client, 2026-10-07): handing it to the
+      // page with pan-y is exactly what let Safari steal a downward drag for pull-to-refresh —
+      // in an in-app browser that closes the whole thing. A pan drift still gives the page its
+      // vertical scroll, which is what lets a brand drift sit in a long page. Tracked by VALUE,
+      // not by the zoom's change: gating it on the zoom meant the line never ran at all until
+      // someone pinched, so a tilt drift kept the stylesheet's pan-y for its whole life.
+      const wantTouch = zoomTarget > 1.05 || vertical ? "none" : "pan-y";
+      if (wantTouch !== touchAction) {
+        touchAction = wantTouch;
+        stage.style.touchAction = wantTouch;
       }
       // Once zoomed in a bit, fade the top/bottom scrims — otherwise a product
       // zoomed to fill the screen gets washed out by them (esp. on light bg).
@@ -1483,7 +1509,7 @@ export default function SpinViewer({
       // The finger starts in the MIDDLE of the frame and carries the footage a little way with
       // it — the same k that drives the scrub drives its travel, so the two are locked together
       // and there is no frame of daylight between the hand and the room it is moving.
-      if (introActive && introHandRef.current && frameRect.w > 0) {
+      if (introActive && introStart && introHandRef.current && frameRect.w > 0) {
         const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
         const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
         const amp = Math.min((vertical ? fh : fw) * 0.1, 46);
@@ -2178,6 +2204,12 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
+      if (prevDoc) {
+        docEl.style.overflow = prevDoc.ovf;
+        docEl.style.overscrollBehavior = prevDoc.osb;
+        document.body.style.overflow = prevDoc.bovf;
+        document.body.style.overscrollBehavior = prevDoc.bosb;
+      }
       foreground?.release();
       if (attentionRef.current === attn) attentionRef.current = null;
       attn?.close();
@@ -2757,6 +2789,9 @@ const R3D_CSS = `
 .r3d-drift.r3d-dir-ttb .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgev}
 .r3d-drift.r3d-dir-btt .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgevback}
 .r3d-dir-ttb .r3d-drift-hand,.r3d-dir-btt .r3d-drift-hand{animation-name:r3dswayv}
+/* A tilt drift owns the vertical axis from the first paint, before any tick has run — a drag in
+   the opening moments is exactly when a browser is most likely to read it as pull-to-refresh. */
+.r3d-stage.r3d-drift.r3d-dir-ttb,.r3d-stage.r3d-drift.r3d-dir-btt{touch-action:none}
 .r3d-dir-ttb canvas,.r3d-dir-btt canvas{touch-action:pan-x}
 @keyframes r3dswayv{0%,100%{transform:translateY(-10px)}50%{transform:translateY(10px)}}
 @keyframes r3darrownudgev{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
@@ -2946,23 +2981,23 @@ const R3D_CSS = `
   .r3d-stage .r3d-stops{display:none}
 }
 
-/* A1: a landscape drift held upright gets the one button that fills the screen. Everything
-   else on a phone drift stays hidden (see the rule that hides reset + fullscreen below). */
+/* A landscape drift on a phone gets the fullscreen button on EVERY stop, not just the first one
+   of a visit (client, 2026-10-07) — a visitor who met it once then had no way back OUT of
+   fullscreen. An iPhone or iPad is the exception and is handled by the .r3d-ios rule below. */
+@media (pointer: coarse){
+  .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+}
 @media (pointer: coarse) and (orientation: portrait){
-  /* Inside an app's own browser, where turning the phone may not hand the screen over at all -
-     and on the FIRST landscape drift of a visit anywhere, so the way to fill the screen is shown
-     once rather than only described (client, 2026-10-02). Every landscape drift after that has
-     the line below it, which is what the client asked for in place of a permanent button. */
-  .r3d-drift.r3d-wide:is(.r3d-inapp,.r3d-fsfirst) [data-fs]{display:inline-grid!important}
-  /* "Turn your phone for the full view" is no longer a flash after a tap — it stands under the
-     drift the whole time a landscape clip is held upright, the only state where it means
-     anything (client, 2026-10-02: "should be on the screen on mobile always"). */
-  .r3d-drift.r3d-wide .r3d-turnhint{opacity:1}
-  /* Beside the drift, not in the far corner of an empty screen: a landscape drift held upright
-     leaves a lot of dead space above the frame and the button sat at the top of it (client's
-     refine1.jpeg). --r3d-frametop is where the footage begins, set each frame in draw(). */
+  /* In the footage's own bottom-right corner, which is where a video player puts it and what the
+     client asked for in place of the sentence ("the icon and placement they are already familiar
+     with from fb and tik tok standards"). --r3d-framebot is the frame's bottom edge, set each
+     frame in draw(). */
   .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
-    top:calc(var(--r3d-frametop,120px) - clamp(32px,9vmin,40px) - 12px)}
+    top:calc(var(--r3d-framebot,60%) - clamp(32px,9vmin,40px) - 14px)}
+  /* The sentence stands only where there is no button to offer instead. On an iPhone or iPad
+     turning the device IS the answer, so there it still says so; everywhere else the icon says
+     it better and in fewer words. */
+  .r3d-drift.r3d-wide.r3d-ios .r3d-turnhint{opacity:1}
 }
 
 /* An iPhone or iPad has no fullscreen to give a web page and no orientation lock, so the button
@@ -3005,7 +3040,10 @@ const R3D_CSS = `
    Turning the device already took the player over the screen, so the button that offers
    the same thing only gets in the way. And on a phone the room is the point: the legal
    line and the credit belong to the pages around the drift, which still carry both. */
-.r3d-auto-fs .r3d-iconbtn[data-fs]{display:none}
+/* 2026-10-07: this used to hide the button once turning the device had taken the screen, so on
+   Android there was no way back out of fullscreen except turning the phone again. The client
+   asked for it to stay. An iPhone never has it at all (the .r3d-ios rule), which is the case
+   this was really written for. */
 /* Any TOUCH screen, either way up — not a width. A phone turned sideways is ~844px wide, so
    a width rule stopped matching exactly where it mattered most: the fullscreen landscape
    player, which is the one place the client wanted them gone (2026-09-26). A desktop keeps

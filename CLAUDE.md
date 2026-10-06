@@ -238,13 +238,17 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     (client, 2026-10-02) — and the pill steps BELOW the cue, because `draw()`
     publishes `--r3d-cuebot` while the cue is sitting there and the pill's `top` reads
     `var(--r3d-cuebot, var(--r3d-framebot))`. Before that the cue floated in the middle of the band and
-    the two sat level with each other (client's refine3.jpeg, 2026-10-02). The `[data-fs]` button is
-    there inside an app's OWN browser (`r3d-inapp`, `rotation3d/inAppBrowser.ts`), where turning the
-    phone may not hand the screen over by itself — and on the FIRST landscape drift of a visit anywhere
-    (`r3d-fsfirst`; the module flag `fsOfferedFor` is keyed to the drift's first frame url, so a
-    re-render keeps the offer and the next stop never inherits it). Shown once, the way to fill the
-    screen is taught; after that the line under the drift does the asking, which is what the client
-    asked for in place of a permanent button. Where it does show it means "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
+    the two sat level with each other (client's refine3.jpeg, 2026-10-02). **The `[data-fs]` button is on EVERY landscape drift** (2026-10-07, client), in
+    the footage's own BOTTOM-RIGHT corner where a video player puts it — "the icon and placement they
+    are already familiar with from fb and tik tok standards", in place of the sentence. It used to be
+    rationed to the first landscape drift of a visit (`r3d-fsfirst` / `fsOfferedFor`, both now gone):
+    a visitor met it once and then had no way back OUT of fullscreen, which is what the client
+    reported. `r3d-auto-fs` no longer hides it either — that rule existed for the iPhone case, and an
+    iPhone never has the button at all. **Apple is the one exception**: `.r3d-stage.r3d-ios` hides it
+    outright, because there is no orientation lock and element fullscreen is `<video>`-only, so turning
+    the device IS the answer — and Apple is therefore the only place the "Turn your phone for the full
+    view" line still stands (`.r3d-drift.r3d-wide.r3d-ios .r3d-turnhint`), since it is the only thing
+    left to say there. Where the button does show it means "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
     `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. The lock is tried THREE
     times: before any await (while the tap is still the user gesture), straight after fullscreen resolves,
     and once more 350ms later — on X's in-app browser the first open never turned and the second always
@@ -456,6 +460,19 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
       landscape clip and wide beside a portrait one — "just outside the frame" covers both, and the
       portrait case lands near the frame rather than out at the screen edge (measured: ground
       312px, frame ends 532, cue starts 541).
+  - **A tilt drift owns the vertical axis, and a tour player holds the document still**
+    (2026-10-07, client): dragging DOWN on a tilt drift was being stolen by Safari as
+    pull-to-refresh, and in an in-app browser that closes the whole thing. The stage's
+    `touch-action` is `none` for a vertical drift (`.r3d-dir-ttb` / `.r3d-dir-btt` in the sheet so it
+    holds from the first paint, and by VALUE in the tick — it used to be set only when the ZOOM state
+    changed, so the line never ran at all until someone pinched). A pan drift keeps `pan-y`, which is
+    what lets a brand drift sit in a scrolling page. Separately, a TOUR player (`driftMode && flowNav
+    && !hero && !landing`) sets `overflow:hidden` + `overscroll-behavior:none` on html and body while
+    it is mounted and puts them back on unmount: a tour fills the screen so there is nothing under it
+    to scroll, and a scrollable document under a fixed full-screen overlay is what makes iOS Safari
+    land a touch somewhere other than where it painted the control ("the button touch is all shifted
+    up" with tabs open). **Not verified against the client's own capture — ref11/ref12 never arrived
+    — so if the shifted touches persist, this was the wrong cure and the next step is a fresh clip.**
   - **The player follows the device; it never turns the drift itself** (2026-09-23, client: "we don't
     want to make them turn their phone. It needs to respond only IF they turn their phone"). An earlier
     pass rotated the stage a quarter turn for a landscape drift on an upright phone — that is REMOVED,
