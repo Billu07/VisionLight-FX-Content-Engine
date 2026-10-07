@@ -43,14 +43,20 @@ function inkOffset(el: HTMLElement): number | null {
   const italic = cs.fontStyle === "italic" || cs.fontStyle === "oblique" ? "italic " : "";
   const font = `${italic}${cs.fontWeight} ${size}px "${family}", sans-serif`;
 
+  // Drawn at SS samples per CSS pixel. One sample per pixel rounds each bearing to a whole
+  // pixel, and the difference between two roundings is where the client's missing pixel went
+  // (ref12): their title sits at the clamp's floor, where the whole difference is only ~1.4px.
+  // Four samples puts the error at a quarter of a pixel, well under anything an eye can hold.
+  const SS = 4;
   const pad = Math.ceil(size); // room on the left for the bearing, and for anything that overhangs
   const w = Math.ceil(size * 2) + pad * 2;
   const h = Math.ceil(size * 2);
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w * SS;
+  canvas.height = h * SS;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
+  ctx.scale(SS, SS);
   ctx.font = font;
   // An engine that would not parse the string leaves ctx.font at what it was. Ask it back.
   if (!ctx.font || ctx.font.indexOf(`${size}px`) === -1) return null;
@@ -58,15 +64,20 @@ function inkOffset(el: HTMLElement): number | null {
   ctx.fillStyle = "#000";
   ctx.fillText(ch, pad, Math.round(h * 0.75));
 
+  const W = w * SS;
+  const H = h * SS;
   let data: Uint8ClampedArray;
   try {
-    data = ctx.getImageData(0, 0, w, h).data;
+    data = ctx.getImageData(0, 0, W, H).data;
   } catch {
     return null; // a locked-down canvas
   }
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      if (data[(y * w + x) * 4 + 3] > 8) return x - pad;
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      // A high bar on purpose: antialiasing throws a faint tail to the left of the real edge,
+      // and the two glyphs are different sizes, so their tails are different lengths. Asking
+      // for solid ink measures the same thing on both.
+      if (data[(y * W + x) * 4 + 3] > 140) return x / SS - pad;
     }
   }
   return null; // nothing was drawn — a font that has not arrived yet

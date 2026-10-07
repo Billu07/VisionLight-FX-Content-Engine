@@ -960,12 +960,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   · SVG `getBBox()` on a text node returns the LAYOUT box, not the ink: it reported ~0 for a 3px bearing and
     made the alignment WORSE. Caught by the probe before it went anywhere.
   So `inkOffset()` draws the glyph on a small canvas and finds its first inked column, which cannot be wrong
-  about what it is looking at. The one remaining fragility — the font string — is handled by quoting ONE
+  about what it is looking at — **at 4 samples per CSS pixel**, and only counting SOLID ink (alpha > 140).
+  One sample per pixel rounded each bearing to a whole pixel, and the difference between two roundings is a
+  third reason this looked fixed here and was not there (client's ref12, 2026-10-08: measured off their own
+  screenshot, the small line still sat 2px left, 3.5% of its cap height). Their phone puts the title at the
+  clamp's FLOOR, 28px, where the whole difference is only ~1.4px — a desktop's 44px happened to round to the
+  right answer, which is exactly why it looked perfect on one device and off on another. The alpha bar is high
+  on purpose: antialiasing throws a faint tail left of the real edge and the two glyphs are different sizes,
+  so their tails differ; asking for solid ink measures the same thing on both. The one remaining fragility — the font string — is handled by quoting ONE
   family plus a generic and reading `ctx.font` back to confirm the engine took it; if it did not, or
   `getImageData` is refused, it falls back to the share of an em a sans-serif capital typically carries
   (0.05), which lands within ~1.4px instead of being 3px out. TourPage re-runs it on `document.fonts.ready`,
-  once more 600ms later, and on resize (the title clamps 28→44px). The probe checks BOTH paths: exact 0px
-  across four first letters normally, and the fallback with the measurement taken away.
+  once more 600ms later, and on resize (the title clamps 28→44px). The probe checks every path at BOTH widths —
+  a desktop at the clamp's ceiling and a phone at its floor, which is the client's case — to within 0.6px,
+  plus the fallback with the measurement taken away.
 - **Pathway, second pass** (2026-10-07, client): the way back reads **"← More {page} Tours"** ("More" says
   what is on the other side of it). The page's **name and logo under it are GONE** (`.tpw-brand`) — the way
   back already says the name, so it was the same word twice in two lines (ref09). The cover's **expand button
