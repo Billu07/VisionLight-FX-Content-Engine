@@ -781,9 +781,12 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   hard to pick out; the filled accent in that row belongs to Publish and Share. A tour drift's background defaults to drift.li's dark ground
   (`TOUR_DEFAULT_BACKGROUND` #0d1119): processing no longer fills the detected colour in for tour steps, and
   `pickedTourBackground` treats a stored colour equal to the manifest's `detectedBg` (older builds) as not picked —
-  the public payload serves the default, the builder shows "Default · drift.li Dark". A demo tour (the site's
-  `isDemo`, or the page's own `demoFlowId`) comes back with `isDemo` on the public pathway → no page back link, brand,
-  enquiry or contact. The client wants **Title Case** on UI text ("That Sounds Good"): done across the tour UI on
+  the public payload serves the default, the builder shows "Default · drift.li Dark". **Only the SITE's demo** (`DriftFlow.isDemo`) comes back
+  with `isDemo` on the public pathway → no page back link, brand, enquiry or contact, and its way out is
+  "← Drift Tours". A page's own `demoFlowId` — the tour its "View Demo" button opens — used to take the same
+  treatment, so a creator's own menu lost their name and offered a way back to a channel they are not on
+  (client, 2026-10-07: "that tour is not a drift tour, that is my account's tour"). It is just one of their
+  tours now; `demoFlowId` still only decides which one View Demo opens. The client wants **Title Case** on UI text ("That Sounds Good"): done across the tour UI on
   2026-09-22 — major words capitalized, short joining words lowercase unless first/last ("Keep the Moments That
   Matter"), phrasal particles up ("Log In"), drift.li / emails / links untouched; one-line text only — multi-sentence
   help paragraphs keep sentence case; the client's own copy (TourLanding, CaptureGuide, landings) untouched. The home's closing
@@ -815,9 +818,18 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   2026-09-26). A PATCH mixing an owned field with a content one is still refused outright. Entries copied BEFORE this are ordinary flows with a credit and no
   `featureOf`: they keep working; remove and re-save one to make it live. Saving the same tour again returns the entry
   already there (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
-  pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Captured by {creator}"** top right (always, client
-  2026-09-26 — it credits whoever filmed it) linking to their
-  page; back link = "← Drift Tours". **A featured tour's menu carries nothing else** (client, 2026-09-26): `featured`
+  pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Captured by {creator}"** top right (client
+  2026-09-26 — it credits whoever filmed it) linking to their page; back link = "← Drift Tours".
+  **Except when the page that filmed it is one of OURS** (2026-10-07): crediting ourselves on our own channel
+  says nothing ("if that drift is from the picdrift account, we don't need that credit card, it's the parent
+  profile"). `creditIsOurs(pageId)` counts a page as ours two ways — a SUPERADMIN belongs to it, **or one of
+  its profiles shares a LOGIN (`authUserId`) with a superadmin**. The second is the one that matters: a tour
+  page is provisioned with an ADMIN user, never a superadmin, so the first test alone would have missed the
+  parent profile's own page entirely; what ties it to us is the same Supabase account behind both. Asked per
+  pathway load rather than stamped at save time, so entries made before today behave too, and the pathway
+  route sends `credit.show:false` — the credit is still PRESENT, so `featured` stays true and the menu stays
+  as bare as any other feature; only the chip goes. If a superadmin ever joins a creator's page as a member,
+  that page reads as ours — at which point this wants to become an explicit flag. **A featured tour's menu carries nothing else** (client, 2026-09-26): `featured`
   in TourPathway is `!!flow.credit`, and it drops the page's name + logo (`.tpw-brand`) and BOTH "Contact {page}"
   buttons, top and bottom — the tour is someone else's, so the channel's own name just repeats the header and
   "Contact Drift" isn't who the visitor wants. `.tpw-featured .tpw-title` takes back the air the brand block gave it.
@@ -895,6 +907,23 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
   (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
+- **Back-office nudges** (2026-10-07, client): a superadmin lands on a tour page's **Admin view** instead of
+  having to press "Admin" first (`usePageAdmin`'s `manage` starts true — it only scopes the creator API to the
+  page via `X-Drift-Org`, and the header's Public side steps straight back out). Hiding a tour **scrolls to
+  the Library / Hidden Tours** and featuring one scrolls back to **Featured Tours** (`#tpg-hidden` /
+  `#tpg-featured`, one frame after `loadAdmin()` so the destination list has rendered) — the two lists are far
+  enough apart on a long page that a tour could vanish from under the cursor with nothing to show for it. The
+  Contact button's **Link field fills in `https://` on focus** and clears it again on blur if nothing was
+  added, so an untouched field never saves a bare prefix.
+- **The page's name and the "Tours" under it are optically aligned** (2026-10-07, client's align.png): nothing
+  in the CSS ever moved them apart — both sit at the same box edge. What separates them is each glyph's own
+  LEFT SIDE BEARING, the blank a font carries before the ink, which scales with type size: a 44px "D" sits
+  ~2px inside its box while the 11px "T" below sits a fifth of that inside its own. A constant nudge cannot
+  fix it either, because the name belongs to the creator and every first letter carries a different bearing —
+  measured: "D" wants 3px, "O" wants 2px. So TourPage measures both first glyphs with
+  `measureText().actualBoundingBoxLeft` against the live computed fonts and sets the eyebrow's `margin-left`
+  to the difference, re-running on `document.fonts.ready` (the first pass can land on a fallback face) and on
+  resize (the title clamps 28→44px). Verified to 0px across four names.
 - **The pathway shows the tour's cover photo** (2026-10-07, client): beside the title on a desktop,
   stacked above it under 560px, with a small expand button on its top-left corner — the client's own
   suggestion. The whole thumbnail opens it full screen (`.tpw-lightbox`), closed by the X, a click anywhere,

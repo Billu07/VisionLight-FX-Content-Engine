@@ -133,14 +133,28 @@ export const publicCredit = (settings: unknown): { name: string; path: string | 
   return c ? { name: c.pageName, path: c.pageSlug ? pagePublicPath(c.pageSlug) : null } : null;
 };
 
-/** Is the page that filmed a featured tour one of OURS? A page with a superadmin on it is the
- *  platform's own, and crediting ourselves on our own channel says nothing (client, 2026-10-07:
- *  "if that drift is from the picdrift account, we don't need that credit card"). Asked per
- *  pathway load rather than stamped at save time, so entries made before today behave too. */
+/** Is the page that filmed a featured tour one of OURS? Crediting ourselves on our own channel
+ *  says nothing (client: "if that drift is from the picdrift account, we don't need that credit
+ *  card, it's the parent profile"). Two ways a page counts as ours:
+ *    · a SUPERADMIN belongs to it; or
+ *    · one of its profiles shares a LOGIN with a superadmin — which is what the parent profile
+ *      actually is. A tour page is provisioned with an ADMIN user, never a superadmin, so the
+ *      first test alone would have missed PicDrift's own page entirely; what ties it to us is
+ *      that the same Supabase account sits behind both.
+ *  Asked per pathway load rather than stamped at save time, so entries made before today behave
+ *  too. If a superadmin ever joins a creator's page as a member, that page would read as ours —
+ *  say so and this becomes an explicit flag instead. */
 export const creditIsOurs = async (pageId: string | null | undefined): Promise<boolean> => {
   if (!pageId) return false;
+  const members = await prisma.user.findMany({
+    where: { organizationId: pageId },
+    select: { role: true, authUserId: true },
+  });
+  if (members.some((m) => m.role === "SUPERADMIN")) return true;
+  const logins = members.map((m) => m.authUserId).filter((a): a is string => !!a);
+  if (!logins.length) return false;
   const su = await prisma.user.findFirst({
-    where: { organizationId: pageId, role: "SUPERADMIN" },
+    where: { role: "SUPERADMIN", authUserId: { in: logins } },
     select: { id: true },
   });
   return !!su;

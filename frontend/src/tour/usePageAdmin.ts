@@ -7,13 +7,16 @@ import { setActiveProfile, setDriftOrgOverride } from "../lib/api";
  * view, so the page and every pathway ask:
  * - a member (one of their TOUR profiles belongs to the page) → admin. Their matching
  *   profile is activated so the creator API acts on this page (a Pro holds several);
- * - a superadmin who isn't a member → a visitor by default, with "Manage this page",
- *   which scopes the creator API calls to the page (X-Drift-Org);
+ * - a superadmin who isn't a member → managing the page from the start, which scopes the
+ *   creator API calls to it (X-Drift-Org); the header's Public side steps back out;
  * - everyone else → the public view.
  */
 export function usePageAdmin(pageId: string | null | undefined) {
   const { user, profiles, isLoading, profileSelectionRequired, checkAuth } = useAuth();
-  const [manage, setManage] = useState(false);
+  // A superadmin lands on the ADMIN view rather than having to press "Admin" first (client,
+  // 2026-10-07). It costs nothing to be wrong about: managing only scopes the creator API to
+  // this page (X-Drift-Org below), and the header's Public side switches straight back.
+  const [manage, setManage] = useState(true);
   const [activating, setActivating] = useState(false);
   const [triedFor, setTriedFor] = useState<string | null>(null);
 

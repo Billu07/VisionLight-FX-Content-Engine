@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { apiEndpoints, setActiveProfile } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
@@ -260,6 +260,11 @@ function PageSettings({
             className="d-input"
             value={contactUrl}
             onChange={(e) => setContactUrl(e.target.value)}
+            /* Typing a link should not start with typing "https://" (client, 2026-10-07). An
+               empty field fills it in when you arrive and clears it again if you leave without
+               adding anything, so an untouched field never saves a bare prefix. */
+            onFocus={() => setContactUrl((v) => v || "https://")}
+            onBlur={() => setContactUrl((v) => (v.trim() === "https://" ? "" : v))}
             maxLength={500}
             placeholder="https://…  ·  mailto:you@…  ·  tel:+1…"
             inputMode="url"
@@ -430,6 +435,39 @@ export default function TourPage() {
   const location = useLocation();
   const [search, setSearch] = useSearchParams();
   const [pub, setPub] = useState<{ page: Page; demo: Demo; flows: PublicFlow[] } | null>(null);
+  // Optically align the page's name with the "Tours" under it (client's align.png, 2026-10-07).
+  // Both sit at the same box edge; what pushes them apart is each glyph's own left side bearing,
+  // which scales with type size — so the big name sits further in than the small line below it.
+  // Measured from the live fonts rather than nudged by a constant, because the name is the
+  // creator's and every first letter carries a different one.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const kindRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const align = () => {
+      const t = titleRef.current, k = kindRef.current;
+      if (!t || !k) return;
+      // How far the first glyph's INK sits from its own origin. actualBoundingBoxLeft counts
+      // leftwards from the alignment point, so a glyph that starts inside its box reports a
+      // negative value — hence the sign flip.
+      const bearing = (el: HTMLElement) => {
+        const ch = (el.textContent || "").trim().charAt(0);
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ch || !ctx) return 0;
+        const cs = getComputedStyle(el);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const m = ctx.measureText(ch);
+        return -(m.actualBoundingBoxLeft ?? 0);
+      };
+      const dx = bearing(t) - bearing(k);
+      k.style.marginLeft = Math.abs(dx) < 0.3 ? "" : `${dx.toFixed(2)}px`;
+    };
+    align();
+    // The first pass can run on a fallback face; redo it once the real one is in.
+    let alive = true;
+    document.fonts?.ready?.then(() => { if (alive) align(); }).catch(() => {});
+    window.addEventListener("resize", align);
+    return () => { alive = false; window.removeEventListener("resize", align); };
+  }, [pub?.page?.name]);
   const [missing, setMissing] = useState(false);
   const [preview, setPreview] = useState(false);
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -546,7 +584,13 @@ export default function TourPage() {
       notify.success(
         pub?.page.slug === "drift" ? (hidden ? "Moved to the Library" : "Featured on the Channel") : hidden ? "Moved to Hidden Tours" : "Back in Featured Tours",
       );
-      loadAdmin();
+      await loadAdmin();
+      // Follow the tour to where it went (client, 2026-10-07): the two lists are far enough
+      // apart on a long page that a tour could vanish from under the cursor with nothing to
+      // show for it. One frame, so the list it is moving into has rendered.
+      requestAnimationFrame(() =>
+        document.getElementById(hidden ? "tpg-hidden" : "tpg-featured")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
     } catch (e) {
       notify.error(apiError(e));
     }
@@ -683,8 +727,8 @@ export default function TourPage() {
             {page.logoUrl ? <img className="tpg-logo" src={page.logoUrl} alt="" /> : <span className="tpg-mark">{initial}</span>}
             {/* The page is the name first; "Tours" says what it holds (client, 2026-09-23). */}
             <div style={{ minWidth: 0 }}>
-              <h1 className="tpg-title">{page.name}</h1>
-              <div className="d-eyebrow tpg-kind">Tours</div>
+              <h1 className="tpg-title" ref={titleRef}>{page.name}</h1>
+              <div className="d-eyebrow tpg-kind" ref={kindRef}>Tours</div>
             </div>
           </div>
           {editing ? (
@@ -799,7 +843,7 @@ export default function TourPage() {
         </div>
       )}
 
-      <section className="tpg-section t-rise t-rise-2">
+      <section className="tpg-section t-rise t-rise-2" id="tpg-featured">
         <div className="tpg-bar">
           <h2>Featured Tours</h2>
         </div>
@@ -846,7 +890,7 @@ export default function TourPage() {
       {canAdmin && page.accountType === "PRO" && <ClientPages />}
 
       {editing && hiddenTours.length > 0 && (
-        <section className="tpg-section">
+        <section className="tpg-section" id="tpg-hidden">
           <div className="tpg-bar">
             <h2>{isChannel ? "Library" : "Hidden Tours"}</h2>
             <span className="d-faint">
