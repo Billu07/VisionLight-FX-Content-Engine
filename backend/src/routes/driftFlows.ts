@@ -237,12 +237,6 @@ const PAGE_SELECT = {
   tourSettings: true,
 } as const;
 
-/** The contact button when a page has no link of its own AND takes no messages. */
-const DEFAULT_CONTACT = {
-  label: process.env.DRIFT_TOUR_CONTACT_LABEL || "Contact PicDrift",
-  url: process.env.DRIFT_TOUR_CONTACT_URL || "mailto:picdrift@picdrift.com",
-};
-
 const pageSettingsOf = (org: { tourSettings?: unknown }): Record<string, any> =>
   org.tourSettings && typeof org.tourSettings === "object" ? (org.tourSettings as Record<string, any>) : {};
 
@@ -257,13 +251,15 @@ const serializePage = (org: any) => {
     path: org.slug ? pagePublicPath(org.slug) : null,
     accountType: (org.tourAccountType ?? null) as string | null,
     logoUrl: typeof s.logoUrl === "string" && s.logoUrl ? (s.logoUrl as string) : null,
-    // "Contact {page}": its own link, else its message form (url null — the page's team gets it);
-    // a page with neither falls back to PicDrift.
+    // "Contact {page}": its own link, else its message form (url null — the page's team gets it).
+    // A page with NEITHER gets no button at all: `url` stays null and ContactButton renders
+    // nothing for a page that takes no messages. It used to fall back to PicDrift's own address,
+    // which meant removing the contact button in page settings did not remove it — it just put
+    // someone else's details on their page (client's ref11, 2026-10-08). The envs that fed that
+    // fallback, DRIFT_TOUR_CONTACT_LABEL and DRIFT_TOUR_CONTACT_URL, are no longer read.
     contact: url
       ? { label: label || `Contact ${org.name}`, url }
-      : enquirySettingsOf(s).enabled && org.slug
-        ? { label: label || `Contact ${org.name}`, url: null }
-        : { label: label || DEFAULT_CONTACT.label, url: DEFAULT_CONTACT.url },
+      : { label: label || `Contact ${org.name}`, url: null },
     contactLabel: label || null,
     contactUrl: url || null,
     demoFlowId: typeof s.demoFlowId === "string" && s.demoFlowId ? (s.demoFlowId as string) : null,

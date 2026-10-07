@@ -106,7 +106,7 @@ export type Page = {
   accountType: string | null;
   logoUrl: string | null;
   /** the effective contact button: "Contact {page}" → its link, or its message form when url is
-   *  null (the page takes messages); "Contact PicDrift" when it has neither */
+   *  null AND the page takes messages. A page with neither renders no button at all. */
   contact: { label: string; url: string | null };
   /** what the admin set (null = default) */
   contactLabel: string | null;

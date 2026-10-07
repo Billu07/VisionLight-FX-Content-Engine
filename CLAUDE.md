@@ -809,8 +809,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   to see what it is, not to open a signup wizard. **Write
   new UI strings in Title Case.** Contact button (`ContactButton`, tourPageParts): "Contact {page}" — its own link when
   set, else (url null, when the page takes enquiries) it opens the page's message form (`EnquirySheet`, exported, sent
-  with `via: "contact"` → the lead's button reads "Contact {page}"); only a page with neither falls back to
-  "Contact PicDrift". `EnquirySheet` portals into the `.drift-ui.d-page` root (animated `.t-rise` sections are their own
+  with `via: "contact"` → the lead's button reads "Contact {page}"). **A page with NEITHER gets no button at all**
+  (2026-10-08): it used to be handed PicDrift's own address, so clearing the contact field in page settings did
+  not remove the button — it just put someone else's details on their page, which is what the client hit
+  ("I removed the contact button in the tour setting and it still defaults to contact PicDrift", ref11). The
+  serializer now leaves `contact.url` null and `ContactButton` already renders nothing for a page that takes no
+  messages, so the fallback branch was the only thing keeping it on screen. `DRIFT_TOUR_CONTACT_LABEL` and
+  `DRIFT_TOUR_CONTACT_URL` are dead env vars now. The page-settings help line says so too. `EnquirySheet` portals into the `.drift-ui.d-page` root (animated `.t-rise` sections are their own
   layer and painted over it). /tour/start (Try It Free) has an × (back, or the Tour landing) and is dark only.
 - **Drift channel + featured library** (2026-09-22, no schema change; `services/driftChannel.ts`): drift.li/tour/drift =
   drift.li's own TOUR page "Drift" (slug `drift`, already in RESERVED_SLUGS, so only `ensureChannel` can create it —

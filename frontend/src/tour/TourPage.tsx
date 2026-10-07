@@ -317,7 +317,7 @@ function PageSettings({
         <span className="d-faint" style={{ fontSize: 12 }}>
           {enqOn
             ? `No Link? "Contact ${page.name}" Opens Your Message Form.`
-            : `No Link? The Button Reads "Contact PicDrift" Until the Enquiry Button Is On.`}
+            : `No Link and No Message Form? Then There Is No Contact Button at All.`}
         </span>
       </div>
       <PagePeople clientPage={clientPage} onSelfChange={onSelfChange} />

@@ -6,7 +6,9 @@ import { useAuth } from "../hooks/useAuth";
 import { CREATOR_HOME, CREATOR_START } from "./tourSession";
 
 /** The page's contact button — "Contact {page}". Its own link when it set one; otherwise the page's
- *  message form (the enquiry sheet, sent to its team); "Contact PicDrift" when it has neither. */
+ *  message form (the enquiry sheet, sent to its team). A page with NEITHER gets no button: it used
+ *  to be handed PicDrift's address, so removing the button in settings did not remove it, it just
+ *  put someone else's details on their page (client, 2026-10-08). */
 /**
  * "Create a Tour", on drift.li's OWN channel only (client, 2026-10-07). A visitor there is not
  * looking at a property to enquire about — they are looking at what the thing does — so the
