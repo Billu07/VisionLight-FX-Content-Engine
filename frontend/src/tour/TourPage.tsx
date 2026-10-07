@@ -6,7 +6,7 @@ import { confirmAction, notify } from "../lib/notifications";
 import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
 import { StatusPill, TourShell, apiError, copyText, publicUrl, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
-import { ContactButton, PathArtH } from "./tourPageParts";
+import { ContactButton, CreateTourButton, PathArtH } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
 import { PagePeople, leavePage } from "./PagePeople";
 import { canEditPage, isPageAdmin } from "./pageRoles";
@@ -780,6 +780,9 @@ export default function TourPage() {
                     ▶ View Demo
                   </Link>
                 )}
+                {/* drift.li's own channel invites you to make one instead of asking about a
+                    property that isn't for sale (client's ref06, 2026-10-07). */}
+                {isChannel && <CreateTourButton />}
                 <EnquiryButton page={page} />
                 <ContactButton page={page} />
               </div>

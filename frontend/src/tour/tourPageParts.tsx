@@ -1,9 +1,27 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { Page } from "./types";
 import { EnquirySheet } from "./EnquirySheet";
+import { useAuth } from "../hooks/useAuth";
+import { CREATOR_HOME, CREATOR_START } from "./tourSession";
 
 /** The page's contact button — "Contact {page}". Its own link when it set one; otherwise the page's
  *  message form (the enquiry sheet, sent to its team); "Contact PicDrift" when it has neither. */
+/**
+ * "Create a Tour", on drift.li's OWN channel only (client, 2026-10-07). A visitor there is not
+ * looking at a property to enquire about — they are looking at what the thing does — so the
+ * invitation is to make one. Signed out it opens Try It Free; signed in it goes straight to
+ * their own page, since they have nothing to sign up for.
+ */
+export function CreateTourButton({ className = "d-btn primary sm" }: { className?: string }) {
+  const { user } = useAuth();
+  return (
+    <Link className={className} to={user ? CREATOR_HOME : CREATOR_START} style={{ textDecoration: "none" }}>
+      Create a Tour
+    </Link>
+  );
+}
+
 export function ContactButton({ page, flowId = null, className = "d-btn" }: { page: Page; flowId?: string | null; className?: string }) {
   const [open, setOpen] = useState(false);
   const url = page.contact.url;

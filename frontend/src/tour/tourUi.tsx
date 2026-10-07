@@ -34,6 +34,16 @@ export const TOUR_STYLES = `
 .t-chip b{color:var(--text)}
 .t-upgrade{border:1px solid var(--accent-border);background:linear-gradient(135deg,var(--accent-soft),transparent 62%),var(--surface)}
 .t-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* The tour's cover in the builder's head, matching what the pathway shows a visitor (client's
+   ref08, 2026-10-07). It keeps its own row on a phone, where the head wraps anyway. */
+.t-head-cover{position:relative;flex:none;width:clamp(104px,20vw,140px);aspect-ratio:4/3;border-radius:14px;overflow:hidden;
+  border:1px solid var(--border);background:var(--surface-3);box-shadow:var(--shadow-sm)}
+.t-head-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.t-head-cover-edit{position:absolute;right:7px;top:7px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;cursor:pointer;
+  color:#fff;background:rgba(11,15,25,.62);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(8px);transition:background .16s}
+.t-head-cover-edit:hover{background:rgba(11,15,25,.85)}
+.t-head-cover-edit svg{width:14px;height:14px}
+@media(max-width:560px){.t-head-cover{width:100%;max-width:260px;aspect-ratio:16/10}}
 .t-steps{display:grid;gap:12px}
 .t-step{display:grid;gap:14px;padding:14px;grid-template-columns:1fr}
 @media(min-width:640px){.t-step{grid-template-columns:150px minmax(0,1fr)}}
@@ -219,7 +229,15 @@ export const TOUR_STYLES = `
 .t-chevron.open{transform:rotate(180deg);color:var(--accent)}
 .t-path-expand{margin:0 0 6px}
 .t-path-expand .t-route-item::before{display:none}
-@media(max-width:560px){.t-path-row{grid-template-columns:44px minmax(0,1fr) auto;padding:10px}.t-path-side .t-arrows{display:none}}
+/* The reorder arrows stay on a phone (client's ref10, 2026-10-07): reordering is the one thing
+   you cannot do any other way, and hiding them left the strips with nothing but a caret. They go
+   compact instead of away — square keys, no label padding — so the row still fits. */
+@media(max-width:560px){
+  .t-path-row{grid-template-columns:44px minmax(0,1fr) auto;padding:10px 8px}
+  .t-path-side{gap:4px}
+  .t-path-side .t-arrows{gap:4px}
+  .t-path-side .t-arrows .d-btn{min-width:0;width:30px;height:30px;padding:0;display:grid;place-items:center;font-size:14px;line-height:1}
+}
 /* Cover picker (tour settings) */
 .t-cover{display:grid;gap:14px;grid-template-columns:1fr;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 @media(min-width:640px){.t-cover{grid-template-columns:120px minmax(0,1fr)}}

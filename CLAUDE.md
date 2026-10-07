@@ -352,6 +352,13 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     `Set` **`handShownFor`**, keyed by the flow: **one hand per TOUR per page session**, which is the
     client's own wording ("The hand only shows up middle screen for the first drift of the tour. Then
     it's just arrows."), writes nothing to the visitor's device, and can actually be looked at again.
+    **It is cancelled only by a touch on the DRIFT, never on a control** (fixed 2026-10-07):
+    `onDown` used to set `userTookOver` before its `isControl` check, so every tap on a button
+    counted as taking the drift over. Tapping through the tips — Skip included — therefore
+    cancelled the demo on the first drift before the tips could hand it over, and since the
+    per-tour key is only claimed when the demo actually STARTS, the SECOND drift became the
+    first stop that could play it (client's ref01.mp4). The regression test drives a real touch
+    on Skip Tips and fails on the old ordering.
     It also fires from BOTH reveal paths now, with no delay: the moment the loader lifts (it used to wait
     another 200ms after the loader's 420ms sweep) **and** on the warm path, where a drift whose frames
     were already in reveals with no loader at all — a tour opened from its own pathway prefetches and
@@ -626,7 +633,9 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 - **Buttons** (2026-09-23, client): every tour drift shows the SAME row — `‹ Prev · Menu · Next ›`.
   Naming the next room read as a destination rather than a step, so the name is gone. The row is
   built in `SpinViewer` from `flowNav` (`tourNav`): Menu → `flow.publicPath`, Prev → the stop before
-  (on the FIRST drift, Prev is the menu), Next → the stop after, looping to #1 at the end; a
+  (on the FIRST drift, Prev is the menu), Next → the stop after and, **on the LAST drift, the
+  MENU** (2026-10-07, client: "when a tour is over, load the next button to bring it to its menu
+  page" — it used to loop silently round to #1); a
   one-drift tour shows Menu alone. Because it comes from `flow.stops`, the unbranded player
   (`/u/{code}`, whose stops the server rewrites) gets the same row for free. Clicks still go through
   `fireCta`, so in-app swaps, fullscreen and tracking are unchanged. `relinkFlow` still writes
@@ -735,6 +744,12 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   tour page, tour, drift, `/u/` = no page name + noindex, `/report/` = generic + noindex, brand drifts; unknown →
   home card, noindex) and `renderSharePage` swaps the block between `<!-- share:start … -->` and `<!-- share:end -->`
   in frontend/index.html (other domains keep that static PicDrift block — put new head tags outside the markers).
+  The TOUR card (2026-10-07, client's ref05) reads just **"Interactive tour"** at size 34 — no "· N spaces",
+  no strip of drift thumbnails above the title. In a message thread those were the smallest, least useful
+  things on it. `renderTourCard` still TAKES `spaces` and `thumbs` so every caller keeps working; it simply
+  draws neither. `pill()` takes a `size` and scales every one of its measurements off it, so the default
+  still renders byte-for-byte as before. **`CARD_VERSION` is now 2** — bumping it is what gets the new card
+  past every cache holding the old one.
   Cards: `driftShareCards.ts` (1200×630 JPEG ≤290 KB for WhatsApp), text drawn as paths from Bai Jamjuree in
   backend/assets/fonts via opentype.js (`driftTypeset.ts`; own typings in src/types/opentype.d.ts — @types/opentype.js
   pulls the DOM lib and breaks Node's Blob typing). Card URLs carry a content version (`CARD_VERSION` refreshes all).
@@ -924,6 +939,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `measureText().actualBoundingBoxLeft` against the live computed fonts and sets the eyebrow's `margin-left`
   to the difference, re-running on `document.fonts.ready` (the first pass can land on a fallback face) and on
   resize (the title clamps 28→44px). Verified to 0px across four names.
+- **Pathway, second pass** (2026-10-07, client): the way back reads **"← More {page} Tours"** ("More" says
+  what is on the other side of it). The page's **name and logo under it are GONE** (`.tpw-brand`) — the way
+  back already says the name, so it was the same word twice in two lines (ref09). The cover's **expand button
+  moved to its top RIGHT** (ref03) and the cover itself **stands off the way back** (`.tpw-head` margin-top
+  22px, 26 on a phone) instead of being jammed under the pill (ref02). On **drift.li's own channel only**, a
+  **Create a Tour** button sits in the row (`CreateTourButton` in tourPageParts, also on the channel PAGE's
+  action row): a visitor there is not looking at a property to enquire about, so the invitation is to make
+  one. Signed out it opens Try It Free, signed in it goes to their own page.
+- **Builder, second pass** (2026-10-07, client): the tour's **cover photo is in the builder's head** too, the
+  same picture the pathway shows (`flow.coverUrl`, else the first drift with a frame), with a **pencil** on it
+  that opens Tour Settings — where the picker lives (ref08). The step strips keep their **reorder arrows on a
+  phone** (ref10): they were there all along, hidden by a `max-width:560px` rule, which left the strips with
+  nothing but a caret and no way to reorder at all on the one device the builder is meant for. They go compact
+  (30px square keys) rather than away.
 - **The pathway shows the tour's cover photo** (2026-10-07, client): beside the title on a desktop,
   stacked above it under 560px, with a small expand button on its top-left corner — the client's own
   suggestion. The whole thumbnail opens it full screen (`.tpw-lightbox`), closed by the X, a click anywhere,

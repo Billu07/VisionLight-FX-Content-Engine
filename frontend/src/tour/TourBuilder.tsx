@@ -708,6 +708,9 @@ export default function TourBuilder({
   const [nameSaving, setNameSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // The tour's cover: the creator's pick, else the first drift that has a frame — the same
+  // fallback the public pathway uses, so the two heads show the same picture.
+  const builderCover = flow ? flow.coverUrl || flow.steps.map((s) => s.product?.thumb).find((t) => !!t) || null : null;
   // The share sheet: "celebrate" right after publishing, "open" from the Share button.
   const [share, setShare] = useState<"none" | "open" | "celebrate">("none");
   const [showGuide, setShowGuide] = useState(false);
@@ -1014,6 +1017,28 @@ export default function TourBuilder({
 
 
       <div className="t-head t-rise" style={{ marginTop: 6 }}>
+        {/* The same cover a visitor sees on the pathway (client's ref08, 2026-10-07), with the
+            pencil opening Tour Settings — where the picker that chooses it lives. A tour whose
+            creator has not picked one shows its first drift's frame, as the pathway does. */}
+        {builderCover && (
+          <div className="t-head-cover">
+            <img src={builderCover} alt="" />
+            {!readOnly && (
+              <button
+                type="button"
+                className="t-head-cover-edit"
+                onClick={() => setShowSettings(true)}
+                title="Change the Cover Photo"
+                aria-label="Change the cover photo"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="d-eyebrow" style={{ marginBottom: 6 }}>
             Tour · <StatusPill status={flow.status} flow />

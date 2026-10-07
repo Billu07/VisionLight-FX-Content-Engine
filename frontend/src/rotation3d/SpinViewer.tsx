@@ -1655,9 +1655,15 @@ export default function SpinViewer({
     const onDown = (e: PointerEvent) => {
       attn?.activity();
       setWarmPaused(true); // the drag owns the network and the main thread
+      if (isControl(e.target)) return;
+      // Only a touch on the DRIFT ITSELF counts as taking it over. This used to be set before
+      // the line above, so a tap on any control did it — and tapping through the tips (Skip
+      // included) therefore cancelled the welcome demo on the first drift before the tips could
+      // hand it over. The per-tour key is only claimed when the demo actually starts, so the
+      // SECOND drift became the first stop that could play it, which is what the client saw
+      // (ref01.mp4, 2026-10-07).
       userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
-      if (isControl(e.target)) return;
       pointers.set(e.pointerId, e);
       if (pointers.size === 2) { dragging = false; axis = ""; return; } // pinch
       if (pointers.size === 1) down(e);
@@ -2290,7 +2296,13 @@ export default function SpinViewer({
       menu,
       // Nothing sits behind the first drift, so there Prev is the way back to the menu.
       prev: i > 0 ? { label: "Prev", url: stops[i - 1].playerPath } : menu,
-      next: { label: "Next", url: stops[(i + 1) % stops.length].playerPath } as SpinCta,
+      // ...and nothing follows the last one: Next hands the visitor back to the menu rather
+      // than looping silently round to the first drift (client, 2026-10-07: "when a tour is
+      // over, load the next button to bring it to its menu page"). It keeps the Next label —
+      // the tour is still carrying them forwards, just out of the rooms and back to the list.
+      next: (i + 1 < stops.length
+        ? { label: "Next", url: stops[i + 1].playerPath }
+        : menu) as SpinCta,
     };
   })();
   // "Tour Powered by …" / "View Powered by …" on flow drifts.

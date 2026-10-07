@@ -10,6 +10,7 @@ import { usePageAdmin } from "./usePageAdmin";
 import { prefetchDriftPath } from "../rotation3d/driftNav";
 import { captureShareLink } from "../rotation3d/personalLink";
 import { EnquiryButton } from "./EnquirySheet";
+import { CreateTourButton } from "./tourPageParts";
 import { lazyRoute } from "../lib/lazyRoute";
 
 /** drift.li's own page: the Drift channel (backend services/driftChannel.ts). */
@@ -80,15 +81,17 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
       {flow.isDemo && page.slug !== CHANNEL_SLUG && (
         <div className="tpw-top">
           <Link className="t-back" to={`/tour/${CHANNEL_SLUG}`}>
-            ← Drift Tours
+            ← More Drift Tours
           </Link>
         </div>
       )}
       {(!flow.isDemo || page.slug === CHANNEL_SLUG) && (
         <>
           <div className="tpw-top">
+            {/* "More" says what is on the other side of it: the rest of this page's tours
+                (client, 2026-10-07). */}
             <Link className="t-back" to={home}>
-              ← {page.name} Tours
+              ← More {page.name} Tours
             </Link>
             <span className="t-inline">
               {flow.credit && flow.credit.show !== false &&
@@ -99,16 +102,14 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
                 ) : (
                   <span className="d-pill tpw-credit">Captured by {flow.credit.name}</span>
                 ))}
+              {page.slug === CHANNEL_SLUG && <CreateTourButton />}
               <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
               {!featured && <ContactButton page={page} flowId={flow.id} className="d-btn sm" />}
             </span>
           </div>
-          {!featured && (
-            <Link to={home} className="tpw-brand">
-              {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
-              <span>{page.name}</span>
-            </Link>
-          )}
+          {/* No brand block: the way back right above it already reads "More {page} Tours", so
+              the name underneath was the same word twice in two lines (client's ref09,
+              2026-10-07). A featured tour never had one. */}
         </>
       )}
       {/* No kind line here: the header already reads "drift.li TOUR", the way back reads

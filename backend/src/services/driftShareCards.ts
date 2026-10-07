@@ -19,7 +19,9 @@ import { ellipsize, measure, runs, text, wrap } from "./driftTypeset";
 export const CARD_W = 1200;
 export const CARD_H = 630;
 /** Part of every card URL — bump it to make crawlers fetch every card again. */
-export const CARD_VERSION = 1;
+// 2 (2026-10-07): the tour card lost its space count and its strip of thumbnails, and its label
+// grew. Bumping this is what gets the new one past every cache that holds the old.
+export const CARD_VERSION = 2;
 const INK = "#0b0f19";
 const WHITE = "#ffffff";
 const MUTED = "#b6c0cf";
@@ -304,13 +306,17 @@ const photoShade = (fromY: number) => `<defs>
   <rect y="${fromY}" width="${CARD_W}" height="${CARD_H - fromY}" fill="url(#bottom)"/>`;
 
 /** A glass pill with an icon and a label; returns its SVG. */
-function pill(x: number, y: number, label: string, accent: string, iconName: IconName = "hand"): string {
-  const h = 52;
-  const tw = measure(label, "semibold", 22);
-  const w = 20 + 28 + 12 + tw + 24;
+/** The label pill. Every measurement is the one it has always had at 22, scaled — so the
+ *  default renders exactly as before and a larger `size` grows the whole thing together
+ *  rather than leaving the type rattling around inside the old shape. */
+function pill(x: number, y: number, label: string, accent: string, iconName: IconName = "hand", size = 22): string {
+  const k = size / 22;
+  const h = Math.round(52 * k);
+  const tw = measure(label, "semibold", size);
+  const w = (20 + 28 + 12 + 24) * k + tw;
   return `<rect x="${x}" y="${y}" width="${w.toFixed(1)}" height="${h}" rx="${h / 2}" fill="${INK}" fill-opacity="0.58" stroke="${WHITE}" stroke-opacity="0.2" stroke-width="1.2"/>
-    ${icon(iconName, x + 20, y + 12, 28, accent, 1.9)}
-    ${text(label, WHITE, { weight: "semibold", size: 22, x: x + 60, y: y + 34 })}`;
+    ${icon(iconName, x + 20 * k, y + 12 * k, 28 * k, accent, 1.9)}
+    ${text(label, WHITE, { weight: "semibold", size, x: x + 60 * k, y: y + 34 * k })}`;
 }
 
 // ───────────────────────────── cards ─────────────────────────────
@@ -383,8 +389,11 @@ export async function renderTourCard(input: {
   const base = input.cover ? photoBase(input.cover) : sharp(svg(CARD_W, CARD_H, backdrop(accent, 380, 600)));
   const layers: sharp.OverlayOptions[] = [];
   const out: string[] = [photoShade(230)];
-  const spaces = `${input.spaces} ${input.spaces === 1 ? "space" : "spaces"}`;
-  out.push(pill(64, 52, `Interactive tour · ${spaces}`, accent));
+  // "Interactive tour", on its own and three sizes up (client's ref05, 2026-10-07). The count
+  // of spaces went with the strip of them below: a share card is read in a glance in a message
+  // thread, and the number was the smallest, least useful thing on it. `input.spaces` is still
+  // taken so every caller keeps working — it simply is not drawn any more.
+  out.push(pill(64, 52, "Interactive tour", accent, "hand", 34));
   if (!input.unbranded) out.push(wordmarkChip(accent));
 
   const title = wrap(input.title, "bold", 60, 1056, 2);
@@ -392,7 +401,6 @@ export async function renderTourCard(input: {
   const LH = 66;
   const firstBaseline = LAST - (title.length - 1) * LH;
   title.forEach((l, i) => out.push(text(l, WHITE, { weight: "bold", size: 60, x: 70, y: firstBaseline + i * LH })));
-  let blockTop = firstBaseline - 52;
 
   if (!input.unbranded && input.pageName) {
     const logo = await logoLayer(input.logo, 150, 40);
@@ -405,17 +413,11 @@ export async function renderTourCard(input: {
       nameX = 72 + logo.width + (logo.dark ? 26 : 16);
     }
     out.push(text(ellipsize(input.pageName, "semibold", 26, 1128 - nameX), WHITE, { weight: "semibold", size: 26, x: nameX, y: rowBaseline, opacity: 0.88 }));
-    blockTop = rowBaseline - 32;
   }
 
-  const thumbs = input.thumbs.length >= 2 ? await Promise.all(input.thumbs.slice(0, 5).map((b) => rounded(b, 112, 84, 10))) : [];
-  const thumbTop = blockTop - 18 - 84;
-  thumbs.forEach((t, i) => {
-    if (!t) return;
-    const x = 72 + i * 124;
-    layers.push({ input: t, top: thumbTop, left: x });
-    out.push(`<rect x="${x + 0.75}" y="${thumbTop + 0.75}" width="110.5" height="82.5" rx="10" fill="none" stroke="${WHITE}" stroke-opacity="0.35" stroke-width="1.5"/>`);
-  });
+  // No strip of thumbnails above the title any more (client's ref05, 2026-10-07): at 112x84 in a
+  // chat bubble they read as specks over the cover rather than as rooms. `input.thumbs` is still
+  // taken so every caller keeps working.
   layers.unshift({ input: svg(CARD_W, CARD_H, out.join("")), top: 0, left: 0 });
   return finish(base, layers);
 }

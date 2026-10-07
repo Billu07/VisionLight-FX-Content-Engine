@@ -94,15 +94,18 @@ export const TOUR_PAGE_STYLES = `
 .tpw-desc{margin:10px 0 0;color:var(--muted);font-size:15px;line-height:1.55}
 /* The cover photo beside the title (client, 2026-10-07). It stacks above it on a phone, where
    there is no room for a column beside a headline that already wraps. */
-.tpw-head{display:flex;align-items:flex-start;gap:16px;margin-top:4px}
+/* Halfway between the way back and the title, not jammed under the pill (client's ref02,
+   2026-10-07). The title carries its own leading below the cover, so the margin above has to be
+   the larger number for the two gaps to read as equal. */
+.tpw-head{display:flex;align-items:flex-start;gap:16px;margin-top:22px}
 .tpw-head-text{min-width:0;flex:1}
 .tpw-head .tpw-title{margin-top:0}
 .tpw-cover{position:relative;flex:none;width:clamp(104px,22vw,148px);aspect-ratio:4/3;padding:0;border-radius:14px;overflow:hidden;
   border:1px solid var(--border);background:var(--surface-3);cursor:zoom-in;box-shadow:var(--shadow-sm);transition:border-color .16s,transform .2s}
 .tpw-cover:hover{border-color:var(--accent-border);transform:translateY(-2px)}
 .tpw-cover img{width:100%;height:100%;object-fit:cover;display:block}
-/* Top left of the thumbnail, which is where the client asked for it. */
-.tpw-cover-btn{position:absolute;left:7px;top:7px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+/* Top RIGHT of the thumbnail (client's ref03, 2026-10-07 — it was on the left for a day). */
+.tpw-cover-btn{position:absolute;right:7px;top:7px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
   color:#fff;background:rgba(11,15,25,.6);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px)}
 .tpw-cover-btn svg{width:14px;height:14px}
 .tpw-lightbox{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;
@@ -113,7 +116,7 @@ export const TOUR_PAGE_STYLES = `
 .tpw-lightbox-x:hover{background:rgba(255,255,255,.2)}
 @keyframes tpwfade{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){
-  .tpw-head{flex-direction:column;gap:12px}
+  .tpw-head{flex-direction:column;gap:12px;margin-top:26px}
   .tpw-cover{width:100%;max-width:280px;aspect-ratio:16/10}
 }
 .tpw-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
