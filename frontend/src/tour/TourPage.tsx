@@ -7,6 +7,7 @@ import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from
 import { StatusPill, TourShell, apiError, copyText, publicUrl, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton, CreateTourButton, PathArtH } from "./tourPageParts";
+import { alignFirstGlyphs } from "./opticalAlign";
 import { usePageAdmin } from "./usePageAdmin";
 import { PagePeople, leavePage } from "./PagePeople";
 import { canEditPage, isPageAdmin } from "./pageRoles";
@@ -435,38 +436,21 @@ export default function TourPage() {
   const location = useLocation();
   const [search, setSearch] = useSearchParams();
   const [pub, setPub] = useState<{ page: Page; demo: Demo; flows: PublicFlow[] } | null>(null);
-  // Optically align the page's name with the "Tours" under it (client's align.png, 2026-10-07).
-  // Both sit at the same box edge; what pushes them apart is each glyph's own left side bearing,
-  // which scales with type size — so the big name sits further in than the small line below it.
-  // Measured from the live fonts rather than nudged by a constant, because the name is the
-  // creator's and every first letter carries a different one.
+  // Line the page's name up with the "Tours" under it — see opticalAlign for why this has to be
+  // measured rather than nudged, and why it is measured the way it is (the first attempt was
+  // reported as doing nothing at all, 2026-10-08).
   const titleRef = useRef<HTMLHeadingElement>(null);
   const kindRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const align = () => {
-      const t = titleRef.current, k = kindRef.current;
-      if (!t || !k) return;
-      // How far the first glyph's INK sits from its own origin. actualBoundingBoxLeft counts
-      // leftwards from the alignment point, so a glyph that starts inside its box reports a
-      // negative value — hence the sign flip.
-      const bearing = (el: HTMLElement) => {
-        const ch = (el.textContent || "").trim().charAt(0);
-        const ctx = document.createElement("canvas").getContext("2d");
-        if (!ch || !ctx) return 0;
-        const cs = getComputedStyle(el);
-        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-        const m = ctx.measureText(ch);
-        return -(m.actualBoundingBoxLeft ?? 0);
-      };
-      const dx = bearing(t) - bearing(k);
-      k.style.marginLeft = Math.abs(dx) < 0.3 ? "" : `${dx.toFixed(2)}px`;
-    };
+    const align = () => alignFirstGlyphs(titleRef.current, kindRef.current);
     align();
-    // The first pass can run on a fallback face; redo it once the real one is in.
+    // The first pass can land on a fallback face; redo it once the real one is in.
     let alive = true;
     document.fonts?.ready?.then(() => { if (alive) align(); }).catch(() => {});
+    // ...and once more a beat later, for an engine whose fonts.ready resolves early.
+    const t = window.setTimeout(() => { if (alive) align(); }, 600);
     window.addEventListener("resize", align);
-    return () => { alive = false; window.removeEventListener("resize", align); };
+    return () => { alive = false; window.clearTimeout(t); window.removeEventListener("resize", align); };
   }, [pub?.page?.name]);
   const [missing, setMissing] = useState(false);
   const [preview, setPreview] = useState(false);

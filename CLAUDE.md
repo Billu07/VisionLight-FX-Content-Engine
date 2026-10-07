@@ -951,10 +951,21 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   LEFT SIDE BEARING, the blank a font carries before the ink, which scales with type size: a 44px "D" sits
   ~2px inside its box while the 11px "T" below sits a fifth of that inside its own. A constant nudge cannot
   fix it either, because the name belongs to the creator and every first letter carries a different bearing —
-  measured: "D" wants 3px, "O" wants 2px. So TourPage measures both first glyphs with
-  `measureText().actualBoundingBoxLeft` against the live computed fonts and sets the eyebrow's `margin-left`
-  to the difference, re-running on `document.fonts.ready` (the first pass can land on a fallback face) and on
-  resize (the title clamps 28→44px). Verified to 0px across four names.
+  measured: "D" wants 3px, "O" wants 2px. **It is measured by DRAWING** (`tour/opticalAlign.ts`), because two
+  cleverer ways both failed and the client reported each as doing nothing:
+  · `measureText().actualBoundingBoxLeft` is not on every engine's TextMetrics, and a canvas font SHORTHAND
+    silently refuses to parse family stacks some engines dislike (`ui-sans-serif`, `system-ui`). Either way
+    both glyphs measure 0, the difference is 0 and no nudge is applied — a no-op indistinguishable from the
+    bug, which is what shipped first (2026-10-07) and was reported as not working (2026-10-08).
+  · SVG `getBBox()` on a text node returns the LAYOUT box, not the ink: it reported ~0 for a 3px bearing and
+    made the alignment WORSE. Caught by the probe before it went anywhere.
+  So `inkOffset()` draws the glyph on a small canvas and finds its first inked column, which cannot be wrong
+  about what it is looking at. The one remaining fragility — the font string — is handled by quoting ONE
+  family plus a generic and reading `ctx.font` back to confirm the engine took it; if it did not, or
+  `getImageData` is refused, it falls back to the share of an em a sans-serif capital typically carries
+  (0.05), which lands within ~1.4px instead of being 3px out. TourPage re-runs it on `document.fonts.ready`,
+  once more 600ms later, and on resize (the title clamps 28→44px). The probe checks BOTH paths: exact 0px
+  across four first letters normally, and the fallback with the measurement taken away.
 - **Pathway, second pass** (2026-10-07, client): the way back reads **"← More {page} Tours"** ("More" says
   what is on the other side of it). The page's **name and logo under it are GONE** (`.tpw-brand`) — the way
   back already says the name, so it was the same word twice in two lines (ref09). The cover's **expand button
