@@ -359,6 +359,17 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     per-tour key is only claimed when the demo actually STARTS, the SECOND drift became the
     first stop that could play it (client's ref01.mp4). The regression test drives a real touch
     on Skip Tips and fails on the old ordering.
+    **And the element is cleared on three occasions, not one** (fixed 2026-10-08): `endIntro`
+    returns early on `!introActive`, so it cleaned up NOTHING when the effect tore down while the
+    demo was still playing — and one SpinViewer serves a whole tour, so `.r3d-intro` is the same
+    element on every stop: `r3d-intro-on` and the inline opacity outlived the drift that wrote
+    them. A visitor who pressed Next mid-demo carried a frozen hand in the middle of every drift
+    for the rest of the visit, which is what the client saw on iOS. Until the fix above this could
+    not happen, because `onDown` called `endIntro()` on a tap anywhere, Next included — taking
+    that out is what exposed it. `clearIntroDom()` has NO state guard and runs when the demo ends,
+    when the effect tears down, and when a drift mounts (the last so a visitor already carrying a
+    stranded hand is freed by the next drift they open). The regression test presses Next part-way
+    through the demo and, before the fix, caught the hand frozen at opacity 0.16 on the next stop.
     It also fires from BOTH reveal paths now, with no delay: the moment the loader lifts (it used to wait
     another 200ms after the loader's 420ms sweep) **and** on the warm path, where a drift whose frames
     were already in reveals with no loader at all — a tour opened from its own pathway prefetches and

@@ -694,10 +694,25 @@ export default function SpinViewer({
     // Class + text only — NOT syncHelper(): its placeHelperX() reads frameRect,
     // which is declared further down this effect (TDZ crash), and the anchor is
     // re-placed every frame from draw() anyway.
+    // Put the hand's element back as it was found. No state guard on purpose: this has to work
+    // when the demo was never running, when it was interrupted, and when it belonged to a drift
+    // that has already gone — one SpinViewer serves a whole tour, so this element is shared and
+    // whatever the last drift left on it is what the next one inherits.
+    const clearIntroDom = () => {
+      const el = introHandRef.current;
+      if (el) {
+        el.classList.remove("r3d-intro-on");
+        // The demo writes the hand's opacity inline — clear it, or the hand stays on screen.
+        el.style.opacity = "";
+      }
+      stage.classList.remove("r3d-introing");
+    };
     if (driftMode) {
       // ...and an arrow a PREVIOUS stop retired for good comes back for this one: the class
       // lives on the DOM, which one mounted SpinViewer carries across every swap.
       hintRef.current?.classList.remove("r3d-back", "r3d-gone");
+      // ...and no hand left behind by the drift before it.
+      clearIntroDom();
       setGuidePoint();
       if (helperTextRef.current) helperTextRef.current.textContent = fwdHelper;
       setHeadState(false);
@@ -737,10 +752,7 @@ export default function SpinViewer({
     const endIntro = () => {
       if (!introActive) return;
       introActive = false;
-      introHandRef.current?.classList.remove("r3d-intro-on");
-      // The demo animates the hand's opacity inline — clear it, or the hand stays on screen.
-      if (introHandRef.current) introHandRef.current.style.opacity = "";
-      stage.classList.remove("r3d-introing");
+      clearIntroDom();
       // yaw is left alone on purpose. Run to the end, the back-swing has already returned it to
       // the start; cut short by a touch, it belongs to the visitor now and snapping it back is
       // the yank the old demo used to give.
@@ -2210,6 +2222,9 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
+      // Pressing Next while the welcome demo is playing tears this effect down mid-demo. Without
+      // this the hand stays on the shared element for the rest of the visit (client, 2026-10-08).
+      clearIntroDom();
       if (prevDoc) {
         docEl.style.overflow = prevDoc.ovf;
         docEl.style.overscrollBehavior = prevDoc.osb;
