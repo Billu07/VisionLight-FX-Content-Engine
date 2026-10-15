@@ -456,6 +456,7 @@ export const apiEndpoints = {
   driftAdminWaitlist: () => api.get("/api/drift/admin/waitlist"),
   driftJoinWaitlist: (email: string, product: string, source?: string) =>
     api.post("/api/drift/public/waitlist", { email, product, source }),
+  driftSiteContact: (payload: Record<string, unknown>) => api.post("/api/drift/public/contact", payload),
   driftMailTemplates: () => api.get("/api/drift/mail/templates"),
   driftMailSaveTemplate: (key: string, data: Record<string, unknown>) =>
     api.put(`/api/drift/mail/templates/${key}`, data),

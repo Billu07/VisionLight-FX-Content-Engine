@@ -217,7 +217,7 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
             </Link>
           ) : (
             <button className="d-btn" onClick={() => setShowLogin(true)}>
-              Login
+              Log In
             </button>
           )}
         </div>
@@ -240,7 +240,7 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
         <p>Drift.li Is a Division of PicDrift</p>
       </footer>
 
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} signUpHref="/tour/start" />
     </div>
   );
 }

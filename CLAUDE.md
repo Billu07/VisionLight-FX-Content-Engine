@@ -938,6 +938,31 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
   (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
+- **Client pass 2026-10-15** (refs in `corrections/`): the drift.li home header reads **"Log In"**,
+  and the login modal's "Sign Up Now" takes a `signUpHref` — drift.li passes `/tour/start`, so a
+  visitor who needs an account lands on Try It Free rather than PicDrift (the studio and
+  rotation3d.com keep the default). "Need a Login?" is left alone: a noun, and correct as written.
+  /tour/start's lead is one line, the client's own: "Turn video clips into an interactive tour."
+  The cover lightbox's **X rides the picture's own top-right corner** — out in the screen's corner
+  people could not find it and had no way out (ref05). A ready drift's **preview is the way into
+  it** (`.t-step-shot` + an `Open ↗` pill): the small Open link in the row below was the only way
+  in and was being missed (ref06). The Tour Settings panel has **its own X** (`.t-panel-x`), since
+  it opens from the cover's pencil and the only way out was the toolbar button above it (ref09).
+  On a phone the builder's **four actions stack in the room beside the cover** (`.t-head-build`, a
+  2-column grid under 560px) instead of wrapping into two more rows (ref10) — scoped to the
+  builder's own head, and it falls back to one column when a tour has no cover to stand beside.
+  The tour footer carries a **Contact** link beside Terms · Privacy → `tour/SiteContactSheet.tsx`
+  → `POST /api/drift/public/contact` → the `drift.contact.new` template to ADMIN_EMAILS with the
+  visitor as reply-to (ref04). It is deliberately NOT EnquirySheet: that one is a creator's page
+  writing to its own inbox and carries their name, phone toggle, tour and personal link; this is
+  the site writing to us. It shares the sheet's CSS, not its component.
+  **The email header** keeps the "d." mark and now reads **"Drift Live Interactive"** beside it,
+  Drift in white and Live Interactive in the teal (ref07). Drawn, not typed: mail clients fall
+  back to their own fonts and the words beside a brand mark have to be the brand's, so the glyphs
+  come from Bai Jamjuree as paths (the share cards' machinery) composited over the icon and sent
+  down from 3x — `frontend/public/drift/email-lockup.png`, 230x36. A NEW filename, so nothing is
+  holding the old one. `scratchpad/email-lockup.js` regenerates it; two sharp passes on purpose,
+  because sharp runs `resize` BEFORE `composite` in one pipeline and shrinks the canvas first.
 - **Back-office nudges** (2026-10-07, client): a superadmin lands on a tour page's **Admin view** instead of
   having to press "Admin" first (`usePageAdmin`'s `manage` starts true — it only scopes the creator API to the
   page via `X-Drift-Org`, and the header's Public side steps straight back out). Hiding a tour **scrolls to

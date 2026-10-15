@@ -238,7 +238,18 @@ function StepCard({
       <div className="t-step-media">
         <div className="t-step-thumb">
           <span className="t-num">{index + 1}</span>
-          {p?.thumb ? (
+          {p?.thumb && p?.playerPath && isReady(status) ? (
+            /* The picture IS the way in (client's ref06, 2026-10-15): the only way to open a
+               drift used to be the small Open link in the row below, which people were missing.
+               The pill says so out loud; the anchor around the whole frame is what they reach
+               for. Same window, like every other Open in this builder. */
+            <a className="t-step-shot" href={p.playerPath} aria-label={`Open ${p.name}`}>
+              <img src={p.thumb} alt="" />
+              <span className="t-step-open" aria-hidden>
+                Open ↗
+              </span>
+            </a>
+          ) : p?.thumb ? (
             <>
               <img src={p.thumb} alt="" />
               {/* The frame proves the clip arrived; this says what happens to it next. */}
@@ -1016,7 +1027,7 @@ export default function TourBuilder({
       </div>
 
 
-      <div className="t-head t-rise" style={{ marginTop: 6 }}>
+      <div className="t-head t-head-build t-rise" style={{ marginTop: 6 }}>
         {/* The same cover a visitor sees on the pathway (client's ref08, 2026-10-07), with the
             pencil opening Tour Settings — where the picker that chooses it lives. A tour whose
             creator has not picked one shows its first drift's frame, as the pathway does. */}
@@ -1123,8 +1134,14 @@ export default function TourBuilder({
       </div>
 
       {showSettings && !readOnly && (
-        <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
-          <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour Settings</div>
+        <div className="d-card d-card-pad" style={{ marginBottom: 18, position: "relative" }}>
+          {/* Opened from the cover's pencil, this panel had no X of its own — the only way
+              out was the toolbar button above it, which people were not finding (client's
+              ref09, 2026-10-15). */}
+          <button type="button" className="t-panel-x" onClick={() => setShowSettings(false)} aria-label="Close tour settings">
+            ✕
+          </button>
+          <div className="d-eyebrow" style={{ marginBottom: 12, paddingRight: 44 }}>Tour Settings</div>
           <div className="t-cover">
             <div className="t-cover-current">{flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No Cover Yet</span>}</div>
             <div className="t-cover-controls">

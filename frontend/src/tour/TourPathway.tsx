@@ -68,10 +68,15 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   const coverHost = typeof document !== "undefined" ? document.querySelector(".drift-ui.d-page") : null;
   const coverLightbox = (
     <div className="tpw-lightbox" role="dialog" aria-modal="true" aria-label="Cover photo" onClick={() => setBig(false)}>
-      <img src={cover || ""} alt={flow.title || flow.name} />
-      <button type="button" className="tpw-lightbox-x" onClick={() => setBig(false)} aria-label="Close">
-        ✕
-      </button>
+      {/* The X hangs off the PICTURE, not the corner of the screen: out there people could not
+          find it and had no way back out (client's ref05, 2026-10-15). A click anywhere still
+          closes, so the wrapper only exists to give the button something to hang from. */}
+      <div className="tpw-lightbox-fig">
+        <img src={cover || ""} alt={flow.title || flow.name} />
+        <button type="button" className="tpw-lightbox-x" onClick={() => setBig(false)} aria-label="Close">
+          ✕
+        </button>
+      </div>
     </div>
   );
   return (

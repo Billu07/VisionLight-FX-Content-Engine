@@ -10,6 +10,10 @@ import { getCanonicalDomainRedirectUrl } from "../lib/domain-routing";
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Where "Sign Up Now" goes. The studio's own sign-up by default; drift.li passes its own
+   *  (client, 2026-10-15: a visitor on drift.li who needs an account wants Try It Free, not
+   *  PicDrift). A path opens in this tab, a URL in a new one. */
+  signUpHref?: string;
 }
 
 type LoginStep = "email" | "password";
@@ -88,7 +92,7 @@ const cacheEmailDomain = (email: string, domain: string, profileId?: string) => 
 const profileLabel = (profile: LoginProfile) =>
   profile.organizationName || profile.name || profile.email;
 
-export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
+export const LoginModal = ({ isOpen, onClose, signUpHref = "https://picdrift.com/sign-up" }: LoginModalProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("email");
@@ -413,11 +417,11 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
           <div className="text-center mt-4 pt-2 border-t border-white/5">
             <p className="text-sm text-gray-400">
+              {/* "Need a Login?" is right as written — a noun (client, 2026-10-15). */}
               Need a Login?{" "}
               <a
-                href="https://picdrift.com/sign-up"
-                target="_blank"
-                rel="noopener noreferrer"
+                href={signUpHref}
+                {...(/^https?:/i.test(signUpHref) ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
               >
                 Sign Up Now

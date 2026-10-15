@@ -110,10 +110,13 @@ export const TOUR_PAGE_STYLES = `
 .tpw-cover-btn svg{width:14px;height:14px}
 .tpw-lightbox{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;
   background:rgba(6,9,16,.92);backdrop-filter:blur(6px);cursor:zoom-out;animation:tpwfade .18s ease}
-.tpw-lightbox img{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
-.tpw-lightbox-x{position:absolute;right:16px;top:16px;width:40px;height:40px;border-radius:12px;font-size:17px;line-height:1;
-  color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);cursor:pointer}
-.tpw-lightbox-x:hover{background:rgba(255,255,255,.2)}
+.tpw-lightbox-fig{position:relative;display:inline-flex;max-width:100%;max-height:100%}
+.tpw-lightbox img{display:block;max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+/* On the picture's own top-right corner, the same place and shape as the expand button that
+   opened it — so the way out is where the way in was (client's ref05, 2026-10-15). */
+.tpw-lightbox-x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:12px;font-size:16px;line-height:1;
+  color:#fff;background:rgba(11,15,25,.66);border:1px solid rgba(255,255,255,.26);backdrop-filter:blur(8px);cursor:pointer}
+.tpw-lightbox-x:hover{background:rgba(11,15,25,.88)}
 @keyframes tpwfade{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){
   .tpw-head{flex-direction:column;gap:12px;margin-top:26px}

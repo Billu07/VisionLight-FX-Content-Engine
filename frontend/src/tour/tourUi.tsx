@@ -6,6 +6,7 @@ import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
 import { isDriftHost } from "../lib/branding";
 import { CREATOR_HOME, CREATOR_LANDING, CREATOR_START } from "./tourSession";
 import { PageSwitcher } from "./PageSwitcher";
+import { SiteContactLink } from "./SiteContactSheet";
 import { invalidateMyPages } from "./myPages";
 
 /**
@@ -34,6 +35,10 @@ export const TOUR_STYLES = `
 .t-chip b{color:var(--text)}
 .t-upgrade{border:1px solid var(--accent-border);background:linear-gradient(135deg,var(--accent-soft),transparent 62%),var(--surface)}
 .t-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* A panel that opens inside the page still needs a way out of its own corner. */
+.t-panel-x{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:11px;font-size:15px;line-height:1;cursor:pointer;
+  color:var(--text);background:var(--surface-2);border:1px solid var(--border);transition:background .16s,border-color .16s}
+.t-panel-x:hover{background:var(--surface-3);border-color:var(--border-strong)}
 /* The tour's cover in the builder's head, matching what the pathway shows a visitor (client's
    ref08, 2026-10-07). It keeps its own row on a phone, where the head wraps anyway. */
 .t-head-cover{position:relative;flex:none;width:clamp(104px,20vw,140px);aspect-ratio:4/3;border-radius:14px;overflow:hidden;
@@ -43,6 +48,19 @@ export const TOUR_STYLES = `
   color:#fff;background:rgba(11,15,25,.62);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(8px);transition:background .16s}
 .t-head-cover-edit:hover{background:rgba(11,15,25,.85)}
 .t-head-cover-edit svg{width:14px;height:14px}
+/* On a phone the builder's four actions stack in the room beside the cover instead of
+   wrapping into two more rows under it (client's ref10, 2026-10-15). Scoped to the builder's
+   own head so nothing else that uses .t-head is touched. */
+@media(max-width:560px){
+  .t-head-build{display:grid;grid-template-columns:minmax(0,140px) minmax(0,1fr);gap:12px;align-items:start}
+  .t-head-build .t-head-cover{grid-column:1;grid-row:1;width:100%;max-width:none;aspect-ratio:4/3}
+  .t-head-build .t-actions{grid-column:2;grid-row:1;flex-direction:column;align-items:stretch;gap:8px}
+  .t-head-build .t-actions .d-btn{width:100%;justify-content:center}
+  /* everything else — the status line, the name, the drift count — takes the full width below */
+  .t-head-build > div:not(.t-head-cover):not(.t-actions){grid-column:1 / -1;grid-row:2}
+  /* ...and with no cover there is nothing to stand beside, so it falls back to one column */
+  .t-head-build:not(:has(.t-head-cover)){display:flex}
+}
 @media(max-width:560px){.t-head-cover{width:100%;max-width:260px;aspect-ratio:16/10}}
 .t-steps{display:grid;gap:12px}
 .t-step{display:grid;gap:14px;padding:14px;grid-template-columns:1fr}
@@ -171,6 +189,12 @@ export const TOUR_STYLES = `
 .t-step-thumb{aspect-ratio:4/5;border-radius:16px}
 .t-building{display:grid;gap:8px;justify-items:center}
 .t-previewing{position:absolute;left:8px;bottom:8px;z-index:1;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--accent);color:var(--accent-ink)}
+/* A ready drift's preview is a link to it, with the pill saying so on the top right corner
+   (client's ref06, 2026-10-15). */
+.t-step-shot{position:absolute;inset:0;display:block;text-decoration:none}
+.t-step-open{position:absolute;right:8px;top:8px;z-index:2;font-size:11px;font-weight:750;padding:5px 10px;border-radius:999px;
+  color:#fff;background:rgba(11,15,25,.66);border:1px solid rgba(255,255,255,.26);backdrop-filter:blur(8px);transition:background .16s}
+.t-step-shot:hover .t-step-open{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 /* Over a drift that is waiting for checkout: the frame is the reassurance, this is the reason
    it isn't playable yet. Readable over any footage, hence the scrim rather than a tint. */
 .t-step-wait{position:absolute;left:0;right:0;bottom:0;z-index:1;padding:14px 8px 8px;font-size:10.5px;font-weight:750;line-height:1.3;
@@ -584,7 +608,9 @@ export function TourShell({ children, view }: { children: React.ReactNode; view?
           )}
         </span>
         <span>
-          <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
+          {/* Somewhere to write to us from any tour page (client's ref04, 2026-10-15). It sits
+              with Terms and Privacy because that is where people look for it. */}
+          <SiteContactLink /> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
         </span>
       </footer>
     </div>

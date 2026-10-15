@@ -322,7 +322,8 @@ export default function TourAuth() {
             ? inviteLine
               ? `Then you'll join ${inviteLine}.`
               : "Then You'll Accept Your Invite."
-            : "Free to start. Turn three phone clips into an interactive tour in minutes.";
+            : // The client's own line, 2026-10-15 — short enough to stay on one.
+              "Turn video clips into an interactive tour.";
 
   const typePicker = (
     <div style={{ display: "grid", gap: 8 }}>

@@ -6,7 +6,7 @@ import { channelStatus, ensureChannel, featureSourceId, findChannel, resolveOwnF
 import { DRIFT_PRICE_CENTS, formatMoney, stripePaymentUrl, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
 import { createProInvite, listProInvites, memberRole, parseAccountType, revokeProInvite } from "../services/driftTourAccounts";
 import { uniqueOrgSlug } from "./drift";
-import { sendWaitlistNoticeEmail } from "../services/mail";
+import { sendSiteContactEmail, sendWaitlistNoticeEmail } from "../services/mail";
 import { processingQueueDepth } from "../services/rotation3d/processingQueue";
 
 // drift.li Tour v2 back office (TOUR_V2_PLAN.md P5): the superadmin's view of every
@@ -464,6 +464,27 @@ router.post("/api/drift/public/waitlist", async (req: AuthenticatedRequest, res:
     void sendWaitlistNoticeEmail({ email, product }).catch((err) => console.error(`[${NS}] wait list notice failed:`, err));
   }
   res.json({ ok: true, already: !!existing });
+});
+
+/**
+ * The drift.li tour footer's Contact button (client, 2026-10-15). Not a page's enquiry — this
+ * one reaches us, not a creator — so it keeps its own route, its own template and the same
+ * honeypot the enquiry form uses.
+ */
+router.post("/api/drift/public/contact", async (req: AuthenticatedRequest, res: Response) => {
+  // A bot fills every field it can see; a person never sees this one.
+  if (String(req.body?.website || "").trim()) return res.json({ ok: true });
+  const name = String(req.body?.name || "").trim().slice(0, 80);
+  const email = String(req.body?.email || "").trim().toLowerCase().slice(0, 254);
+  const message = String(req.body?.message || "").trim().slice(0, 4000);
+  const page = String(req.body?.page || "").trim().slice(0, 200) || null;
+  if (!name) return res.status(400).json({ error: "Please add your name" });
+  if (!isEmail(email)) return res.status(400).json({ error: "Enter a valid email address" });
+  if (!message) return res.status(400).json({ error: "Please add a message" });
+  void sendSiteContactEmail({ name, email, message, page }).catch((err: unknown) =>
+    console.error(`[${NS}] site contact failed:`, err),
+  );
+  res.json({ ok: true });
 });
 
 export default router;

@@ -386,6 +386,25 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
     }),
   },
   {
+    key: "drift.contact.new",
+    name: "Contact drift.li (team notice)",
+    description: "Someone used the Contact button in the drift.li tour footer.",
+    trigger: "A visitor sends the site contact form",
+    audience: "Platform admins (ADMIN_EMAILS)",
+    vars: [
+      { name: "name", description: "Their name", sample: "Alex Morgan" },
+      { name: "email", description: "Their email", sample: "alex@example.com" },
+      { name: "message", description: "What they wrote", sample: "Can I use this for a listing?" },
+      { name: "page", description: "The page they were on", sample: "/tour/harbour-homes" },
+    ],
+    defaults: f({
+      subject: "drift.li contact · {{name}}",
+      heading: "New message from drift.li",
+      intro: "{{name}} ({{email}}) wrote in from {{page}}.",
+      footnote: "Reply straight to this email and it reaches them.",
+    }),
+  },
+  {
     key: "waitlist.join.notice",
     name: "Wait list sign-up (team notice)",
     description: "Tells your team someone joined the View, Memory or Path wait list on the drift.li home.",

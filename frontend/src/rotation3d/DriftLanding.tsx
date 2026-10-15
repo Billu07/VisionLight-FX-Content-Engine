@@ -195,7 +195,7 @@ function HeroLanding({ product }: { product: any }) {
         />
         </Suspense>
       </div>
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} signUpHref="/tour/start" />
     </div>
   );
 }

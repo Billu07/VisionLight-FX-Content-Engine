@@ -267,8 +267,8 @@ export function renderEmail(opts: {
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e9ef">
         <tr><td style="background-color:#0b0f19;background-image:linear-gradient(135deg,#0d1324,#0a0e19);padding:18px 28px">
-          <img src="${PUBLIC_URL}/drift/email-logo.png" width="121" height="32" alt="drift.li — Drift Live Interactive"
-               style="display:block;border:0;outline:none;text-decoration:none;height:32px;width:121px">
+          <img src="${PUBLIC_URL}/drift/email-lockup.png" width="230" height="36" alt="Drift Live Interactive"
+               style="display:block;border:0;outline:none;text-decoration:none;height:36px;width:230px">
         </td></tr>
         <tr><td style="padding:26px 28px 30px">
           <h1 style="margin:0 0 10px;font-size:20px;color:#0b0f19">${esc(opts.heading)}</h1>
@@ -721,6 +721,26 @@ export async function sendTourEnquiryEmail(params: {
     },
     defaultTo: params.to,
     rows,
+    replyTo: params.email,
+  });
+}
+
+/** The Contact button in the drift.li tour footer. Goes to the platform admins with the
+ *  visitor as reply-to, so answering it is one tap. */
+export async function sendSiteContactEmail(params: {
+  name: string;
+  email: string;
+  message: string;
+  page?: string | null;
+}): Promise<void> {
+  await sendTemplated("drift.contact.new", {
+    vars: {
+      name: params.name,
+      email: params.email,
+      message: params.message,
+      page: params.page || "drift.li",
+    },
+    defaultTo: ADMIN_EMAILS,
     replyTo: params.email,
   });
 }
