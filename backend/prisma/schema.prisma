@@ -92,7 +92,7 @@ model Organization {
   tourAccountType   String? // GENERAL (realtors, brands, venues) | PRO (photographers / videographers)
   managedByOrgId    String? // the Pro page that created / manages this client page
   tourSettings      Json? // { contactLabel, contactUrl, demoFlowId, logoUrl }
-  freeDrifts        Int     @default(3) // drifts the page may build before checkout (per-drift pricing)
+  freeDrifts        Int     @default(3) // drifts the page may build before checkout (per-drift pricing); a promo code at sign-up can raise it
 
   driftProducts     DriftProduct[]
   driftSourceImages DriftSourceImage[]
@@ -935,4 +935,40 @@ model EmailOptOut {
   email     String   @id // lower-case
   source    String? // the email (template key) the link came from
   createdAt DateTime @default(now())
+}
+
+/// A sign-up promo code: "Betatester20" and the like. `freeDrifts` is the TOTAL the page ends
+/// up with, not a top-up — the admin thinks in totals and the code's own name says so.
+/// Expiry, a use limit and the on/off switch are each optional and independent.
+model DriftPromoCode {
+  id          String   @id @default(cuid())
+  code        String   @unique // stored upper-case; typed by hand, so case and spaces are normalised away
+  freeDrifts  Int // the total allowance a redeeming page ends up with (never lowers an existing one)
+  note        String? // what it is for, for the back office's own eyes
+  expiresAt   DateTime?
+  maxUses     Int? // null = no limit
+  uses        Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  redemptions DriftPromoRedemption[]
+
+  @@index([active])
+}
+
+/// One page's use of one code. The unique pair is what stops a page redeeming the same code
+/// twice; the rows are also the back office's record of who a campaign reached.
+model DriftPromoRedemption {
+  id             String   @id @default(cuid())
+  codeId         String
+  organizationId String
+  email          String?
+  freeDrifts     Int // what the code gave at the time, so later edits to the code cannot rewrite history
+  createdAt      DateTime @default(now())
+
+  code DriftPromoCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, organizationId])
+  @@index([organizationId])
 }

@@ -669,6 +669,37 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `.async_payment_failed` → order FAILED, drifts due again / `.expired`) or return-page confirm → PAID,
   `hostingExpiresAt` +1y (not enforced yet) → processed. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   optional `TOUR_DRIFT_PRICE_CENTS`/`TOUR_CURRENCY`. Superadmin = COMP, no clip limit.
+- **Promo codes** (2026-10-15, client; needs `prisma db push`): a **Promo Code (Optional)** field on
+  /tour/start raises the free allowance of the page a sign-up creates. `services/driftPromos.ts` +
+  `DriftPromoCode` / `DriftPromoRedemption`; back office = Admin → drift.li → Tour → **Promo codes**
+  (create, switch on/off, copy the campaign link `…/tour/start?promo=CODE`, see who used one, delete).
+  **A code's number is the TOTAL the page ends up with, not a top-up** — the codes are named after it
+  ("Betatester20" gives 20, which is 17 on the usual 3) and the admin thinks in totals; both readings
+  are printed wherever the number appears so neither can be misread. It **never lowers** an allowance
+  the page already has (`max(current, code.freeDrifts)`), so a hand-set invite keeps its own. Expiry,
+  a use limit and the on/off switch are each optional and independent.
+  **A bad code never fails the sign-up**: redemption returns null and the account is made anyway —
+  losing an account over a typo is the worst possible moment to be strict. The only place a bad code
+  is mentioned is the field itself, which checks against `GET /api/drift/public/promo/:code` as it is
+  typed ("20 Free Drifts Instead of 3" before they commit). The code rides the auth round-trip in
+  localStorage beside the account type (`rememberPromoCode`/`takePromoCode`, key `drift_creator_promo`)
+  because an email confirmation can be opened minutes later and Google leaves the page entirely;
+  `ensureCreatorProfile` clears it either way, so a leftover can never be spent on a later sign-up.
+  Redemption is one `$transaction`, and the use limit is enforced by the UPDATE's own WHERE
+  (`uses < maxUses`) rather than by a read-then-write: Postgres re-evaluates that after waiting for
+  the row lock, so two people redeeming the last use cannot both win. It does **not** also pin `uses`
+  to the value just read — that pin made an UNLIMITED code single-use under concurrency (two sign-ups
+  in the same second collided over a code with no limit to run out of). Caught by
+  `scratchpad/promo-probe.js`, which drives the service against a fake Prisma: 45 checks, both races
+  included.
+- **Pre-bought drift credits for a page's Pros** — asked for 2026-10-15, **not built**. Worth knowing
+  what already exists: `Organization.freeDrifts` is a PAGE-wide pool and `billingSummary` counts it
+  against every flow-step drift on that page, so a Pro invited to a realtor's page as an EDITOR
+  already spends the realtor's allowance — the shared pool is real. What is missing is only the
+  self-serve purchase: today the allowance is raised by a superadmin by hand, by an invite's limits,
+  or by a promo code, and Stripe checkout is per drift at the point of conversion. "Buy 10 credits"
+  would be a second Checkout line that increments `freeDrifts` on success — the same webhook, a
+  different fulfilment.
 - **Accounts** (`services/driftTourAccounts.ts`): `tourAccountType` GENERAL | PRO; Pro "Client Pages"
   (org with `managedByOrgId` + an Admin profile for the Pro); page invites (one-time links with a role).
 - **Page roles** (2026-09-15): a member = a User profile in the page's org; `User.tourRole` ADMIN | EDITOR |

@@ -949,6 +949,285 @@ function Waitlist() {
   );
 }
 
+type PromoUse = { id: string; email: string | null; createdAt: string; organizationId: string; freeDrifts: number };
+type PromoRow = {
+  id: string;
+  code: string;
+  freeDrifts: number;
+  extra: number;
+  note: string | null;
+  expiresAt: string | null;
+  maxUses: number | null;
+  uses: number;
+  active: boolean;
+  expired: boolean;
+  usedUp: boolean;
+  createdAt: string;
+  redemptions: PromoUse[];
+};
+
+/**
+ * Sign-up promo codes (client, 2026-10-15: "being able to set codes with expiry in the tour
+ * backend would be very helpful for marketing").
+ *
+ * A code's number is the TOTAL a redeeming page ends up with, because that is how the codes are
+ * named — "Betatester20" gives 20. Both readings are on screen wherever the number appears, so
+ * nobody has to remember which one it is.
+ */
+function Promos() {
+  const [rows, setRows] = useState<PromoRow[] | null>(null);
+  const [base, setBase] = useState(3);
+  const [msg, setMsg] = useState<Msg>(null);
+  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [killing, setKilling] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: "", freeDrifts: "20", note: "", expiresAt: "", maxUses: "" });
+
+  const take = (r: any) => {
+    setRows(r.data?.codes || []);
+    if (Number.isFinite(Number(r.data?.defaultFreeDrifts))) setBase(Number(r.data.defaultFreeDrifts));
+  };
+  useEffect(() => {
+    apiEndpoints
+      .driftTourAdminPromos()
+      .then(take)
+      .catch((e) => {
+        setMsg({ kind: "err", text: errText(e, "Couldn't load the promo codes") });
+        setRows([]);
+      });
+  }, []);
+
+  const run = async (work: () => Promise<any>, ok: string) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      take(await work());
+      setMsg({ kind: "ok", text: ok });
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "That didn't work") });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async () => {
+    const code = form.code.trim().replace(/\s+/g, "").toUpperCase();
+    if (code.length < 3) return setMsg({ kind: "err", text: "A code needs at least three characters" });
+    await run(
+      () =>
+        apiEndpoints.driftTourAdminCreatePromo({
+          code,
+          freeDrifts: Number(form.freeDrifts),
+          note: form.note.trim(),
+          expiresAt: form.expiresAt,
+          maxUses: form.maxUses,
+        }),
+      `${code} is live`,
+    );
+    setForm({ code: "", freeDrifts: "20", note: "", expiresAt: "", maxUses: "" });
+    setAdding(false);
+  };
+
+  const gives = (total: number, extra: number) =>
+    extra > 0 ? `${plural(total, "free drift")} · +${extra} on the usual ${base}` : plural(total, "free drift");
+
+  return (
+    <div className="d-card d-card-pad">
+      <div className="d-head">
+        <div>
+          <div className="d-h2">Promo codes</div>
+          <p className="d-sub" style={{ fontSize: 12.5 }}>
+            Typed on Try It Free. A code's number is the <strong>total</strong> free drifts the new page starts with — 20
+            means 20, which is {Math.max(0, 20 - base)} more than the usual {base}. It never lowers an allowance a page
+            already has.
+          </p>
+        </div>
+        <button className="d-btn sm primary" onClick={() => setAdding((v) => !v)} disabled={busy}>
+          {adding ? "Cancel" : "New code"}
+        </button>
+      </div>
+      <Banner msg={msg} onClose={() => setMsg(null)} />
+
+      {adding && (
+        <div className="d-card d-card-pad" style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))" }}>
+            <div>
+              <label className="d-label" htmlFor="pr-code">
+                Code
+              </label>
+              <input
+                id="pr-code"
+                className="d-input"
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().replace(/\s+/g, "") })}
+                placeholder="BETATESTER20"
+                style={{ textTransform: "uppercase", letterSpacing: ".04em" }}
+                maxLength={40}
+              />
+            </div>
+            <div>
+              <label className="d-label" htmlFor="pr-free">
+                Free drifts (total)
+              </label>
+              <input
+                id="pr-free"
+                className="d-input"
+                type="number"
+                min={1}
+                max={500}
+                value={form.freeDrifts}
+                onChange={(e) => setForm({ ...form, freeDrifts: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="d-label" htmlFor="pr-exp">
+                Expires (optional)
+              </label>
+              <input
+                id="pr-exp"
+                className="d-input"
+                type="date"
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="d-label" htmlFor="pr-max">
+                Use limit (optional)
+              </label>
+              <input
+                id="pr-max"
+                className="d-input"
+                type="number"
+                min={1}
+                value={form.maxUses}
+                onChange={(e) => setForm({ ...form, maxUses: e.target.value })}
+                placeholder="No limit"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="d-label" htmlFor="pr-note">
+              What it's for (optional)
+            </label>
+            <input
+              id="pr-note"
+              className="d-input"
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              placeholder="Beta testers, October"
+              maxLength={200}
+            />
+          </div>
+          <div className="d-actions">
+            <button className="d-btn primary sm" onClick={create} disabled={busy}>
+              {busy ? "Saving…" : "Create code"}
+            </button>
+            <span className="d-faint" style={{ fontSize: 12 }}>
+              {Number(form.freeDrifts) > base
+                ? `Gives ${plural(Number(form.freeDrifts) || 0, "free drift")} — ${Number(form.freeDrifts) - base} more than the usual ${base}.`
+                : `Gives ${plural(Number(form.freeDrifts) || 0, "free drift")}.`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="d-list" style={{ marginTop: 12 }}>
+        {rows === null ? (
+          <div className="py-6 text-center">
+            <LoadingSpinner size="sm" />
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="d-faint" style={{ fontSize: 12.5 }}>
+            No codes yet.
+          </p>
+        ) : (
+          rows.map((r) => {
+            const dead = !r.active || r.expired || r.usedUp;
+            return (
+              <div key={r.id} className="d-item static" style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                  <span className="d-name" style={{ fontSize: 14, letterSpacing: ".04em" }}>
+                    {r.code}
+                  </span>
+                  <span className={`d-pill ${dead ? "" : "ok"}`}>{gives(r.freeDrifts, r.extra)}</span>
+                  {!r.active && <span className="d-pill">Off</span>}
+                  {r.expired && <span className="d-pill err">Expired</span>}
+                  {r.usedUp && <span className="d-pill warn">Used up</span>}
+                </div>
+                <span className="sub" style={{ fontSize: 12 }}>
+                  {r.note ? `${r.note} · ` : ""}
+                  {r.uses}
+                  {r.maxUses !== null ? ` / ${r.maxUses}` : ""} used
+                  {r.expiresAt ? ` · until ${when(r.expiresAt)}` : " · no expiry"}
+                </span>
+                <div className="d-actions">
+                  <button
+                    className="d-btn ghost sm"
+                    disabled={busy}
+                    onClick={() => run(() => apiEndpoints.driftTourAdminUpdatePromo(r.id, { active: !r.active }), r.active ? `${r.code} switched off` : `${r.code} is live`)}
+                  >
+                    {r.active ? "Switch off" : "Switch on"}
+                  </button>
+                  <CopyLink url={onDrift(`/tour/start?promo=${encodeURIComponent(r.code)}`)} label="Copy sign-up link" />
+                  {r.uses > 0 && (
+                    <button className="d-btn ghost sm" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                      {openId === r.id ? "Hide who used it" : `Who used it (${r.uses})`}
+                    </button>
+                  )}
+                  {killing === r.id ? (
+                    <>
+                      <button
+                        className="d-btn danger sm"
+                        disabled={busy}
+                        onClick={async () => {
+                          await run(() => apiEndpoints.driftTourAdminDeletePromo(r.id), `${r.code} deleted`);
+                          setKilling(null);
+                        }}
+                      >
+                        Delete it
+                      </button>
+                      <button className="d-btn ghost sm" onClick={() => setKilling(null)}>
+                        Keep it
+                      </button>
+                    </>
+                  ) : (
+                    <button className="d-btn ghost sm" onClick={() => setKilling(r.id)} title="Switching it off is usually enough — deleting takes its history too">
+                      Delete
+                    </button>
+                  )}
+                </div>
+                {openId === r.id && (
+                  <div className="d-list d-scroll" style={{ maxHeight: 220 }}>
+                    {r.redemptions.length === 0 ? (
+                      <p className="d-faint" style={{ fontSize: 12 }}>
+                        Used {plural(r.uses, "time")}, before we kept the record.
+                      </p>
+                    ) : (
+                      r.redemptions.map((u) => (
+                        <div key={u.id} className="d-item static">
+                          <span className="grow">
+                            <span className="d-name" style={{ display: "block", fontSize: 12.5 }}>
+                              {u.email || "—"}
+                            </span>
+                            <span className="sub">{when(u.createdAt)}</span>
+                          </span>
+                          <span className="d-pill">{plural(u.freeDrifts, "drift")}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 type ChannelInfo = { channel: { id: string; name: string; slug: string; path: string } | null; featured: number; library: number };
 
 /** drift.li/tour/drift: drift.li's own page for demos and tours saved from creators. */
@@ -1031,7 +1310,7 @@ function DriftChannel() {
 }
 
 export default function DriftTourAdmin() {
-  const [tab, setTab] = useState<"pages" | "channel" | "demo" | "orders" | "waitlist">("pages");
+  const [tab, setTab] = useState<"pages" | "channel" | "demo" | "orders" | "promos" | "waitlist">("pages");
   const [status, setStatus] = useState<{
     payments: boolean;
     webhook: boolean;
@@ -1059,6 +1338,7 @@ export default function DriftTourAdmin() {
     ["channel", "Drift Channel"],
     ["demo", "Demo tour"],
     ["orders", "Orders"],
+    ["promos", "Promo codes"],
     ["waitlist", "Wait list"],
   ] as const;
   return (
@@ -1089,7 +1369,19 @@ export default function DriftTourAdmin() {
           </span>
         )}
       </div>
-      {tab === "pages" ? <Pages /> : tab === "channel" ? <DriftChannel /> : tab === "demo" ? <DemoTour /> : tab === "orders" ? <Orders /> : <Waitlist />}
+      {tab === "pages" ? (
+        <Pages />
+      ) : tab === "channel" ? (
+        <DriftChannel />
+      ) : tab === "demo" ? (
+        <DemoTour />
+      ) : tab === "orders" ? (
+        <Orders />
+      ) : tab === "promos" ? (
+        <Promos />
+      ) : (
+        <Waitlist />
+      )}
     </div>
   );
 }

@@ -346,8 +346,16 @@ export const apiEndpoints = {
   driftPublicBrandProduct: (brandSlug: string, productSlug: string) =>
     api.get(`/api/drift/public/b/${brandSlug}/${productSlug}`),
   // ── Creator suite (drift.li/tour|view|memory|path): account + flows ──
-  driftCreatorSignup: (name?: string, confirm?: boolean, accountType?: string, ownPage?: boolean) =>
-    api.post("/api/drift/creator/signup", { name, confirm: confirm === true, accountType, ownPage: ownPage === true }),
+  driftCreatorSignup: (name?: string, confirm?: boolean, accountType?: string, ownPage?: boolean, promoCode?: string) =>
+    api.post("/api/drift/creator/signup", {
+      name,
+      confirm: confirm === true,
+      accountType,
+      ownPage: ownPage === true,
+      promoCode: promoCode || undefined,
+    }),
+  // What a promo code gives, before it is used — the Try It Free field checks as it is typed.
+  driftPromoCheck: (code: string) => api.get(`/api/drift/public/promo/${encodeURIComponent(code)}`),
   driftCreatorProfile: () => api.get("/api/drift/creator/profile"),
   driftMyFlows: (kind?: string) => api.get("/api/drift/my/flows", { params: kind ? { kind } : undefined }),
   driftCreateFlow: (data: Record<string, unknown>) => api.post("/api/drift/my/flows", data),
@@ -453,6 +461,11 @@ export const apiEndpoints = {
   // A page's Featured Tours order
   driftSetTourOrder: (flowIds: string[]) => api.put("/api/drift/my/page/tour-order", { flowIds }),
   driftTourAdminOrders: () => api.get("/api/drift/admin/tour/orders"),
+  driftTourAdminPromos: () => api.get("/api/drift/admin/tour/promos"),
+  driftTourAdminCreatePromo: (data: Record<string, unknown>) => api.post("/api/drift/admin/tour/promos", data),
+  driftTourAdminUpdatePromo: (id: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/admin/tour/promos/${id}`, data),
+  driftTourAdminDeletePromo: (id: string) => api.delete(`/api/drift/admin/tour/promos/${id}`),
   driftAdminWaitlist: () => api.get("/api/drift/admin/waitlist"),
   driftJoinWaitlist: (email: string, product: string, source?: string) =>
     api.post("/api/drift/public/waitlist", { email, product, source }),

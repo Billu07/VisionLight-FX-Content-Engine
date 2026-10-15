@@ -17,6 +17,7 @@ import {
   nextFromLocation,
   rememberAccountType,
   rememberNext,
+  rememberPromoCode,
   signInWithGoogle,
   type AccountType,
 } from "./tourSession";
@@ -90,6 +91,11 @@ const STYLES = `
 .ta-type:hover{border-color:var(--border-strong)}
 .ta-type.on{border-color:var(--accent-border);background:var(--accent-soft);box-shadow:0 0 0 3px var(--accent-soft)}
 .ta-type-note{font-size:12px;color:var(--muted);line-height:1.45}
+.ta-promo{display:grid;gap:6px}
+.ta-promo .d-input{text-transform:uppercase;letter-spacing:.04em}
+.ta-promo-note{font-size:12px;font-weight:650;line-height:1.4}
+.ta-promo-note.ok{color:var(--accent)}
+.ta-promo-note.bad{color:var(--err)}
 `;
 
 export default function TourAuth() {
@@ -112,6 +118,9 @@ export default function TourAuth() {
     const t = (params.get("type") || "").toUpperCase();
     return t === "PRO" ? "PRO" : "GENERAL";
   });
+  // ?promo=BETATESTER20 — a campaign link can fill it in for them.
+  const [promo, setPromo] = useState((params.get("promo") || "").toUpperCase().replace(/\s+/g, ""));
+  const [promoInfo, setPromoInfo] = useState<{ ok: boolean; text: string } | null>(null);
   const [email, setEmail] = useState(params.get("email") || "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -123,6 +132,36 @@ export default function TourAuth() {
     checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // What the code gives, checked as it is typed: someone pasting one off a flyer sees "20 free
+  // drifts instead of 3" before they commit, and a typo is caught while it can still be fixed.
+  // The sign-up itself never fails over a code — this is the only place a bad one is mentioned.
+  useEffect(() => {
+    const code = promo.trim();
+    if (code.length < 3) {
+      setPromoInfo(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      apiEndpoints
+        .driftPromoCheck(code)
+        .then((r) => {
+          if (!alive) return;
+          const total = Number(r.data?.freeDrifts) || 0;
+          const extra = Number(r.data?.extra) || 0;
+          setPromoInfo({
+            ok: true,
+            text: extra > 0 ? `${total} Free Drifts Instead of ${total - extra}` : `${total} Free Drifts`,
+          });
+        })
+        .catch((e) => alive && setPromoInfo({ ok: false, text: errorMessage(e, "That Code Isn't Valid") }));
+    }, 400);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [promo]);
 
   // Joining: whose page, and as what (shown in the copy).
   useEffect(() => {
@@ -159,7 +198,7 @@ export default function TourAuth() {
     setError("");
     try {
       rememberNext(next);
-      await ensureCreatorProfile(undefined, { confirm: true, accountType });
+      await ensureCreatorProfile(undefined, { confirm: true, accountType, promoCode: promo.trim() || undefined });
       navigate(next, { replace: true });
     } catch (e) {
       setError(errorMessage(e));
@@ -178,7 +217,7 @@ export default function TourAuth() {
       return;
     }
     try {
-      await ensureCreatorProfile(displayName, { accountType });
+      await ensureCreatorProfile(displayName, { accountType, promoCode: promo.trim() || undefined });
     } catch (e) {
       if (!isConfirmRequired(e)) throw e;
       await checkAuth();
@@ -215,6 +254,7 @@ export default function TourAuth() {
     setError("");
     try {
       rememberAccountType(joining ? null : accountType);
+      rememberPromoCode(joining ? null : promo.trim());
       await signInWithGoogle(next);
     } catch (e) {
       setError(errorMessage(e));
@@ -241,6 +281,7 @@ export default function TourAuth() {
       if (mode === "signup" && password.length < 8) throw new Error("Use at Least 8 Characters for Your Password.");
       rememberNext(next);
       if (mode === "signup") rememberAccountType(joining ? null : accountType);
+      if (mode === "signup") rememberPromoCode(joining ? null : promo.trim());
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: em,
@@ -343,6 +384,30 @@ export default function TourAuth() {
         ))}
       </div>
       <div className="ta-type-note">{ACCOUNT_TYPES.find((t) => t.value === accountType)?.note}</div>
+    </div>
+  );
+  // Small, optional, and last: it must not look like a step on the way in (client, 2026-10-15).
+  const promoField = (
+    <div className="ta-promo">
+      <label className="d-label" htmlFor="ta-promo">
+        Promo Code (Optional)
+      </label>
+      <input
+        id="ta-promo"
+        className="d-input"
+        value={promo}
+        onChange={(e) => setPromo(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+        placeholder="e.g. BETATESTER20"
+        autoComplete="off"
+        spellCheck={false}
+        maxLength={40}
+      />
+      {promoInfo && (
+        <div className={`ta-promo-note ${promoInfo.ok ? "ok" : "bad"}`}>
+          {promoInfo.ok ? "✓ " : ""}
+          {promoInfo.text}
+        </div>
+      )}
     </div>
   );
   const nameField = (
@@ -501,6 +566,7 @@ export default function TourAuth() {
                         />
                       </div>
                     )}
+                    {mode === "signup" && !joining && promoField}
                     {error && <div className="d-banner err">{error}</div>}
                     {notice && <div className="d-banner ok">{notice}</div>}
                     <button type="submit" className="d-btn primary ta-submit" disabled={busy}>

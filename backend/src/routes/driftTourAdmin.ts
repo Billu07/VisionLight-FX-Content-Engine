@@ -7,6 +7,7 @@ import { DRIFT_PRICE_CENTS, formatMoney, stripePaymentUrl, stripeConfigured, str
 import { createProInvite, listProInvites, memberRole, parseAccountType, revokeProInvite } from "../services/driftTourAccounts";
 import { uniqueOrgSlug } from "./drift";
 import { sendSiteContactEmail, sendWaitlistNoticeEmail } from "../services/mail";
+import { DEFAULT_FREE_DRIFTS, listPromoCodes, normalizeCode } from "../services/driftPromos";
 import { processingQueueDepth } from "../services/rotation3d/processingQueue";
 
 // drift.li Tour v2 back office (TOUR_V2_PLAN.md P5): the superadmin's view of every
@@ -465,6 +466,90 @@ router.post("/api/drift/public/waitlist", async (req: AuthenticatedRequest, res:
   }
   res.json({ ok: true, already: !!existing });
 });
+
+/**
+ * Promo codes (client, 2026-10-15: "being able to set codes with expiry in the tour backend
+ * would be very helpful for marketing"). Superadmin only, like the rest of this file.
+ */
+router.get("/api/drift/admin/tour/promos", ...guard, async (_req: AuthenticatedRequest, res: Response) => {
+  res.json({ codes: await listPromoCodes(), defaultFreeDrifts: DEFAULT_FREE_DRIFTS });
+});
+
+router.post("/api/drift/admin/tour/promos", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  const code = normalizeCode(req.body?.code);
+  if (code.length < 3) return res.status(400).json({ error: "A code needs at least three characters" });
+  const freeDrifts = Math.round(Number(req.body?.freeDrifts));
+  if (!Number.isFinite(freeDrifts) || freeDrifts < 1 || freeDrifts > 500) {
+    return res.status(400).json({ error: "Free drifts must be between 1 and 500" });
+  }
+  const parsed = parsePromoFields(req.body);
+  if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+  try {
+    await prisma.driftPromoCode.create({
+      data: { code, freeDrifts, ...parsed.data, createdById: req.user?.id || null },
+    });
+  } catch (err: any) {
+    if (err?.code === "P2002") return res.status(409).json({ error: "That code already exists" });
+    throw err;
+  }
+  res.status(201).json({ codes: await listPromoCodes(), defaultFreeDrifts: DEFAULT_FREE_DRIFTS });
+});
+
+router.patch("/api/drift/admin/tour/promos/:id", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  const data: Record<string, unknown> = {};
+  if ("active" in req.body) data.active = req.body.active === true;
+  if ("freeDrifts" in req.body) {
+    const n = Math.round(Number(req.body.freeDrifts));
+    if (!Number.isFinite(n) || n < 1 || n > 500) return res.status(400).json({ error: "Free drifts must be between 1 and 500" });
+    data.freeDrifts = n;
+  }
+  const parsed = parsePromoFields(req.body, true);
+  if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+  Object.assign(data, parsed.data);
+  if (!Object.keys(data).length) return res.status(400).json({ error: "Nothing to change" });
+  try {
+    await prisma.driftPromoCode.update({ where: { id: String(req.params.id) }, data });
+  } catch {
+    return res.status(404).json({ error: "That code is gone" });
+  }
+  res.json({ codes: await listPromoCodes(), defaultFreeDrifts: DEFAULT_FREE_DRIFTS });
+});
+
+router.delete("/api/drift/admin/tour/promos/:id", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  // Deleting takes its redemptions with it (cascade). Switching a code OFF is the gentler
+  // option and the one the UI offers first — the rows are a record of who a campaign reached.
+  await prisma.driftPromoCode.deleteMany({ where: { id: String(req.params.id) } });
+  res.json({ codes: await listPromoCodes(), defaultFreeDrifts: DEFAULT_FREE_DRIFTS });
+});
+
+/** The fields a code shares between create and patch. `partial` leaves absent ones alone. */
+function parsePromoFields(body: any, partial = false): { data: Record<string, unknown> } | { error: string } {
+  const data: Record<string, unknown> = {};
+  if (!partial || "note" in body) {
+    const note = String(body?.note ?? "").trim().slice(0, 200);
+    data.note = note || null;
+  }
+  if (!partial || "expiresAt" in body) {
+    const raw = String(body?.expiresAt ?? "").trim();
+    if (!raw) data.expiresAt = null;
+    else {
+      // A date from a <input type="date"> is a DAY, and a code should last all of it.
+      const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T23:59:59` : raw);
+      if (Number.isNaN(d.getTime())) return { error: "That expiry date isn't a date" };
+      data.expiresAt = d;
+    }
+  }
+  if (!partial || "maxUses" in body) {
+    const raw = String(body?.maxUses ?? "").trim();
+    if (!raw) data.maxUses = null;
+    else {
+      const n = Math.round(Number(raw));
+      if (!Number.isFinite(n) || n < 1 || n > 100000) return { error: "A use limit must be between 1 and 100000" };
+      data.maxUses = n;
+    }
+  }
+  return { data };
+}
 
 /**
  * The drift.li tour footer's Contact button (client, 2026-10-15). Not a page's enquiry — this

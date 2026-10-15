@@ -10,6 +10,7 @@ import {
   isInvitePath,
   peekNext,
   takeAccountType,
+  takePromoCode,
   takeNext,
   type AccountType,
 } from "./tourSession";
@@ -55,7 +56,9 @@ const waitForSession = (ms: number): Promise<Session | null> =>
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
-  const [confirm, setConfirm] = useState<{ email: string; name: string; accountType?: AccountType } | null>(null);
+  const [confirm, setConfirm] = useState<{ email: string; name: string; accountType?: AccountType; promoCode?: string } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -68,6 +71,8 @@ export default function AuthCallback() {
       const meta = (session.user?.user_metadata || {}) as Record<string, unknown>;
       const name = String(meta.full_name || meta.name || "").trim();
       const accountType = takeAccountType();
+      // Read once, here: the email confirmation may be opened long after it was typed.
+      const promoCode = takePromoCode();
       if (isInvitePath(peekNext())) {
         // Signed up from an invite: back to accept it — no page of their own is created.
         window.history.replaceState(null, "", "/auth/callback");
@@ -75,12 +80,12 @@ export default function AuthCallback() {
         return;
       }
       try {
-        await ensureCreatorProfile(name || undefined, { accountType });
+        await ensureCreatorProfile(name || undefined, { accountType, promoCode });
       } catch (e) {
         if (!isConfirmRequired(e)) throw e;
         // An existing studio/brand account signed in with Google: ask, never assume.
         window.history.replaceState(null, "", "/auth/callback");
-        if (alive) setConfirm({ email: e.email || session.user?.email || "", name, accountType });
+        if (alive) setConfirm({ email: e.email || session.user?.email || "", name, accountType, promoCode });
         return;
       }
       window.history.replaceState(null, "", "/auth/callback");
@@ -114,7 +119,11 @@ export default function AuthCallback() {
                 setBusy(true);
                 setError("");
                 try {
-                  await ensureCreatorProfile(confirm.name || undefined, { confirm: true, accountType: confirm.accountType });
+                  await ensureCreatorProfile(confirm.name || undefined, {
+                    confirm: true,
+                    accountType: confirm.accountType,
+                    promoCode: confirm.promoCode,
+                  });
                   navigate(takeNext(), { replace: true });
                 } catch (e) {
                   setError(errorMessage(e));

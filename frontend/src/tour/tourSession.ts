@@ -10,6 +10,7 @@ import { useAuth } from "../hooks/useAuth";
 
 const NEXT_KEY = "drift_creator_next";
 const ACCOUNT_KEY = "drift_creator_account";
+const PROMO_KEY = "drift_creator_promo";
 
 /** Tour v2: General (realtors, brands, venues) or Pro (photographers, videographers). */
 export type AccountType = "GENERAL" | "PRO";
@@ -33,6 +34,32 @@ export function takeAccountType(): AccountType | undefined {
     return undefined;
   }
 }
+/**
+ * A promo code typed on Try It Free has to survive the same round-trip the account type does:
+ * email confirmation can be opened minutes later, and Google leaves the page entirely. It is
+ * consumed by `ensureCreatorProfile`, which clears it once a profile exists either way — a code
+ * left behind would otherwise be spent on some later, unrelated sign-up.
+ */
+export function rememberPromoCode(code: string | null) {
+  try {
+    const c = String(code || "").trim();
+    if (c) localStorage.setItem(PROMO_KEY, c);
+    else localStorage.removeItem(PROMO_KEY);
+  } catch {
+    /* storage unavailable — they can ask us to apply it by hand */
+  }
+}
+
+export function takePromoCode(): string | undefined {
+  try {
+    const v = localStorage.getItem(PROMO_KEY);
+    localStorage.removeItem(PROMO_KEY);
+    return v ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The Drift Tour landing — public, signed in or not. */
 export const CREATOR_LANDING = "/tour";
 /** "Dashboard": /tour/dashboard opens the signed-in creator's own page. */
@@ -108,7 +135,7 @@ export const isConfirmRequired = (e: unknown): e is CreatorConfirmRequired =>
  */
 export async function ensureCreatorProfile(
   name?: string,
-  opts?: { confirm?: boolean; accountType?: AccountType; ownPage?: boolean },
+  opts?: { confirm?: boolean; accountType?: AccountType; ownPage?: boolean; promoCode?: string },
 ): Promise<void> {
   const {
     data: { session },
@@ -117,11 +144,19 @@ export async function ensureCreatorProfile(
   setAuthToken(session.access_token);
   let r;
   try {
-    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true, opts?.accountType, opts?.ownPage === true);
+    r = await apiEndpoints.driftCreatorSignup(
+      name,
+      opts?.confirm === true,
+      opts?.accountType,
+      opts?.ownPage === true,
+      opts?.promoCode,
+    );
   } catch (e: any) {
     if (e?.code === "CREATOR_CONFIRM") throw new CreatorConfirmRequired(String(e?.details?.email || ""));
     throw e;
   }
+  // The code has had its chance — spent or refused, it must not follow them around.
+  rememberPromoCode(null);
   const profileId = r.data?.profileId as string | undefined;
   if (profileId) setActiveProfile(profileId, r.data?.name || undefined);
   await useAuth.getState().checkAuth();
