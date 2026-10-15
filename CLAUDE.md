@@ -1080,10 +1080,14 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   moving parts. (It did fix something real on the way past: left at `"metadata"` until `play()`, the
   browser fetches the header, goes idle and starts the body again from scratch — **two requests** for
   the same file, the first one's bytes wasted.)
-  **What holds it back is a person, never the page**: `prefers-reduced-motion`, data saver, and an
-  `effectiveType` of 3g or worse (`SPARING_LINKS`) each leave it on the poster behind a play button with
-  `preload="metadata"`, so a link that cannot carry ~3 Mbps is not asked to stutter through it. Same
-  stance `driftNav` takes with a drift's frames.
+  **What holds it back is a person, never the page**: `prefers-reduced-motion`, data saver and the two
+  2G classes (`SPARING_LINKS`) leave it on the poster behind a play button with `preload="metadata"`.
+  **`effectiveType === "3g"` was in that list for one commit and must never go back**: it is as much a
+  round-trip-time estimate as a throughput one, so a distant server, a VPN or simply the first
+  navigation of a session reports "3g" on connections that are nothing of the sort — the film then sat
+  on its poster and never played at all (client, 2026-10-15: "the video doesn't even play now"). A
+  browser already knows how to buffer a slow link; guessing at it from a coarse hint cost far more than
+  it saved. Only an explicit request holds it now.
   **Measured, not assumed** — `scratchpad/gv-load.js` and the `guide-trace-*` shots (which take a
   `throttle`, and a `pre` hook to arm before playback) trace every request and media event on a
   throttled connection. At 2.8 Mbps of video: 10 Mbps link → first frame 1.40s, no stall but the loop's
@@ -1113,10 +1117,24 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   / 0.9878. CRF 20 was tried and rejected for delivery, not for looks: at 4.3 Mbps a 3 Mbps visitor
   waited ~10s for the first frame and then stalled every half second.
   Re-encode from `videos/` if the client sends new cuts; do NOT put a `.mov` on the page.
-  **22 MB is a lot to serve off the VPS** — the same box that runs ffmpeg — and it is the obvious next
-  thing to improve: either R2 behind the CDN (`managedStorage.ts` is the existing path) or a VP9/WebM
-  source alongside the mp4, which would carry this quality at roughly half the bitrate for every browser
-  but Safari. Neither changes a line of `GuideVideo.tsx`.
+  **They are served from R2 when the build is told to** (2026-10-15): `frontend/src/rotation3d/guideFilms.ts`
+  reads `VITE_GUIDE_CDN` and every film and poster comes off Cloudflare's edge instead of the VPS — which
+  matters because that VPS is the same single box that runs ffmpeg for every drift conversion, and 22 MB
+  of film is a lot to put next to it. Unset, the paths stay local (`/drift/guide/…` out of
+  `frontend/public`), so a build is never broken by this being missing, only slower; the repo copies are
+  both the fallback and the source of truth. Upload with `npm run media:upload-guide-films` on the VPS
+  (`src/scripts/upload-guide-films.ts`, stable keys under `drift/guide/`, immutable cache), which prints
+  the `VITE_GUIDE_CDN` line to paste into `frontend/.env.production`. Keys are stable NAMES rather than
+  the random UUIDs managedStorage usually mints, because the frontend has to name them without a
+  manifest — so **bump `VERSION` in guideFilms.ts whenever a film is re-encoded**, or the year-long
+  immutable cache keeps serving the old one. Same trick as `CARD_VERSION`.
+  **VP9/WebM was tried and rejected** (2026-10-15) — do not spend the day on it again. The promise is
+  the same picture at half the bitrate; measured on this footage it did not deliver. SSIM against the
+  master: VP9 CRF 33 = 0.9766 (3.0 MB), CRF 28 = 0.9778 (4.4 MB), CRF 25 = 0.9784 (5.7 MB) — it
+  **plateaus around 0.978 and more bits do not move it** — against H.264 CRF 23 at **0.9916 for 5.0 MB**.
+  At equal or larger size VP9 scored materially lower, and 0.977 is exactly the score the client
+  rejected on the downscaled encode, so there was no honest way to call it lossless. (Single-pass
+  `libvpx-vp9 -cpu-used 2`; a two-pass encode might close some of the gap, but not a 0.014 SSIM gap.)
 - **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
   all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
   horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →

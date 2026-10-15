@@ -17,7 +17,8 @@
     "jobs:byok-reconcile-report": "tsx src/scripts/byok-reconcile-report.ts",
     "jobs:byok-ops-alert-check": "tsx src/scripts/byok-ops-alert-check.ts",
     "jobs:recover-video": "tsx src/scripts/recover-video-jobs.ts",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
+    "media:upload-guide-films": "tsx src/scripts/upload-guide-films.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1002.0",

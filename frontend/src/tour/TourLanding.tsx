@@ -7,6 +7,7 @@ import { PathArtH } from "./tourPageParts";
 import { CREATOR_START } from "./tourSession";
 import PerspectiveGrid from "../rotation3d/PerspectiveGrid";
 import GuideVideo, { GUIDE_VIDEO_STYLES } from "../rotation3d/GuideVideo";
+import { guideFilm } from "../rotation3d/guideFilms";
 
 /**
  * drift.li/tour — the Drift Tour landing, in the client's words (TOUR_V2_PLAN.md §6).
@@ -215,8 +216,8 @@ export default function TourLanding() {
           title="Film Each Room. Share One Tour."
           lead="A Few Seconds per Space Is All It Takes."
           label="How a Drift Tour is made"
-          desktop={{ src: "/drift/guide/tour-desktop.mp4", poster: "/drift/guide/tour-desktop.jpg" }}
-          mobile={{ src: "/drift/guide/tour-mobile.mp4", poster: "/drift/guide/tour-mobile.jpg" }}
+          desktop={guideFilm("tour-desktop")}
+          mobile={guideFilm("tour-mobile")}
         />
 
         <section className="tl-section tl-band t-rise t-rise-3">

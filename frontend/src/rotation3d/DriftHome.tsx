@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Arrow, DriftSiteShell } from "./driftSite";
 import { HomeScene, HOME_SCENE_STYLES } from "./DriftHomeScene";
 import GuideVideo, { GUIDE_VIDEO_STYLES } from "./GuideVideo";
+import { guideFilm } from "./guideFilms";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
@@ -215,8 +216,8 @@ export default function DriftHome() {
           title="Take a Video. Get a Live Interactive."
           lead="Capture It, Upload It, Explore It."
           label="How Drift works"
-          desktop={{ src: "/drift/guide/drift-desktop.mp4", poster: "/drift/guide/drift-desktop.jpg" }}
-          mobile={{ src: "/drift/guide/drift-mobile.mp4", poster: "/drift/guide/drift-mobile.jpg" }}
+          desktop={guideFilm("drift-desktop")}
+          mobile={guideFilm("drift-mobile")}
         />
 
         <section className="dh-section" aria-label="Tour, View, Memory and Path">
