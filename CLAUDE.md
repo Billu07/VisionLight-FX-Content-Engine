@@ -1063,44 +1063,60 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   with its own `.gv-*` sheet because the two pages speak different dialects (`dh-*` / `tl-*`) over the
   same tokens. Wired in DriftHome and TourLanding; the copy above each one is ours (the films carry
   their own burned-in captions, so it stays short and out of their way).
-  **It plays by itself, muted, looping** — the films are 13–16s of real footage whose audio is digital
-  silence (-91 dB, measured), which is a product loop, not a lecture: a play button in front of one asks
-  for a decision before it has said anything. The poster is the film's own frame 0, so the still and the
-  first frame are the same picture; a missing file removes the whole section (`error` → `gone`) rather
-  than leaving a broken player under the hero. `prefers-reduced-motion`, data saver and a 2G
-  `effectiveType` all hold it on the poster behind a play button (`sparing()`, the same stance
-  `driftNav` takes with a drift's frames), and the pause control is always present at 50% — motion that
-  starts on its own and runs past five seconds has to be stoppable (WCAG 2.2.2). A pause by hand sticks:
-  `heldRef` outranks the observer, so scrolling away and back does not overrule it.
-  **TWO observers, because arriving and loading are different moments** (2026-10-15, after the client
-  reported it loading slowly): NEAR (`rootMargin: "800px"`) turns `preload` up to `"auto"` and
-  disconnects, so the film is downloading before anyone reaches it; ON SCREEN (`threshold: 0.25`)
-  plays and pauses. Left on `"metadata"` until `play()`, the browser fetches the header, goes idle and
-  then starts the body from scratch — **measured as two requests** for the same file, the first one's
-  bytes wasted, and the wait landing on the visitor. `scratchpad/gv-load.js` and the `guide-trace-*`
-  shots measure this end to end on a throttled connection. After the fix, on 10 Mbps: one request,
-  first frame at 1.14s; on 3 Mbps: one request, first frame at 3.2s, then smooth. The only stall left
-  is a 7–12ms decoder flush when `loop` seeks back to 0, which is below perception. If it is ever slow
-  again, measure before changing anything here — the likelier culprits are the VPS's uplink (the same
-  box runs ffmpeg) and whether nginx is sending cache headers for `/drift/guide/*`.
+  **It plays by itself, muted, looping, and NOTHING pauses it** — the films are 13–16s of real footage
+  whose audio is digital silence (-91 dB, measured), which is a product loop, not a lecture: a play
+  button in front of one asks for a decision before it has said anything. The poster is the film's own
+  frame 0, so the still and the first frame are the same picture; a missing file removes the whole
+  section (`error` → `gone`) rather than leaving a broken player under the hero. The pause control is
+  always present at 50% opacity — motion that starts on its own and runs past five seconds has to be
+  stoppable (WCAG 2.2.2).
+  **There is NO viewport gating, and that is the fix, not an omission** (2026-10-15, client: "I think
+  you introduced some pausing system that is causing the issue" — they were right). The first version
+  played it on an IntersectionObserver and paused it whenever the frame fell below a quarter visible,
+  so scrolling anywhere near it stopped and restarted playback. That is what "super slow to load" and
+  "gets paused every second" both were. **Do not reintroduce it** — not as a battery saving, not as a
+  bandwidth saving. A second observer at `rootMargin: 800px` that only raised `preload` was an
+  intermediate step and is also gone; `preload="auto"` from the start does the same job without any
+  moving parts. (It did fix something real on the way past: left at `"metadata"` until `play()`, the
+  browser fetches the header, goes idle and starts the body again from scratch — **two requests** for
+  the same file, the first one's bytes wasted.)
+  **What holds it back is a person, never the page**: `prefers-reduced-motion`, data saver, and an
+  `effectiveType` of 3g or worse (`SPARING_LINKS`) each leave it on the poster behind a play button with
+  `preload="metadata"`, so a link that cannot carry ~3 Mbps is not asked to stutter through it. Same
+  stance `driftNav` takes with a drift's frames.
+  **Measured, not assumed** — `scratchpad/gv-load.js` and the `guide-trace-*` shots (which take a
+  `throttle`, and a `pre` hook to arm before playback) trace every request and media event on a
+  throttled connection. At 2.8 Mbps of video: 10 Mbps link → first frame 1.40s, no stall but the loop's
+  own 7–12ms decoder flush, which is below perception; 3 Mbps link → first frame 5.9s and a stall every
+  half second, because 2.8 through 3 has no headroom. That is inherent to full-resolution 1080p, which
+  is why a slow link is held rather than served. **Measure before changing anything here.**
   **The frame takes the film's own shape**, and that shape is read off the ELEMENT in an effect, never
   from a React `onLoadedMetadata` prop: media events do not bubble, so React binds them on the node
   during commit, and a file already in cache or on a fast disk fires `loadedmetadata` before that —
   the event is then never heard and the frame keeps its 16:9 default. Invisible on the wide cut, whose
   shape that already is, and wrong on every portrait one. The probe caught it: a 900x1600 film drawn
   379x213. The effect calls `read()` once itself before subscribing, which is the whole fix.
-  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, 4.7 MB for all eight):
-  the masters are QuickTime `.mov` at ~12 Mbps with two silent audio tracks. `scratchpad/guide-encode3.sh`
-  is the current recipe — H.264 MP4, `-map 0:v:0 -an` (the silence costs ~2.9 MB a file in PCM alone, and
-  a film with no audio track is one every browser will autoplay), **`-movflags +faststart`** (a .mov keeps
-  its moov atom at the END, so without this a browser downloads the whole file before the first frame),
-  `-preset veryslow -crf 30`, scaled to **1280 wide (desktop) / 720 wide (portrait)**. 88 MB → 4.7 MB.
-  The width is the point: the frame is drawn at most ~1080 CSS px (desktop) and ~420 (portrait), so the
-  earlier 1600/900 encode was paying for pixels nobody sees — and every one of those bytes comes off the
-  VPS, the same box that runs ffmpeg. Compared frame by frame at the drawn size before it was adopted
-  (`scratchpad/gv/cmp_*.jpg`): indistinguishable, and half the bytes. Re-encode from `videos/` if the
-  client sends new cuts; do NOT put a `.mov` on the page. If these ever grow or multiply, they belong on
-  R2 behind the CDN rather than on the VPS — `managedStorage.ts` is the existing path.
+  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, 22 MB for all eight):
+  the masters are QuickTime `.mov` at ~12 Mbps with two silent audio tracks. `scratchpad/guide-encode5.sh`
+  is the recipe — H.264 MP4, `-map 0:v:0 -an` (the silence costs ~2.9 MB a file in PCM alone, and a film
+  with no audio track is one every browser will autoplay), **`-movflags +faststart`** (a .mov keeps its
+  moov atom at the END, so without this a browser downloads the whole file before the first frame),
+  `-preset slow -crf 23`, at **NATIVE resolution — never scaled**. 1920x1080 for the wide cuts,
+  1080x1920 for the portrait ones, 2.8–3.3 Mbps each.
+  **Do not scale these down.** A pass that encoded them at 1280/720 was reported by the client as a
+  quality drop and they were right — SSIM against the master, measured: native CRF 23 is **0.9916**, the
+  1280-wide CRF 30 version was **0.9769**, and cropped 1:1 at the drawn size the small on-screen text in
+  the footage is visibly mushier. The frame is drawn at ~1080 CSS px, which is **2160 device px on a
+  retina screen**, so 1920 is the correct number and anything less is softer where it is actually
+  looked at. The CRF ladder, all at native resolution, if it ever needs revisiting: CRF 18 = 9.9 MB /
+  0.9947, CRF 20 = 7.5 MB / 0.9936, CRF 23 = 5.0 MB / 0.9916, CRF 25 = 3.8 MB / 0.9899, CRF 27 = 3.0 MB
+  / 0.9878. CRF 20 was tried and rejected for delivery, not for looks: at 4.3 Mbps a 3 Mbps visitor
+  waited ~10s for the first frame and then stalled every half second.
+  Re-encode from `videos/` if the client sends new cuts; do NOT put a `.mov` on the page.
+  **22 MB is a lot to serve off the VPS** — the same box that runs ffmpeg — and it is the obvious next
+  thing to improve: either R2 behind the CDN (`managedStorage.ts` is the existing path) or a VP9/WebM
+  source alongside the mp4, which would carry this quality at roughly half the bitrate for every browser
+  but Safari. Neither changes a line of `GuideVideo.tsx`.
 - **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
   all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
   horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →

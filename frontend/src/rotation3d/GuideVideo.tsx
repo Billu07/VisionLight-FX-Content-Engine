@@ -14,25 +14,28 @@ import { useEffect, useId, useRef, useState } from "react";
  * pausable — the arrangement every browser permits without a gesture, precisely because
  * there is no sound to intrude.
  *
- * Four things keep that from costing the page anything:
+ * **It starts with the page and does not stop.** There is NO viewport gating here, and that
+ * is a decision, not an omission: the first version played it on an IntersectionObserver and
+ * paused it whenever the frame fell below a quarter visible. Scrolling anywhere near it then
+ * stopped and restarted playback, which the client reported as the film "pausing every
+ * second" and as loading slowly — both were that. A fifteen-second silent loop is cheaper
+ * than the stuttering was. Do not reintroduce it.
  *
- * - **It plays only while someone can see it.** An IntersectionObserver starts it on the
- *   way in and pauses it on the way out, so a film further down the page never spends a
- *   phone's battery decoding frames nobody is looking at.
- * - **It downloads only when it is reached.** `preload="metadata"` fetches the header, not
- *   the film; the frames follow when it first plays. The poster is the film's own frame 0,
- *   so the still and the first frame of playback are the same picture — nothing jumps.
+ * The rest:
+ *
+ * - **The poster is the film's own frame 0**, so the still and the first frame of playback
+ *   are the same picture and nothing jumps when it starts.
  * - **The frame takes the film's own shape**, read off `videoWidth/videoHeight` rather than
  *   assumed, so the portrait mobile cut and the wide desktop one are both drawn whole.
  * - **A missing file removes the section** rather than leaving a broken player under the
  *   hero.
  *
- * **Where it does NOT play by itself**: `prefers-reduced-motion` and the browser's own
- * data-saver flag both hold it on its poster behind a play button. And because motion that
- * starts on its own and runs past five seconds has to be stoppable (WCAG 2.2.2), the
- * pause control is always present — on a pointer it fades in with the frame, on a touch
- * screen it simply stays. Pausing by hand sticks: scrolling away and back does not
- * overrule it.
+ * **Where it does NOT play by itself**: `prefers-reduced-motion`, the browser's data-saver
+ * flag and a 2G `effectiveType` each hold it on its poster behind a play button, and keep
+ * `preload` at "metadata" so nothing but the header is fetched until someone asks. And
+ * because motion that starts on its own and runs past five seconds has to be stoppable
+ * (WCAG 2.2.2), the pause control is always present — quiet at rest, full on hover or
+ * focus, and always visible on a touch screen.
  */
 
 export type GuideSource = {
@@ -69,14 +72,17 @@ const useMedia = (query: string) => {
 };
 
 /**
- * Someone on a metered or genuinely slow connection did not ask for a megabyte of film. Data
- * saver is an explicit request; 2G is a measurement. Either way the film waits on its poster
- * behind a play button, which is also what `driftNav` does with a drift's frames.
+ * Someone on a metered or genuinely slow connection did not ask for this. Data saver is an
+ * explicit request; the effective type is a measurement. The films run at ~2.8-3.3 Mbps —
+ * that is what full resolution costs — and a link Chrome classes as 3G or worse cannot carry
+ * that, so rather than stuttering through it they get the poster and a play button and can
+ * decide for themselves. `driftNav` takes the same stance with a drift's frames.
  */
+const SPARING_LINKS = ["slow-2g", "2g", "3g"];
 const sparing = () => {
   try {
     const c = (navigator as any)?.connection;
-    return c?.saveData === true || c?.effectiveType === "2g" || c?.effectiveType === "slow-2g";
+    return c?.saveData === true || SPARING_LINKS.includes(c?.effectiveType);
   } catch {
     return false;
   }
@@ -160,11 +166,9 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
   const [ratio, setRatio] = useState<string | undefined>();
   const [tall, setTall] = useState(false);
   const [playing, setPlaying] = useState(false);
-  // Held = waiting on a person: reduced motion, a metered connection, or they pressed pause
-  // before it ever ran. A hold by hand outranks the observer, so scrolling past cannot undo it.
+  // Held = waiting on a person: reduced motion, a sparing connection, or they pressed pause.
+  // Nothing else ever pauses this film — see the note on the element below.
   const [held, setHeld] = useState(() => still || sparing());
-  const heldRef = useRef(held);
-  heldRef.current = held;
 
   const pick = (phone && mobile) || desktop;
 
@@ -202,44 +206,6 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     if (videoRef.current) videoRef.current.muted = true;
   }, [pick.src]);
 
-  // Two observers, because arriving and loading are different moments.
-  //
-  // NEAR (a screen's worth of warning): turn `preload` up to "auto" so the film is already
-  // downloading before anyone reaches it. Left on "metadata" until play, the browser fetches
-  // the header, goes idle, and then has to start the body from scratch when play() is called
-  // — measured as two requests and a visible wait on the first frame. This one keeps the
-  // section honest (nothing is fetched by a visitor who never scrolls) while making it feel
-  // like it was already there, which is the whole trick.
-  //
-  // ON SCREEN: play and pause. Kept at a real threshold so a film half out of the window
-  // stops rather than playing to nobody.
-  useEffect(() => {
-    const frame = frameRef.current;
-    const v = videoRef.current;
-    if (!frame || !v) return;
-    const near = new IntersectionObserver(
-      ([e]) => {
-        if (!e.isIntersecting) return;
-        if (v.preload !== "auto") v.preload = "auto";
-        near.disconnect(); // once is enough; the browser takes it from here
-      },
-      { rootMargin: "800px 0px" },
-    );
-    const shown = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting && !heldRef.current) void v.play().catch(() => undefined);
-        else v.pause();
-      },
-      { threshold: 0.25 },
-    );
-    near.observe(frame);
-    shown.observe(frame);
-    return () => {
-      near.disconnect();
-      shown.disconnect();
-    };
-  }, [pick.src]);
-
   // The loop's hairline. Driven by rAF only while it is actually running, so a paused or
   // off-screen film costs nothing.
   useEffect(() => {
@@ -260,6 +226,7 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     if (!v) return;
     if (v.paused) {
       setHeld(false);
+      if (v.preload !== "auto") v.preload = "auto"; // held until now: fetch the rest
       void v.play().catch(() => undefined);
     } else {
       setHeld(true);
@@ -283,12 +250,23 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
         className={`gv-frame ${tall ? "tall" : ""} ${held && !playing ? "held" : ""}`}
         style={ratio ? ({ "--gv-ar": ratio } as React.CSSProperties) : undefined}
       >
+        {/*
+          It autoplays and keeps going. There is deliberately NO viewport gating here: an
+          earlier pass played it on an IntersectionObserver and paused it whenever the frame
+          fell below a quarter visible, which meant scrolling anywhere near it stopped and
+          restarted playback — reported by the client as the film "pausing every second", and
+          it was. A fifteen-second silent loop costs less than the stuttering did. The only
+          things that stop it are the pause button, and a visitor who asked for less motion or
+          less data (`held`), who also gets `preload="metadata"` so nothing but the header is
+          fetched until they press play.
+        */}
         <video
           ref={videoRef}
           className="gv-video"
           src={pick.src}
           poster={pick.poster}
-          preload="metadata"
+          preload={held ? "metadata" : "auto"}
+          autoPlay={!held}
           muted
           loop
           playsInline
