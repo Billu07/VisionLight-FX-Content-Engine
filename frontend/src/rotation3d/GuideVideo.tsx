@@ -72,13 +72,17 @@ const useMedia = (query: string) => {
 };
 
 /**
- * Someone on a metered or genuinely slow connection did not ask for this. Data saver is an
- * explicit request; the effective type is a measurement. The films run at ~2.8-3.3 Mbps —
- * that is what full resolution costs — and a link Chrome classes as 3G or worse cannot carry
- * that, so rather than stuttering through it they get the poster and a play button and can
- * decide for themselves. `driftNav` takes the same stance with a drift's frames.
+ * Someone who has ASKED for less data gets the poster and a play button. That is `saveData`
+ * and the two 2G classes, and nothing else.
+ *
+ * It briefly also held a link Chrome reports as `"3g"`, which looked reasonable and was not:
+ * `effectiveType` is a round-trip-time estimate as much as a throughput one, so a distant
+ * server, a VPN or simply the first navigation of a session reports "3g" on connections that
+ * are nothing of the sort — and the film then sat on its poster and never played, which is
+ * what the client hit. A browser already knows how to buffer a slow link; second-guessing it
+ * from a coarse hint costs more than it saves.
  */
-const SPARING_LINKS = ["slow-2g", "2g", "3g"];
+const SPARING_LINKS = ["slow-2g", "2g"];
 const sparing = () => {
   try {
     const c = (navigator as any)?.connection;
