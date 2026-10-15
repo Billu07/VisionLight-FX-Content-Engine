@@ -6,6 +6,7 @@ import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { PathArtH } from "./tourPageParts";
 import { CREATOR_START } from "./tourSession";
 import PerspectiveGrid from "../rotation3d/PerspectiveGrid";
+import GuideVideo, { GUIDE_VIDEO_STYLES } from "../rotation3d/GuideVideo";
 
 /**
  * drift.li/tour — the Drift Tour landing, in the client's words (TOUR_V2_PLAN.md §6).
@@ -178,6 +179,7 @@ export default function TourLanding() {
   return (
     <TourShell>
       <style>{TOUR_PAGE_STYLES}</style>
+      <style>{GUIDE_VIDEO_STYLES}</style>
       <style>{STYLES}</style>
 
       <div className="tl">
@@ -206,7 +208,18 @@ export default function TourLanding() {
           </div>
         </section>
 
-        <section className="tl-section tl-band t-rise t-rise-2">
+        {/* The client's own film, under the hero: one room filmed, then the next. */}
+        <GuideVideo
+          className="t-rise t-rise-2"
+          kicker="How It Works"
+          title="Film Each Room. Share One Tour."
+          lead="A Few Seconds per Space Is All It Takes."
+          label="How a Drift Tour is made"
+          desktop={{ src: "/drift/guide/tour-desktop.mp4", poster: "/drift/guide/tour-desktop.jpg" }}
+          mobile={{ src: "/drift/guide/tour-mobile.mp4", poster: "/drift/guide/tour-mobile.jpg" }}
+        />
+
+        <section className="tl-section tl-band t-rise t-rise-3">
           <div style={{ minWidth: 0 }}>
             <div className="tl-kicker">3-Second Capture</div>
             <h2 className="tl-h2">Take a pan or tilt video of each space</h2>

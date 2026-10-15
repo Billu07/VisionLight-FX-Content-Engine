@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Arrow, DriftSiteShell } from "./driftSite";
 import { HomeScene, HOME_SCENE_STYLES } from "./DriftHomeScene";
+import GuideVideo, { GUIDE_VIDEO_STYLES } from "./GuideVideo";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
@@ -184,6 +185,7 @@ export default function DriftHome() {
   return (
     <DriftSiteShell className="dh">
       <style>{HOME_SCENE_STYLES}</style>
+      <style>{GUIDE_VIDEO_STYLES}</style>
       <style>{STYLES}</style>
 
         <section className="dh-hero t-rise">
@@ -204,6 +206,18 @@ export default function DriftHome() {
           </div>
           <HomeScene />
         </section>
+
+        {/* The client's own film, under the hero: take a video, get a Live Interactive. It
+            carries its own captions, so the words above it stay out of its way. */}
+        <GuideVideo
+          className="t-rise t-rise-2"
+          kicker="How It Works"
+          title="Take a Video. Get a Live Interactive."
+          lead="Capture It, Upload It, Explore It."
+          label="How Drift works"
+          desktop={{ src: "/drift/guide/drift-desktop.mp4", poster: "/drift/guide/drift-desktop.jpg" }}
+          mobile={{ src: "/drift/guide/drift-mobile.mp4", poster: "/drift/guide/drift-mobile.jpg" }}
+        />
 
         <section className="dh-section" aria-label="Tour, View, Memory and Path">
           <div className="dh-products">
