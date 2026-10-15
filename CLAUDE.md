@@ -1065,28 +1065,42 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   their own burned-in captions, so it stays short and out of their way).
   **It plays by itself, muted, looping** — the films are 13–16s of real footage whose audio is digital
   silence (-91 dB, measured), which is a product loop, not a lecture: a play button in front of one asks
-  for a decision before it has said anything. Four things keep that cheap: an IntersectionObserver plays
-  it only while it is on screen; `preload="metadata"` fetches the header and leaves the frames until it
-  first plays; the poster is the film's own frame 0, so the still and the first frame are the same
-  picture; and a missing file removes the whole section (`error` → `gone`) rather than leaving a broken
-  player under the hero. `prefers-reduced-motion` and the browser's data-saver flag both hold it on the
-  poster behind a play button, and the pause control is always present at 50% — motion that starts on
-  its own and runs past five seconds has to be stoppable (WCAG 2.2.2). A pause by hand sticks:
+  for a decision before it has said anything. The poster is the film's own frame 0, so the still and the
+  first frame are the same picture; a missing file removes the whole section (`error` → `gone`) rather
+  than leaving a broken player under the hero. `prefers-reduced-motion`, data saver and a 2G
+  `effectiveType` all hold it on the poster behind a play button (`sparing()`, the same stance
+  `driftNav` takes with a drift's frames), and the pause control is always present at 50% — motion that
+  starts on its own and runs past five seconds has to be stoppable (WCAG 2.2.2). A pause by hand sticks:
   `heldRef` outranks the observer, so scrolling away and back does not overrule it.
+  **TWO observers, because arriving and loading are different moments** (2026-10-15, after the client
+  reported it loading slowly): NEAR (`rootMargin: "800px"`) turns `preload` up to `"auto"` and
+  disconnects, so the film is downloading before anyone reaches it; ON SCREEN (`threshold: 0.25`)
+  plays and pauses. Left on `"metadata"` until `play()`, the browser fetches the header, goes idle and
+  then starts the body from scratch — **measured as two requests** for the same file, the first one's
+  bytes wasted, and the wait landing on the visitor. `scratchpad/gv-load.js` and the `guide-trace-*`
+  shots measure this end to end on a throttled connection. After the fix, on 10 Mbps: one request,
+  first frame at 1.14s; on 3 Mbps: one request, first frame at 3.2s, then smooth. The only stall left
+  is a 7–12ms decoder flush when `loop` seeks back to 0, which is below perception. If it is ever slow
+  again, measure before changing anything here — the likelier culprits are the VPS's uplink (the same
+  box runs ffmpeg) and whether nginx is sending cache headers for `/drift/guide/*`.
   **The frame takes the film's own shape**, and that shape is read off the ELEMENT in an effect, never
   from a React `onLoadedMetadata` prop: media events do not bubble, so React binds them on the node
   during commit, and a file already in cache or on a fast disk fires `loadedmetadata` before that —
   the event is then never heard and the frame keeps its 16:9 default. Invisible on the wide cut, whose
   shape that already is, and wrong on every portrait one. The probe caught it: a 900x1600 film drawn
   379x213. The effect calls `read()` once itself before subscribing, which is the whole fix.
-  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, ~9.5 MB for all eight):
-  the masters are QuickTime `.mov` at ~12 Mbps with two silent audio tracks. `scratchpad/guide-encode*.sh`
-  turns each into H.264 MP4 — `-map 0:v:0 -an` (the silence costs ~2.9 MB a file in PCM alone, and a
-  film with no audio track is one every browser will autoplay), **`-movflags +faststart`** (a .mov keeps
+  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, 4.7 MB for all eight):
+  the masters are QuickTime `.mov` at ~12 Mbps with two silent audio tracks. `scratchpad/guide-encode3.sh`
+  is the current recipe — H.264 MP4, `-map 0:v:0 -an` (the silence costs ~2.9 MB a file in PCM alone, and
+  a film with no audio track is one every browser will autoplay), **`-movflags +faststart`** (a .mov keeps
   its moov atom at the END, so without this a browser downloads the whole file before the first frame),
-  scaled to roughly twice the drawn size (1600 wide / 900 wide) at CRF 26–27. 88 MB → 9.5 MB, checked
-  frame-by-frame at the size it is actually drawn. Re-encode from `videos/` if the client sends new cuts;
-  do NOT put a `.mov` on the page.
+  `-preset veryslow -crf 30`, scaled to **1280 wide (desktop) / 720 wide (portrait)**. 88 MB → 4.7 MB.
+  The width is the point: the frame is drawn at most ~1080 CSS px (desktop) and ~420 (portrait), so the
+  earlier 1600/900 encode was paying for pixels nobody sees — and every one of those bytes comes off the
+  VPS, the same box that runs ffmpeg. Compared frame by frame at the drawn size before it was adopted
+  (`scratchpad/gv/cmp_*.jpg`): indistinguishable, and half the bytes. Re-encode from `videos/` if the
+  client sends new cuts; do NOT put a `.mov` on the page. If these ever grow or multiply, they belong on
+  R2 behind the CDN rather than on the VPS — `managedStorage.ts` is the existing path.
 - **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
   all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
   horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →

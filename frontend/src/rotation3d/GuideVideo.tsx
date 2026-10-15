@@ -68,10 +68,15 @@ const useMedia = (query: string) => {
   return on;
 };
 
-/** Someone on a metered connection did not ask for 3 MB of film. */
-const saveData = () => {
+/**
+ * Someone on a metered or genuinely slow connection did not ask for a megabyte of film. Data
+ * saver is an explicit request; 2G is a measurement. Either way the film waits on its poster
+ * behind a play button, which is also what `driftNav` does with a drift's frames.
+ */
+const sparing = () => {
   try {
-    return (navigator as any)?.connection?.saveData === true;
+    const c = (navigator as any)?.connection;
+    return c?.saveData === true || c?.effectiveType === "2g" || c?.effectiveType === "slow-2g";
   } catch {
     return false;
   }
@@ -157,7 +162,7 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
   const [playing, setPlaying] = useState(false);
   // Held = waiting on a person: reduced motion, a metered connection, or they pressed pause
   // before it ever ran. A hold by hand outranks the observer, so scrolling past cannot undo it.
-  const [held, setHeld] = useState(() => still || saveData());
+  const [held, setHeld] = useState(() => still || sparing());
   const heldRef = useRef(held);
   heldRef.current = held;
 
@@ -197,20 +202,42 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     if (videoRef.current) videoRef.current.muted = true;
   }, [pick.src]);
 
-  // Play while it is on screen, pause when it is not.
+  // Two observers, because arriving and loading are different moments.
+  //
+  // NEAR (a screen's worth of warning): turn `preload` up to "auto" so the film is already
+  // downloading before anyone reaches it. Left on "metadata" until play, the browser fetches
+  // the header, goes idle, and then has to start the body from scratch when play() is called
+  // — measured as two requests and a visible wait on the first frame. This one keeps the
+  // section honest (nothing is fetched by a visitor who never scrolls) while making it feel
+  // like it was already there, which is the whole trick.
+  //
+  // ON SCREEN: play and pause. Kept at a real threshold so a film half out of the window
+  // stops rather than playing to nobody.
   useEffect(() => {
     const frame = frameRef.current;
     const v = videoRef.current;
     if (!frame || !v) return;
-    const io = new IntersectionObserver(
+    const near = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        if (v.preload !== "auto") v.preload = "auto";
+        near.disconnect(); // once is enough; the browser takes it from here
+      },
+      { rootMargin: "800px 0px" },
+    );
+    const shown = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting && !heldRef.current) void v.play().catch(() => undefined);
         else v.pause();
       },
       { threshold: 0.25 },
     );
-    io.observe(frame);
-    return () => io.disconnect();
+    near.observe(frame);
+    shown.observe(frame);
+    return () => {
+      near.disconnect();
+      shown.disconnect();
+    };
   }, [pick.src]);
 
   // The loop's hairline. Driven by rAF only while it is actually running, so a paused or
