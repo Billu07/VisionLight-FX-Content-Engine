@@ -1070,6 +1070,22 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   section (`error` → `gone`) rather than leaving a broken player under the hero. The pause control is
   always present at 50% opacity — motion that starts on its own and runs past five seconds has to be
   stoppable (WCAG 2.2.2).
+  **Autoplay is ASKED FOR REPEATEDLY, not once** (2026-10-16, client: "should autoplay on mobile as
+  well"). The `autoplay` attribute gets a single attempt at the moment the element is ready, and a
+  phone browser refuses it more readily than a desktop one — notably the first attempt of a page
+  session. Nothing then asks again and the film sits on its poster for good. So an effect calls
+  `play()` itself and re-calls it on `loadeddata` and `canplay` (a no-op on something already
+  playing), setting `muted` on the NODE immediately before each request: React sets `muted` as a
+  property and never writes the attribute, and an unmuted film is refused everywhere, so doing it
+  there removes any question of ordering. A rejection is only surfaced as the big play button when
+  it is a `NotAllowedError`; an `AbortError` is just `load()` or a source swap interrupting the
+  request, and the next `canplay` retries. **This is not the viewport gating returning** — nothing in
+  it looks at where the frame is — and it stands down entirely while `held`, so it never fights the
+  pause button.
+  **Two things on the VISITOR's device will still hold it**, and both are correct: `prefers-reduced-motion`
+  (iOS Settings → Accessibility → Motion → Reduce Motion, commonly on) and Data Saver. A phone with
+  Reduce Motion on shows the poster and the play button while the same page autoplays on a desktop,
+  which looks exactly like a mobile autoplay bug and is not one — check that first.
   **There is NO viewport gating, and that is the fix, not an omission** (2026-10-15, client: "I think
   you introduced some pausing system that is causing the issue" — they were right). The first version
   played it on an IntersectionObserver and paused it whenever the frame fell below a quarter visible,

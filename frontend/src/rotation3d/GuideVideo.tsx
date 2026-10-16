@@ -204,11 +204,39 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     };
   }, [pick.src]);
 
-  // React can leave `muted` off the element, and an unmuted film is one the browser will
-  // refuse to start. Set it on the node itself, every render of a new source.
+  // Autoplay is a REQUEST, and on a phone it is one the browser can refuse. The `autoplay`
+  // attribute gets exactly one attempt at the moment the element is ready; if that attempt is
+  // turned down — and mobile Safari and Chrome turn it down more readily, especially the first
+  // one of a page session — nothing ever asks again and the film sits on its poster for good.
+  // That is what "should autoplay on mobile as well" was (client, 2026-10-16).
+  //
+  // So ask here too, and ask again each time the film becomes playable. `play()` on something
+  // already playing is a no-op, so the repeats cost nothing.
+  //
+  // `muted` is set on the NODE first, every time: React sets it as a property and never writes
+  // the attribute, and an unmuted film is refused everywhere. Setting it immediately before the
+  // request removes any question of ordering between the two.
+  //
+  // This is not the viewport gating coming back — nothing here looks at where the frame is.
   useEffect(() => {
-    if (videoRef.current) videoRef.current.muted = true;
-  }, [pick.src]);
+    const v = videoRef.current;
+    if (!v || held) return; // held = they asked for it to wait; don't fight that
+    const go = () => {
+      v.muted = true;
+      void v.play().catch((err: unknown) => {
+        // Only a refusal puts the big play button up. An AbortError is just load() or a
+        // source swap interrupting the request, and the next `canplay` will try again.
+        if ((err as { name?: string })?.name === "NotAllowedError") setHeld(true);
+      });
+    };
+    go();
+    v.addEventListener("loadeddata", go);
+    v.addEventListener("canplay", go);
+    return () => {
+      v.removeEventListener("loadeddata", go);
+      v.removeEventListener("canplay", go);
+    };
+  }, [pick.src, held]);
 
   // The loop's hairline. Driven by rAF only while it is actually running, so a paused or
   // off-screen film costs nothing.
