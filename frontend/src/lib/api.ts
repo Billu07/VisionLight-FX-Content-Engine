@@ -458,6 +458,8 @@ export const apiEndpoints = {
   driftTourAdminChannel: () => api.get("/api/drift/admin/tour/channel"),
   driftTourAdminSetupChannel: () => api.post("/api/drift/admin/tour/channel"),
   driftTourAdminSaveToChannel: (flowId: string) => api.post(`/api/drift/admin/tour/flows/${encodeURIComponent(flowId)}/save-to-channel`),
+  /** Prepaid drift credits for the page: opens Stripe Checkout (page Admins only). */
+  driftBuyCredits: (quantity: number) => api.post("/api/drift/my/page/credits", { quantity }),
   // A page's Featured Tours order
   driftSetTourOrder: (flowIds: string[]) => api.put("/api/drift/my/page/tour-order", { flowIds }),
   driftTourAdminOrders: () => api.get("/api/drift/admin/tour/orders"),

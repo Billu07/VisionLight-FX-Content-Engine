@@ -10,7 +10,13 @@ import { probeClipInfo } from "../services/rotation3d/pipeline";
 import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
 import { parseCtaPlacement, parseDirection, parseFirstDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
-import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
+import {
+  billingSummary,
+  confirmCheckoutSession,
+  createCreditsCheckout,
+  createFlowCheckout,
+  storePendingClip,
+} from "../services/driftBilling";
 import { MAX_PINS, ensurePinTrack, pinFrames, sanitizePins, serializePin } from "../services/driftPins";
 import {
   createShareLink,
@@ -578,6 +584,29 @@ router.post("/api/drift/my/flows/:id/checkout", authenticateToken, async (req: A
     const result = await createFlowCheckout({
       orgId,
       flowId: req.params.id,
+      userId: req.user?.id || null,
+      email: req.user?.email || null,
+      origin: req.headers.origin,
+    });
+    res.json(result);
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+/**
+ * Buy drift credits for this page. **ADMIN**, not EDIT: an Editor is usually the photographer
+ * working on someone else's page, and they build with the allowance rather than paying for it
+ * (client, 2026-10-15 — "a realtor can buy 10 slots or credits that their assigned pros can
+ * use"; the realtor is the page's Admin). Per-drift checkout stays at EDIT, unchanged.
+ */
+router.post("/api/drift/my/page/credits", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "ADMIN");
+  if (!orgId) return;
+  try {
+    const result = await createCreditsCheckout({
+      orgId,
+      quantity: Number(req.body?.quantity),
       userId: req.user?.id || null,
       email: req.user?.email || null,
       origin: req.headers.origin,

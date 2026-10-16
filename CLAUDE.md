@@ -692,14 +692,33 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   in the same second collided over a code with no limit to run out of). Caught by
   `scratchpad/promo-probe.js`, which drives the service against a fake Prisma: 45 checks, both races
   included.
-- **Pre-bought drift credits for a page's Pros** — asked for 2026-10-15, **not built**. Worth knowing
-  what already exists: `Organization.freeDrifts` is a PAGE-wide pool and `billingSummary` counts it
-  against every flow-step drift on that page, so a Pro invited to a realtor's page as an EDITOR
-  already spends the realtor's allowance — the shared pool is real. What is missing is only the
-  self-serve purchase: today the allowance is raised by a superadmin by hand, by an invite's limits,
-  or by a promo code, and Stripe checkout is per drift at the point of conversion. "Buy 10 credits"
-  would be a second Checkout line that increments `freeDrifts` on success — the same webhook, a
-  different fulfilment.
+- **Pre-bought drift credits** (2026-10-17, client: "a realtor can buy 10 slots or credits that their
+  assigned pros can use"; needs `prisma db push`). **Nothing was needed to make them shareable** —
+  `Organization.freeDrifts` has always been a PAGE-wide pool and `billingSummary` counts it against
+  every flow-step drift on the page, so a Pro invited as an EDITOR already spends the page owner's
+  allowance. All this adds is the purchase: `createCreditsCheckout` in `services/driftBilling.ts` →
+  Stripe → on payment, `freeDrifts` is incremented by the quantity. One credit = one drift, priced at
+  `DRIFT_PRICE_CENTS` unless `TOUR_CREDIT_PRICE_CENTS` says otherwise (the knob for a bulk discount),
+  1–200 per order.
+  **One order table serves both kinds**: `DriftTourOrder.kind` is `DRIFT` | `CREDITS` (+ `creditsAdded`,
+  recorded at fulfilment so a later price change cannot rewrite history), and `fulfillSession` branches
+  on it — credits raise the allowance and send `tour.credits.paid.buyer` / `.notice`, drifts convert as
+  before. The webhook, the Stripe customer + invoice and the generic
+  `POST /api/drift/my/checkout/confirm` are all reused untouched, so a credit order confirms through
+  the same return page.
+  **Paying is ADMIN, not EDIT** (`POST /api/drift/my/page/credits`): an Editor is usually the
+  photographer working on someone else's page and builds with the allowance rather than buying it —
+  the realtor is the page's Admin. Per-drift checkout stays at EDIT, unchanged. The UI is
+  `PageCredits` in page settings (`tour/TourPage.tsx`), which shows the balance, 5/10/25 or a typed
+  quantity, and the total; `TourPage` now keeps the `billing` summary the list route already returned.
+  **Double payment is prevented by `SELECT … FOR UPDATE` + the `status === "PAID"` early return**, not
+  by anything new: the webhook and the return page both fulfil, and Postgres serialises them.
+  `scratchpad/credits-probe.js` proves it against a fake Stripe and Prisma — 31 checks covering the
+  quantity guard, that checkout alone moves no allowance, that a paid order credits exactly once,
+  that a second (and a simultaneous) fulfilment is a no-op, that an unpaid session gives nothing, that
+  another page cannot confirm it, and that the per-drift path still converts. **The fake's
+  `$transaction` is serialised on purpose** — it models the row lock; without that the race test
+  passes vacuously and proves nothing.
 - **Accounts** (`services/driftTourAccounts.ts`): `tourAccountType` GENERAL | PRO; Pro "Client Pages"
   (org with `managedByOrgId` + an Admin profile for the Pro); page invites (one-time links with a role).
 - **Page roles** (2026-09-15): a member = a User profile in the page's org; `User.tourRole` ADMIN | EDITOR |

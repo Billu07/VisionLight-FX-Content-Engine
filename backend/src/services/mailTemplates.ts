@@ -272,6 +272,52 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
     }),
   },
   {
+    key: "tour.credits.paid.buyer",
+    essential: true,
+    name: "Drift credits bought (to the buyer)",
+    description:
+      "Confirms a credit purchase and says what the page's balance is now. A link to Stripe's hosted invoice — the buyer's receipt — is added under the body whenever one is ready.",
+    trigger: "A drift-credit checkout is paid",
+    audience: "The person who checked out",
+    vars: [
+      { name: "name", description: "Buyer's name (may be empty)", sample: "Alex" },
+      { name: "pageName", description: "The page the credits are on", sample: "Harbour Homes" },
+      { name: "quantity", description: "Credits bought", sample: "10" },
+      { name: "creditsLabel", description: '"credit" or "credits"', sample: "credits" },
+      { name: "balance", description: "Drifts the page can now build", sample: "13" },
+      { name: "amount", description: "Total paid", sample: "$65.00" },
+      { name: "url", description: "drift.li", sample: "https://drift.li" },
+    ],
+    defaults: f({
+      subject: "Payment received — {{quantity}} drift {{creditsLabel}}",
+      heading: "Your drift credits are ready",
+      intro:
+        'Thanks for your order. We received {{amount}} for {{quantity}} drift {{creditsLabel}} on "{{pageName}}", which can now build {{balance}} drifts. Anyone you have invited to the page can use them.',
+      ctaLabel: "Open Drift Tour",
+      ctaUrl: "{{url}}",
+      footnote: "Credits never expire. Each one covers one drift's conversion and a year of hosting.",
+    }),
+  },
+  {
+    key: "tour.credits.paid.notice",
+    name: "Drift credits bought (team notice)",
+    description: "Tells your team a page bought drift credits.",
+    trigger: "A drift-credit checkout is paid",
+    audience: "Platform admins (ADMIN_EMAILS)",
+    vars: [
+      { name: "buyerLabel", description: "Name · email, or just the email", sample: "Alex · alex@example.com" },
+      { name: "pageName", description: "The page", sample: "Harbour Homes" },
+      { name: "quantity", description: "Credits bought", sample: "10" },
+      { name: "balance", description: "The page's allowance now", sample: "13" },
+      { name: "amount", description: "Total paid", sample: "$65.00" },
+    ],
+    defaults: f({
+      subject: "Paid: {{quantity}} drift credits · {{amount}} · {{pageName}}",
+      heading: "Drift credits bought",
+      intro: '{{buyerLabel}} paid {{amount}} for {{quantity}} drift credits on "{{pageName}}". That page can now build {{balance}} drifts.',
+    }),
+  },
+  {
     key: "tour.order.paid.notice",
     name: "Drifts paid (team notice)",
     description: "Tells your team a tour checkout was paid.",

@@ -8,8 +8,8 @@ import { prisma } from "./database";
 import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
 import { posterFrame } from "./rotation3d/pipeline";
 import { processClip } from "../routes/drift";
-import { FlowError, flowPublicPath } from "./driftFlows";
-import { sendTourOrderPaidEmails } from "./mail";
+import { FlowError, flowPublicPath, pagePublicPath } from "./driftFlows";
+import { sendTourCreditsPaidEmails, sendTourOrderPaidEmails } from "./mail";
 
 // drift.li Tour v2 billing (TOUR_V2_PLAN.md P3): pay per drift. A page's first
 // `Organization.freeDrifts` drifts are free; every drift after that is uploaded, kept
@@ -31,6 +31,14 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 export const DRIFT_PRICE_CENTS = Math.max(50, Math.round(Number(process.env.TOUR_DRIFT_PRICE_CENTS) || 650));
 export const DRIFT_CURRENCY = (process.env.TOUR_CURRENCY || "usd").trim().toLowerCase();
 export const HOSTING_DAYS = 365;
+/** A prepaid credit is one drift. Priced the same unless TOUR_CREDIT_PRICE_CENTS says otherwise,
+ *  which is the knob for a bulk discount. */
+export const CREDIT_PRICE_CENTS = Math.max(
+  50,
+  Math.round(Number(process.env.TOUR_CREDIT_PRICE_CENTS) || DRIFT_PRICE_CENTS),
+);
+export const CREDIT_MIN = 1;
+export const CREDIT_MAX = 200;
 const APP_URL = (process.env.DRIFT_APP_URL || "https://drift.li").replace(/\/+$/, "");
 
 export const stripeConfigured = () => !!STRIPE_SECRET_KEY;
@@ -325,6 +333,105 @@ async function openFlowCheckout(args: CheckoutArgs) {
   };
 }
 
+/**
+ * Buy drift credits for a page: a Stripe Checkout that, when it is paid, raises
+ * `Organization.freeDrifts` instead of converting any particular drift.
+ *
+ * Nothing else is needed to make them shareable, because the allowance has always been a
+ * PAGE-wide pool: `billingSummary` counts it against every flow-step drift on the page, so a
+ * Pro invited as an Editor already draws on the page owner's allowance. That is exactly what
+ * the client asked for ("a realtor can buy 10 slots that their assigned pros can use") — the
+ * only thing missing was a way to pay for more.
+ */
+export async function createCreditsCheckout(args: {
+  orgId: string;
+  quantity: number;
+  userId: string | null;
+  email: string | null;
+  origin?: unknown;
+}) {
+  if (!stripeConfigured()) {
+    throw new FlowError(503, "Checkout isn't switched on yet — contact us and we'll activate it for you.", {
+      code: "PAYMENTS_OFF",
+    });
+  }
+  const quantity = Math.round(Number(args.quantity));
+  if (!Number.isFinite(quantity) || quantity < CREDIT_MIN || quantity > CREDIT_MAX) {
+    throw new FlowError(400, `Choose between ${CREDIT_MIN} and ${CREDIT_MAX} credits.`);
+  }
+  const org = await prisma.organization.findUnique({
+    where: { id: args.orgId },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!org) throw new FlowError(404, "Page not found");
+
+  const order = await prisma.driftTourOrder.create({
+    data: {
+      organizationId: org.id,
+      userId: args.userId,
+      kind: "CREDITS",
+      quantity,
+      unitAmountCents: CREDIT_PRICE_CENTS,
+      amountCents: CREDIT_PRICE_CENTS * quantity,
+      currency: DRIFT_CURRENCY,
+      status: "PENDING",
+    },
+  });
+
+  // Back to the page itself: that is where the balance is shown, and where the return page
+  // confirms the session (the same generic /checkout/confirm the per-drift flow uses).
+  const back = `${returnOrigin(args.origin)}${pagePublicPath(org.slug || "")}`;
+  const label = `${quantity} drift credit${quantity === 1 ? "" : "s"}`;
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          quantity,
+          price_data: {
+            currency: DRIFT_CURRENCY,
+            unit_amount: CREDIT_PRICE_CENTS,
+            product_data: {
+              name: "Drift credit — one drift, converted and hosted a year",
+              description: `${org.name} · ${label}`,
+            },
+          },
+        },
+      ],
+      success_url: `${back}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${back}?checkout=cancel`,
+      customer_email: args.email || undefined,
+      customer_creation: "always",
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: `${label} for "${org.name}" — each covers one drift's conversion and a year of hosting`,
+          footer: "Credits never expire. Each one covers one drift.",
+          metadata: { orderId: order.id, organizationId: org.id },
+        },
+      },
+      client_reference_id: order.id,
+      metadata: { orderId: order.id, organizationId: org.id, kind: "CREDITS" },
+      payment_intent_data: { metadata: { orderId: order.id, organizationId: org.id, kind: "CREDITS" } },
+    });
+  } catch (err: any) {
+    await prisma.driftTourOrder.update({ where: { id: order.id }, data: { status: "CANCELED" } }).catch(() => undefined);
+    console.error(`[${NS}] credits checkout failed for org ${org.id}:`, err?.message || err);
+    throw new FlowError(502, "We couldn't open checkout just now. Please try again in a moment.");
+  }
+  await prisma.driftTourOrder.update({ where: { id: order.id }, data: { stripeSessionId: session.id } });
+  console.log(`[${NS}] order ${order.id}: checkout for ${label} on page ${org.id}`);
+  return {
+    url: session.url,
+    orderId: order.id,
+    quantity,
+    amountCents: order.amountCents,
+    amount: formatMoney(order.amountCents),
+    currency: DRIFT_CURRENCY,
+  };
+}
+
 // A paid clip is fetched back from storage — a network blip shouldn't fail a paid drift.
 async function downloadClip(url: string, attempts = 3): Promise<Buffer> {
   let last: unknown;
@@ -398,6 +505,29 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
     await tx.$queryRaw`SELECT id FROM "DriftTourOrder" WHERE id = ${orderId} FOR UPDATE`;
     const order = await tx.driftTourOrder.findUnique({ where: { id: orderId } });
     if (!order || order.status === "PAID") return null;
+
+    // Credits: no drift to convert, just a bigger allowance. The increment is atomic and the
+    // row is already held FOR UPDATE above, so a webhook and a return-page confirm arriving
+    // together cannot add them twice.
+    if (order.kind === "CREDITS") {
+      await tx.driftTourOrder.update({
+        where: { id: orderId },
+        data: {
+          status: "PAID",
+          paidAt: now,
+          stripeSessionId: session.id,
+          stripePaymentIntentId: paymentIntent,
+          creditsAdded: order.quantity,
+        },
+      });
+      const org = await tx.organization.update({
+        where: { id: order.organizationId },
+        data: { freeDrifts: { increment: order.quantity } },
+        select: { name: true, freeDrifts: true },
+      });
+      return { kind: "credits" as const, order, balance: org.freeDrifts, pageName: org.name };
+    }
+
     const ids = Array.isArray(order.productIds) ? (order.productIds as unknown[]).map(String) : [];
     await tx.driftTourOrder.update({
       where: { id: orderId },
@@ -419,9 +549,18 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
         `[${NS}] order ${orderId}: ${ids.length - products.length} of ${ids.length} drift(s) were removed or already paid before payment — review for a refund`,
       );
     }
-    return { order, products };
+    return { kind: "drifts" as const, order, products };
   });
   if (!result) return { status: "paid" as const, orderId, started: 0 };
+
+  if (result.kind === "credits") {
+    const { order, balance, pageName } = result;
+    console.log(`[${NS}] order ${orderId} PAID — ${order.quantity} credit(s), page allowance now ${balance}`);
+    void notifyCreditsPaid(order, balance, pageName, session).catch((err) =>
+      console.error(`[${NS}] credit emails failed for ${orderId}:`, err),
+    );
+    return { status: "paid" as const, orderId, started: 0, credits: order.quantity, balance };
+  }
 
   for (const p of result.products) void startPaidProcessing(p);
   console.log(`[${NS}] order ${orderId} PAID — converting ${result.products.length} drift(s)`);
@@ -430,6 +569,28 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
     console.error(`[${NS}] paid emails failed for ${orderId}:`, err),
   );
   return { status: "paid" as const, orderId, started: result.products.length };
+}
+
+async function notifyCreditsPaid(
+  order: { userId: string | null; quantity: number; amountCents: number; currency: string },
+  balance: number,
+  pageName: string,
+  session: Stripe.Checkout.Session,
+) {
+  const [receiptUrl, user] = await Promise.all([
+    receiptUrlFor(session),
+    order.userId ? prisma.user.findUnique({ where: { id: order.userId }, select: { email: true, name: true } }) : null,
+  ]);
+  await sendTourCreditsPaidEmails({
+    buyerEmail: user?.email ?? null,
+    buyerName: user?.name ?? null,
+    pageName,
+    quantity: order.quantity,
+    balance,
+    amount: formatMoney(order.amountCents, order.currency),
+    url: APP_URL,
+    receiptUrl,
+  });
 }
 
 async function notifyPaid(

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { apiEndpoints, setActiveProfile } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { confirmAction, notify } from "../lib/notifications";
-import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
+import type { Billing, ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
 import { StatusPill, TourShell, apiError, copyText, publicUrl, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton, CreateTourButton, PathArtH } from "./tourPageParts";
@@ -107,9 +107,97 @@ function TourPathList({ items, renderActions }: { items: TourItem[]; renderActio
   );
 }
 
+/**
+ * Prepaid drift credits (client, 2026-10-15: "a realtor can buy 10 slots or credits that their
+ * assigned pros can use").
+ *
+ * There is nothing here about sharing, because the allowance has always been a PAGE-wide pool:
+ * anyone invited to this page builds against it. So buying credits simply raises it, and the
+ * photographer you invited spends them without being given anything of their own.
+ *
+ * Admin-only, like the rest of page settings — an Editor is usually working on someone else's
+ * page and builds with the allowance rather than paying for it.
+ */
+function PageCredits({ billing }: { billing: Billing | null }) {
+  const [qty, setQty] = useState(10);
+  const [busy, setBusy] = useState(false);
+  if (!billing || billing.unlimited) return null;
+
+  const each = billing.priceCents / 100;
+  const total = (each * qty).toLocaleString(undefined, { style: "currency", currency: (billing.currency || "usd").toUpperCase() });
+  const left = billing.freeLeft ?? 0;
+
+  const buy = async () => {
+    setBusy(true);
+    try {
+      const r = await apiEndpoints.driftBuyCredits(qty);
+      // Stripe hosts the payment; the page is the return address, and ?checkout=success there
+      // confirms the session through the same endpoint the per-drift flow uses.
+      if (r.data?.url) window.location.href = r.data.url as string;
+      else notify.error("Checkout didn't open. Please try again.");
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+      <div className="d-eyebrow">Drift Credits</div>
+      <p className="d-sub" style={{ fontSize: 12.5, marginTop: 6 }}>
+        One credit builds one drift — converted and hosted for a year. Anyone you invite to this page can
+        use them, so you can buy ahead for your photographer.
+      </p>
+      <div className="d-actions" style={{ marginTop: 10, alignItems: "center" }}>
+        <span className={`d-pill ${left > 0 ? "ok" : "warn"}`}>
+          {left} {left === 1 ? "drift" : "drifts"} available
+        </span>
+        <span className="d-faint" style={{ fontSize: 12 }}>
+          {billing.usedFreeDrifts} of {billing.freeDrifts} used
+        </span>
+      </div>
+      {billing.paymentsEnabled ? (
+        <>
+          <div className="d-actions" style={{ marginTop: 12 }}>
+            {[5, 10, 25].map((n) => (
+              <button key={n} type="button" className={`d-btn sm ${qty === n ? "primary" : ""}`} onClick={() => setQty(n)}>
+                {n}
+              </button>
+            ))}
+            <input
+              className="d-input"
+              type="number"
+              min={1}
+              max={200}
+              value={qty}
+              onChange={(e) => setQty(Math.max(1, Math.min(200, Math.round(Number(e.target.value) || 1))))}
+              style={{ width: 88 }}
+              aria-label="How many credits"
+            />
+          </div>
+          <div className="t-actions" style={{ marginTop: 12 }}>
+            <button className="d-btn primary" onClick={buy} disabled={busy}>
+              {busy ? "Opening Checkout…" : `Buy ${qty} ${qty === 1 ? "Credit" : "Credits"} · ${total}`}
+            </button>
+            <span className="d-faint" style={{ fontSize: 12 }}>
+              {billing.price} Each · Credits Never Expire.
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="d-faint" style={{ fontSize: 12, marginTop: 10 }}>
+          Checkout isn't switched on yet — contact us and we'll activate it for your page.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PageSettings({
   page,
   flows,
+  billing,
   onSaved,
   onClose,
   clientPage,
@@ -117,6 +205,7 @@ function PageSettings({
 }: {
   page: Page;
   flows: Flow[];
+  billing: Billing | null;
   onSaved: (page: Page, demo?: Demo) => void;
   onClose: () => void;
   /** a Pro manages this page */
@@ -321,6 +410,7 @@ function PageSettings({
             : `No Link and No Message Form? Then There Is No Contact Button at All.`}
         </span>
       </div>
+      <PageCredits billing={billing} />
       <PagePeople clientPage={clientPage} onSelfChange={onSelfChange} />
     </div>
   );
@@ -456,6 +546,7 @@ export default function TourPage() {
   const [preview, setPreview] = useState(false);
   const [flows, setFlows] = useState<Flow[]>([]);
   const [manager, setManager] = useState<PageRef | null>(null);
+  const [billing, setBilling] = useState<Billing | null>(null);
   const [adminLoaded, setAdminLoaded] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -514,6 +605,7 @@ export default function TourPage() {
       setFlows(r.data.flows || []);
       if (r.data.page) setPub((d) => (d ? { ...d, page: r.data.page } : d));
       setManager(r.data.manager || null);
+      setBilling((r.data.billing as Billing) || null);
       setRole((r.data.role as PageRole) || "ADMIN");
     } catch (e) {
       notify.error(apiError(e));
@@ -783,6 +875,7 @@ export default function TourPage() {
           key={page.id}
           page={page}
           flows={flows}
+          billing={billing}
           clientPage={!!manager}
           onSelfChange={() => {
             setShowSettings(false);

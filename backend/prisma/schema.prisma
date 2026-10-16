@@ -845,12 +845,16 @@ model DriftFlowStep {
   @@index([formId])
 }
 
-// Tour v2 — a Stripe Checkout for drifts (price per drift; TOUR_V2_PLAN.md P3).
+// Tour v2 — a Stripe Checkout for drifts (price per drift; TOUR_V2_PLAN.md P3), and since
+// 2026-10-17 for prepaid drift credits as well: same table, same webhook, `kind` tells them
+// apart and decides what fulfilment does.
 model DriftTourOrder {
   id                    String    @id @default(uuid())
   organizationId        String
   userId                String?
   flowId                String?
+  kind                  String    @default("DRIFT") // DRIFT (converts the drifts it names) | CREDITS (raises the page's allowance)
+  creditsAdded          Int? // CREDITS: what the allowance actually went up by, recorded so a later price change cannot rewrite history
   quantity              Int
   unitAmountCents       Int
   amountCents           Int

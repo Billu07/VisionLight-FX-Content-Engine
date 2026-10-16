@@ -630,6 +630,50 @@ export async function sendTourOrderPaidEmails(params: {
   });
 }
 
+/** A page bought prepaid drift credits: confirm it to the buyer, and tell the team. */
+export async function sendTourCreditsPaidEmails(params: {
+  buyerEmail: string | null;
+  buyerName: string | null;
+  pageName: string;
+  quantity: number;
+  balance: number;
+  amount: string;
+  url: string;
+  /** Stripe's hosted invoice for this payment — the buyer's receipt, when it is ready. */
+  receiptUrl?: string | null;
+}): Promise<void> {
+  const vars = {
+    name: params.buyerName || "",
+    buyerLabel: params.buyerEmail ? creatorLabel(params.buyerEmail, params.buyerName) : params.buyerName || "A creator",
+    pageName: params.pageName,
+    quantity: String(params.quantity),
+    creditsLabel: params.quantity === 1 ? "credit" : "credits",
+    balance: String(params.balance),
+    amount: params.amount,
+    url: params.url,
+  };
+  const rows: Array<[string, string]> = [
+    ["Page", params.pageName],
+    ["Credits", String(params.quantity)],
+    ["Total", params.amount],
+    ["Drifts available", String(params.balance)],
+  ];
+  if (params.buyerEmail) {
+    await sendTemplated("tour.credits.paid.buyer", {
+      vars,
+      defaultTo: [params.buyerEmail],
+      rows,
+      appendHtml: params.receiptUrl ? linkBlock("View or download your receipt", params.receiptUrl) : undefined,
+    });
+  }
+  await sendTemplated("tour.credits.paid.notice", {
+    vars,
+    defaultTo: ADMIN_EMAILS,
+    rows,
+    appendHtml: params.receiptUrl ? linkBlock("The buyer's receipt", params.receiptUrl) : undefined,
+  });
+}
+
 /** "Invite a Pro": the one-time link to the invited photographer / videographer. */
 export async function sendTourProInviteEmail(params: {
   to: string;
