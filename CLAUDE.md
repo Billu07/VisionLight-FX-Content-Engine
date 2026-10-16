@@ -1063,7 +1063,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   with its own `.gv-*` sheet because the two pages speak different dialects (`dh-*` / `tl-*`) over the
   same tokens. Wired in DriftHome and TourLanding; the copy above each one is ours (the films carry
   their own burned-in captions, so it stays short and out of their way).
-  **It plays by itself, muted, looping, and NOTHING pauses it** — the films are 13–16s of real footage
+  **It plays ONCE and rests on its own end card** (2026-10-16): both films close on the drift.li mark
+  over black, so they are finished pieces, not loops. Looping one cut from that logo straight back to
+  the opening sunset every fifteen seconds — measured, the first and last frames share almost nothing
+  (SSIM 0.014 on the home film, 0.0006 on the tour one), which is what that cut is numerically. `loop`
+  is off and the centre control becomes **Replay** when it ends. If a looping film is ever wanted here,
+  the footage needs a crossfade built into the encode; do not simply put `loop` back.
+  **It plays by itself, muted, and NOTHING pauses it** — the films are 13–16s of real footage
   whose audio is digital silence (-91 dB, measured), which is a product loop, not a lecture: a play
   button in front of one asks for a decision before it has said anything. The poster is the film's own
   frame 0, so the still and the first frame are the same picture; a missing file removes the whole

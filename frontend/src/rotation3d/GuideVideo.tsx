@@ -14,7 +14,12 @@ import { useEffect, useId, useRef, useState } from "react";
  * pausable — the arrangement every browser permits without a gesture, precisely because
  * there is no sound to intrude.
  *
- * **It starts with the page and does not stop.** There is NO viewport gating here, and that
+ * **It plays once and rests on its own end card.** Both films close on the drift.li mark over
+ * black — they are finished pieces, not loops, and looping one cut from that logo back to the
+ * opening sunset every fifteen seconds (the first and last frames share almost nothing: SSIM
+ * 0.014). So `loop` is off and the control becomes Replay when it ends.
+ *
+ * **It starts with the page.** There is NO viewport gating here, and that
  * is a decision, not an omission: the first version played it on an IntersectionObserver and
  * paused it whenever the frame fell below a quarter visible. Scrolling anywhere near it then
  * stopped and restarted playback, which the client reported as the film "pausing every
@@ -152,6 +157,13 @@ const PlayGlyph = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const ReplayGlyph = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M3 12a9 9 0 1 0 2.64-6.36" />
+    <path d="M3 4.5V10h5.5" />
+  </svg>
+);
+
 const PauseGlyph = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
     <rect x="6" y="4.5" width="4.4" height="15" rx="1.4" />
@@ -170,6 +182,7 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
   const [ratio, setRatio] = useState<string | undefined>();
   const [tall, setTall] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
   // Held = waiting on a person: reduced motion, a sparing connection, or they pressed pause.
   // Nothing else ever pauses this film — see the note on the element below.
   const [held, setHeld] = useState(() => still || sparing());
@@ -253,6 +266,15 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
+  const replay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setEnded(false);
+    setHeld(false);
+    v.currentTime = 0;
+    void v.play().catch(() => undefined);
+  };
+
   const toggle = () => {
     const v = videoRef.current;
     if (!v) return;
@@ -283,7 +305,13 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
         style={ratio ? ({ "--gv-ar": ratio } as React.CSSProperties) : undefined}
       >
         {/*
-          It autoplays and keeps going. There is deliberately NO viewport gating here: an
+          NOT looped. Both films close on the drift.li brand card over black, so they are
+          finished pieces, not loops: looping one cuts from that logo straight back to the
+          opening sunset every fifteen seconds. Measured, the first and last frames share
+          almost nothing (SSIM 0.014 and 0.0006), which is what that cut looks like
+          numerically. It plays once, rests on the brand card, and offers Replay.
+
+          It autoplays. There is deliberately NO viewport gating here: an
           earlier pass played it on an IntersectionObserver and paused it whenever the frame
           fell below a quarter visible, which meant scrolling anywhere near it stopped and
           restarted playback — reported by the client as the film "pausing every second", and
@@ -300,20 +328,26 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
           preload={held ? "metadata" : "auto"}
           autoPlay={!held}
           muted
-          loop
           playsInline
           aria-label={label}
-          onPlay={() => setPlaying(true)}
+          onPlay={() => {
+            setPlaying(true);
+            setEnded(false);
+          }}
           onPause={() => setPlaying(false)}
+          onEnded={() => setEnded(true)}
         />
         <div className="gv-rail" aria-hidden>
           <i ref={railRef as React.RefObject<HTMLElement>} />
         </div>
-        {held && !playing ? (
-          <button type="button" className="gv-start" onClick={toggle} aria-label={`Play: ${label}`}>
-            <span aria-hidden>
-              <PlayGlyph />
-            </span>
+        {ended || (held && !playing) ? (
+          <button
+            type="button"
+            className="gv-start"
+            onClick={ended ? replay : toggle}
+            aria-label={`${ended ? "Replay" : "Play"}: ${label}`}
+          >
+            <span aria-hidden>{ended ? <ReplayGlyph /> : <PlayGlyph />}</span>
           </button>
         ) : (
           <button type="button" className="gv-toggle" onClick={toggle} aria-label={playing ? `Pause: ${label}` : `Play: ${label}`}>
