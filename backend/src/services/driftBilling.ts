@@ -381,7 +381,7 @@ export async function createCreditsCheckout(args: {
   // Back to the page itself: that is where the balance is shown, and where the return page
   // confirms the session (the same generic /checkout/confirm the per-drift flow uses).
   const back = `${returnOrigin(args.origin)}${pagePublicPath(org.slug || "")}`;
-  const label = `${quantity} drift credit${quantity === 1 ? "" : "s"}`;
+  const label = `${quantity} Drift Credit${quantity === 1 ? "" : "s"}`;
   let session: Stripe.Checkout.Session;
   try {
     session = await stripe().checkout.sessions.create({
@@ -393,7 +393,7 @@ export async function createCreditsCheckout(args: {
             currency: DRIFT_CURRENCY,
             unit_amount: CREDIT_PRICE_CENTS,
             product_data: {
-              name: "Drift credit — one drift, converted and hosted a year",
+              name: "Drift Credit — one drift, converted and hosted for a year",
               description: `${org.name} · ${label}`,
             },
           },
@@ -407,7 +407,7 @@ export async function createCreditsCheckout(args: {
         enabled: true,
         invoice_data: {
           description: `${label} for "${org.name}" — each covers one drift's conversion and a year of hosting`,
-          footer: "Credits never expire. Each one covers one drift.",
+          footer: "Drift Credits never expire. Each one covers one drift.",
           metadata: { orderId: order.id, organizationId: org.id },
         },
       },

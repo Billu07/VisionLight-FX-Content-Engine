@@ -647,14 +647,14 @@ export async function sendTourCreditsPaidEmails(params: {
     buyerLabel: params.buyerEmail ? creatorLabel(params.buyerEmail, params.buyerName) : params.buyerName || "A creator",
     pageName: params.pageName,
     quantity: String(params.quantity),
-    creditsLabel: params.quantity === 1 ? "credit" : "credits",
+    creditsLabel: params.quantity === 1 ? "Drift Credit" : "Drift Credits",
     balance: String(params.balance),
     amount: params.amount,
     url: params.url,
   };
   const rows: Array<[string, string]> = [
     ["Page", params.pageName],
-    ["Credits", String(params.quantity)],
+    ["Drift Credits", String(params.quantity)],
     ["Total", params.amount],
     ["Drifts available", String(params.balance)],
   ];

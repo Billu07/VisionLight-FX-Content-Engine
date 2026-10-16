@@ -697,7 +697,10 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `Organization.freeDrifts` has always been a PAGE-wide pool and `billingSummary` counts it against
   every flow-step drift on the page, so a Pro invited as an EDITOR already spends the page owner's
   allowance. All this adds is the purchase: `createCreditsCheckout` in `services/driftBilling.ts` →
-  Stripe → on payment, `freeDrifts` is incremented by the quantity. One credit = one drift, priced at
+  Stripe → on payment, `freeDrifts` is incremented by the quantity. **They are called "Drift Credits"**
+  (client, 2026-10-17) — capitalised as a product name everywhere a person sees it: the panel, the
+  Stripe line item, the invoice footer and both emails. The `CREDITS` order kind, the template keys and
+  every identifier keep their own spelling. One Drift Credit = one drift, priced at
   `DRIFT_PRICE_CENTS` unless `TOUR_CREDIT_PRICE_CENTS` says otherwise (the knob for a bulk discount),
   1–200 per order.
   **One order table serves both kinds**: `DriftTourOrder.kind` is `DRIFT` | `CREDITS` (+ `creditsAdded`,

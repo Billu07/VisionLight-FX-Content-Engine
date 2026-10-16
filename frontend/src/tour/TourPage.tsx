@@ -146,15 +146,15 @@ function PageCredits({ billing }: { billing: Billing | null }) {
     <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
       <div className="d-eyebrow">Drift Credits</div>
       <p className="d-sub" style={{ fontSize: 12.5, marginTop: 6 }}>
-        One credit builds one drift — converted and hosted for a year. Anyone you invite to this page can
-        use them, so you can buy ahead for your photographer.
+        One Drift Credit builds one drift — converted and hosted for a year. Anyone you invite to this page
+        can use them, so you can buy ahead for your photographer.
       </p>
       <div className="d-actions" style={{ marginTop: 10, alignItems: "center" }}>
         <span className={`d-pill ${left > 0 ? "ok" : "warn"}`}>
-          {left} {left === 1 ? "drift" : "drifts"} available
+          {left} Drift Credit{left === 1 ? "" : "s"} Left
         </span>
         <span className="d-faint" style={{ fontSize: 12 }}>
-          {billing.usedFreeDrifts} of {billing.freeDrifts} used
+          {billing.usedFreeDrifts} of {billing.freeDrifts} Used
         </span>
       </div>
       {billing.paymentsEnabled ? (
@@ -173,15 +173,15 @@ function PageCredits({ billing }: { billing: Billing | null }) {
               value={qty}
               onChange={(e) => setQty(Math.max(1, Math.min(200, Math.round(Number(e.target.value) || 1))))}
               style={{ width: 88 }}
-              aria-label="How many credits"
+              aria-label="How many Drift Credits"
             />
           </div>
           <div className="t-actions" style={{ marginTop: 12 }}>
             <button className="d-btn primary" onClick={buy} disabled={busy}>
-              {busy ? "Opening Checkout…" : `Buy ${qty} ${qty === 1 ? "Credit" : "Credits"} · ${total}`}
+              {busy ? "Opening Checkout…" : `Buy ${qty} Drift Credit${qty === 1 ? "" : "s"} · ${total}`}
             </button>
             <span className="d-faint" style={{ fontSize: 12 }}>
-              {billing.price} Each · Credits Never Expire.
+              {billing.price} Each · Drift Credits Never Expire.
             </span>
           </div>
         </>
