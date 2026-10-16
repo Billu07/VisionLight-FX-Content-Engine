@@ -44,8 +44,10 @@ import { useEffect, useId, useRef, useState } from "react";
  */
 
 export type GuideSource = {
-  /** Absolute path under the site root (frontend/public is served from there). */
+  /** The H.264 mp4: the universal fallback, and what Safari plays. */
   src: string;
+  /** AV1 in a WebM container — a better picture than the mp4 at 43% of its bytes, where taken. */
+  webm?: string;
   /** The film's own frame 0. */
   poster?: string;
 };
@@ -178,6 +180,7 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
   const frameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const railRef = useRef<HTMLElement>(null);
+  const lastSrc = useRef<string | null>(null);
   const [gone, setGone] = useState(false);
   const [ratio, setRatio] = useState<string | undefined>();
   const [tall, setTall] = useState(false);
@@ -208,6 +211,12 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
     // A new source is a new film: its shape belongs to it, not to the one before.
     setRatio(undefined);
     setTall(false);
+    // The film is chosen by <source> children now, and swapping those does NOTHING on its own
+    // — the element has to be told to run resource selection again, or a window dragged across
+    // the 820px line keeps playing the cut it started with. Only on a real change: load() on
+    // mount would throw away the fetch the browser has already begun.
+    if (lastSrc.current && lastSrc.current !== pick.src) v.load();
+    lastSrc.current = pick.src;
     read(); // already known?
     v.addEventListener("loadedmetadata", read);
     v.addEventListener("error", fail);
@@ -323,7 +332,6 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
         <video
           ref={videoRef}
           className="gv-video"
-          src={pick.src}
           poster={pick.poster}
           preload={held ? "metadata" : "auto"}
           autoPlay={!held}
@@ -336,7 +344,24 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
           }}
           onPause={() => setPlaying(false)}
           onEnded={() => setEnded(true)}
-        />
+        >
+          {/*
+            AV1 first, in a WebM container. Measured against the master with VMAF — the metric
+            the streaming industry actually tunes against, and the one that does not punish a
+            modern codec for the perceptual smoothing it does on purpose — AV1 CRF 32 scores
+            94.73 where the H.264 CRF 23 beneath it scores 94.35, at 43% of the bytes. Better
+            picture, less than half the weight, which is the whole reason this is here.
+
+            The container is the fallback mechanism, and deliberately so: Safari's AV1 support
+            is MP4-only, so `type="video/webm"` makes it skip this source without fetching a
+            byte and take the mp4 — no guessing at an `av01.0.08M.08` codec string that, got
+            wrong, either hides a playable source or hands over an unplayable one.
+
+            (VP9 was measured twice and lost both times — 82 VMAF even two-pass. Don't retry it.)
+          */}
+          {pick.webm && <source src={pick.webm} type="video/webm" />}
+          <source src={pick.src} type="video/mp4" />
+        </video>
         <div className="gv-rail" aria-hidden>
           <i ref={railRef as React.RefObject<HTMLElement>} />
         </div>

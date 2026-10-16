@@ -20,8 +20,12 @@ const BASE = String(import.meta.env.VITE_GUIDE_CDN || "/drift/guide").replace(/\
 
 const VERSION = 1;
 
-/** The mp4 and its poster for one film, e.g. `guideFilm("drift-desktop")`. */
+/**
+ * Every file for one film, e.g. `guideFilm("drift-desktop")`. The AV1/WebM is offered first
+ * and carries most visitors; the mp4 is the fallback Safari takes.
+ */
 export const guideFilm = (name: string) => ({
+  webm: `${BASE}/${name}.webm?v=${VERSION}`,
   src: `${BASE}/${name}.mp4?v=${VERSION}`,
   poster: `${BASE}/${name}.jpg?v=${VERSION}`,
 });

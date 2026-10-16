@@ -1122,7 +1122,9 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   the event is then never heard and the frame keeps its 16:9 default. Invisible on the wide cut, whose
   shape that already is, and wrong on every portrait one. The probe caught it: a 900x1600 film drawn
   379x213. The effect calls `read()` once itself before subscribing, which is the whole fix.
-  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, 22 MB for all eight):
+  **The files** (`frontend/public/drift/guide/`, served at `/drift/guide/*`, 33 MB for all twelve —
+  four AV1/WebM at 2.2–3.5 MB, four H.264 mp4 at 4.4–6.1 MB, four posters; a visitor fetches ONE film,
+  and on anything but Safari it is the AV1):
   the masters are QuickTime `.mov` at ~12 Mbps with two silent audio tracks. `scratchpad/guide-encode5.sh`
   is the recipe — H.264 MP4, `-map 0:v:0 -an` (the silence costs ~2.9 MB a file in PCM alone, and a film
   with no audio track is one every browser will autoplay), **`-movflags +faststart`** (a .mov keeps its
@@ -1150,13 +1152,34 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   the random UUIDs managedStorage usually mints, because the frontend has to name them without a
   manifest — so **bump `VERSION` in guideFilms.ts whenever a film is re-encoded**, or the year-long
   immutable cache keeps serving the old one. Same trick as `CARD_VERSION`.
-  **VP9/WebM was tried and rejected** (2026-10-15) — do not spend the day on it again. The promise is
-  the same picture at half the bitrate; measured on this footage it did not deliver. SSIM against the
-  master: VP9 CRF 33 = 0.9766 (3.0 MB), CRF 28 = 0.9778 (4.4 MB), CRF 25 = 0.9784 (5.7 MB) — it
-  **plateaus around 0.978 and more bits do not move it** — against H.264 CRF 23 at **0.9916 for 5.0 MB**.
-  At equal or larger size VP9 scored materially lower, and 0.977 is exactly the score the client
-  rejected on the downscaled encode, so there was no honest way to call it lossless. (Single-pass
-  `libvpx-vp9 -cpu-used 2`; a two-pass encode might close some of the gap, but not a 0.014 SSIM gap.)
+  **Two sources: AV1 first, H.264 behind it** (2026-10-16, "what's industry standard for smooth
+  seamless experience? go with that"). Measured on the home film against the master with **VMAF**, which
+  is what the streaming industry tunes against and which — unlike SSIM — does not punish a modern codec
+  for the perceptual smoothing it does deliberately (`scratchpad/codec-ladder.sh`):
+
+  | codec | MB | Mbps | VMAF |
+  |---|---|---|---|
+  | x264 crf23 (what was live) | 5.00 | 2.8 | 94.35 |
+  | x264 crf26 | 3.36 | 1.9 | 91.69 |
+  | x264 crf28 | 2.61 | 1.5 | 89.29 |
+  | vp9 2-pass crf31 | 3.07 | 1.7 | 82.41 |
+  | vp9 2-pass crf34 | 2.52 | 1.4 | 81.84 |
+  | **av1 crf32 (shipped)** | **2.17** | **1.2** | **94.73** |
+  | av1 crf38 | 1.49 | 0.8 | 93.02 |
+
+  **AV1 CRF 32 scores ABOVE the H.264 it replaces at 43% of the bytes** — there is no trade here, it is
+  simply better, and it is what makes full native resolution affordable to autoplay. SVT-AV1 preset 5,
+  native resolution, `scratchpad/av1-encode.sh`, then remuxed `-c copy` into WebM.
+  **The container IS the fallback mechanism, deliberately**: Safari's AV1 support is MP4-only, so
+  `type="video/webm"` makes it skip that source without fetching a byte and take the mp4 — rather than
+  guessing at an `av01.0.08M.08` codec string which, got wrong, either hides a playable source or hands
+  over an unplayable one. Verified that Chrome really decodes ours, not just that ffprobe likes them:
+  `scratchpad/av1-check.js` plays all four over `file://` and checks dimensions (needs no server).
+  **VP9 lost twice and is not coming back**: 82 VMAF even two-pass with `auto-alt-ref`, against AV1's
+  94.7 at less weight. Don't retry it.
+  Because the element is fed by `<source>` children now and no longer carries `src`, the effect calls
+  `v.load()` when `pick.src` actually changes — swapping those children does nothing on its own, so
+  without it a window dragged across the 820px line keeps playing the cut it started with.
 - **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
   all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
   horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →
