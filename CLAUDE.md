@@ -1145,7 +1145,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   stacked above it under 560px, with a small expand button on its top-left corner — the client's own
   suggestion. The whole thumbnail opens it full screen (`.tpw-lightbox`), closed by the X, a click anywhere,
   or Escape. The picture is `flow.coverUrl || flow.thumb`, so a tour with no cover of its own shows its first
-  drift's frame. The overlay is **portalled into `.drift-ui.d-page`**: `.tpw` is a `.t-rise` section, those
+  drift's frame. **The X stands ABOVE the picture's top-right corner, never on it** — the third and settled
+  place: the screen's corner, where nobody could find it (ref05, 2026-10-15) → the picture's own corner →
+  above it (2026-10-17, "take it outside the frame as well, just lift it up so it's out of the frame", the
+  same correction as the player's fullscreen button). `.tpw-lightbox-fig` is a COLUMN with the button
+  first, done with flow rather than a negative `top`: the lightbox centres its contents, so a tall
+  picture would push a negatively-offset button off the top of the screen. The image gives up the
+  button's height (`max-height:calc(100% - 48px)`) or the pair would overflow the viewport. The overlay is **portalled into `.drift-ui.d-page`**: `.tpw` is a `.t-rise` section, those
   animate, an animating element is a containing block, and a `position:fixed` overlay inside one covers the
   section instead of the page — which is exactly what it did before the portal (seen in the shot).
   EnquirySheet portals for the same reason.

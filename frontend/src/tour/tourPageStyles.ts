@@ -110,11 +110,18 @@ export const TOUR_PAGE_STYLES = `
 .tpw-cover-btn svg{width:14px;height:14px}
 .tpw-lightbox{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;
   background:rgba(6,9,16,.92);backdrop-filter:blur(6px);cursor:zoom-out;animation:tpwfade .18s ease}
-.tpw-lightbox-fig{position:relative;display:inline-flex;max-width:100%;max-height:100%}
+/* A column, so the X can stand ABOVE the picture and still be right-aligned to its edge. Done
+   with flow rather than a negative offset on purpose: the lightbox centres its contents, so a
+   button lifted by a negative top offset would be pushed off the top of the screen by a tall picture. */
+.tpw-lightbox-fig{position:relative;display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:100%;max-height:100%}
 .tpw-lightbox img{display:block;max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
-/* On the picture's own top-right corner, the same place and shape as the expand button that
-   opened it — so the way out is where the way in was (client's ref05, 2026-10-15). */
-.tpw-lightbox-x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:12px;font-size:16px;line-height:1;
+/* The picture gives up the button's height, or the two together would overflow the viewport. */
+.tpw-lightbox-fig img{max-height:calc(100% - 48px)}
+/* ABOVE the picture's top-right corner, covering none of it (client, 2026-10-17: "take it
+   outside the frame as well, just lift it up so it's out of the frame"). It sat ON that corner
+   from 2026-10-15, which was itself a move IN from the screen's corner, where people could not
+   find it — it is still right next to the picture, it simply no longer sits on top of it. */
+.tpw-lightbox-x{position:static;flex:none;width:38px;height:38px;border-radius:12px;font-size:16px;line-height:1;
   color:#fff;background:rgba(11,15,25,.66);border:1px solid rgba(255,255,255,.26);backdrop-filter:blur(8px);cursor:pointer}
 .tpw-lightbox-x:hover{background:rgba(11,15,25,.88)}
 @keyframes tpwfade{from{opacity:0}to{opacity:1}}
