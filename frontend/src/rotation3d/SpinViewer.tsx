@@ -3049,7 +3049,8 @@ const R3D_CSS = `
 .r3d-stage.r3d-touchsim.r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
 @media (orientation: portrait){
   .r3d-stage.r3d-touchsim.r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
-    top:calc(var(--r3d-frametop,20%) + 14px)}
+    top:max(max(14px,env(safe-area-inset-top)),
+            calc(var(--r3d-frametop,20%) - clamp(32px,9vmin,40px) - 12px))}
 }
 
 /* A landscape drift on a phone gets the fullscreen button on EVERY stop, not just the first one
@@ -3059,16 +3060,19 @@ const R3D_CSS = `
   .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
 }
 @media (pointer: coarse) and (orientation: portrait){
-  /* The footage's own TOP-right corner (client, 2026-10-17: "we had it previously on the top
-     right of the frame, that was a better place"). It sat in the BOTTOM-right from 2026-10-07,
-     on the reasoning that a video player puts it there; in the frame's own top corner it reads
-     as the drift's control rather than the page's, and it is nowhere near the drag cue or the
-     turn-phone pill that hang off the frame's bottom edge. --r3d-frametop is the frame's top
-     edge, set each frame in draw() (and tracked separately from --r3d-framebot since
-     2026-10-06, which is what makes this safe to hang off). Apple never has the button at all,
-     so in practice this rule is Android. */
+  /* ABOVE the frame's top edge, in the ground over it — not inside it (client, 2026-10-17:
+     "I didn't mean inside the frame... it is sitting on the frame, just take it up, out of the
+     frame"). The first pass read "top right of the frame" as 14px INSIDE the top edge, which is
+     still over the footage. So: the frame's top, less the button's own height, less a gap.
+     --r3d-frametop is that edge, set each frame in draw(). The max() is a floor, for a clip tall
+     enough that there is no ground above it: the button stays on screen and under the status
+     bar rather than running off the top. It cannot collide with the brand titles up there, which
+     are left-aligned while this sits at right:16px. Apple never has the button, so in practice
+     this rule is Android. The sideways/fullscreen placement is a different rule and the client
+     has confirmed it is right — do not touch it from here. */
   .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
-    top:calc(var(--r3d-frametop,20%) + 14px)}
+    top:max(max(14px,env(safe-area-inset-top)),
+            calc(var(--r3d-frametop,20%) - clamp(32px,9vmin,40px) - 12px))}
   /* The sentence stands only where there is no button to offer instead. On an iPhone or iPad
      turning the device IS the answer, so there it still says so; everywhere else the icon says
      it better and in fewer words. */

@@ -239,12 +239,18 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     publishes `--r3d-cuebot` while the cue is sitting there and the pill's `top` reads
     `var(--r3d-cuebot, var(--r3d-framebot))`. Before that the cue floated in the middle of the band and
     the two sat level with each other (client's refine3.jpeg, 2026-10-02). **The `[data-fs]` button is on EVERY landscape drift** (2026-10-07, client), in
-    the footage's own corner, in place of the sentence — **TOP-right since 2026-10-17** (client:
-    "we had it previously on the top right of the frame, that was a better place"), hung off
-    `--r3d-frametop`. It was BOTTOM-right from 2026-10-07 on the reasoning that a video player puts
-    it there ("the icon and placement they are already familiar with from fb and tik tok standards");
-    in the frame's top corner it reads as the drift's own control and is nowhere near the drag cue or
-    the turn-phone pill, which both hang off the frame's BOTTOM edge. Apple never has the button, so
+    **ABOVE the frame's top-right corner** since 2026-10-17 — in the ground over the footage, NOT
+    inside it. Two passes: the client asked for "the top right of the frame", the first reading put it
+    14px inside the top edge, and the answer was "I didn't mean inside the frame… it is sitting on the
+    frame, just take it up, out of the frame and that's it". So the rule is `--r3d-frametop` LESS the
+    button's own height less a gap, with a `max()` floor against the safe-area inset for a clip tall
+    enough to leave no ground above it (it cannot collide with the brand titles up there: those are
+    left-aligned, this sits at `right:16px`). It was BOTTOM-right from 2026-10-07 on the reasoning
+    that a video player puts it there ("the icon and placement they are already familiar with from fb
+    and tik tok standards"); above the frame it covers no footage at all, which was the point.
+    **The sideways/fullscreen placement is a separate rule the client has confirmed is right** — the
+    portrait rule is the only one in play here. The builder's `r3d-touchsim` twin has to be changed
+    with it or the preview shows the old placement. Apple never has the button, so
     that rule is Android in practice.
     **Sideways and filling the screen, the EXIT button steps left of Menu**
     (`.r3d-stage.r3d-corners:not(.r3d-ios) .r3d-tools`, 2026-10-17): Menu owns the top-right corner
