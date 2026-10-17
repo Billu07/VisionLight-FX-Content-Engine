@@ -20,6 +20,15 @@ export const isFacebookBrowser = () => /FBAN|FBAV|FB_IAB|FBIOS/i.test(ua());
 export const isInAppBrowser = () => /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Twitter|TwitterAndroid|Line\//i.test(ua());
 
 /**
+ * Instagram's own webview. It will not hand the screen over when the phone is turned — the
+ * orientation is pinned — so "turn your phone for the full view" is advice that cannot be taken
+ * there, and the drift says to open the page in a real browser instead (client, 2026-10-17).
+ * Kept apart from the two above because this is about what the hint SAYS, not about touch
+ * handling or whether a button is offered.
+ */
+export const isInstagramBrowser = () => /Instagram/i.test(ua());
+
+/**
  * An iPhone or iPad — every browser on them is Safari's engine, so this is a capability
  * question, not a brand one. There is no orientation lock and element fullscreen is granted to
  * `<video>` alone, so a "fill the screen" button can only ever pseudo-fullscreen and ask, which

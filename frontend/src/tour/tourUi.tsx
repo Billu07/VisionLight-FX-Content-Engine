@@ -104,6 +104,11 @@ export const TOUR_STYLES = `
   color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border);text-decoration:none;
   transition:filter .16s,transform .16s}
 .t-back:hover{filter:brightness(1.12);transform:translateX(-2px)}
+/* "+ New Tour" sits in the same row as the way back and was a ghost button, which next to an
+   accent pill read as disabled (client, 2026-10-17: "it's hard to see, use the same blue
+   aesthetic"). It takes .t-back itself so the two can never drift apart — only the hover lean
+   is reversed, because it goes forward. */
+.t-back.t-fwd:hover{transform:translateX(2px)}
 .t-name-input{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:8px 10px}
 .t-muted-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
 
@@ -258,9 +263,14 @@ export const TOUR_STYLES = `
    compact instead of away — square keys, no label padding — so the row still fits. */
 @media(max-width:560px){
   .t-path-row{grid-template-columns:44px minmax(0,1fr) auto;padding:10px 8px}
-  .t-path-side{gap:4px}
-  .t-path-side .t-arrows{gap:4px}
+  /* Up, down and the settings caret stood 4px apart, which on a phone is one fingertip across
+     all three — reaching for the caret hit "move down" instead (client, 2026-10-17). The keys
+     stay compact; the SPACE between them is what grows, and the caret gets a touch target of
+     its own instead of being a bare 14px glyph. */
+  .t-path-side{gap:10px}
+  .t-path-side .t-arrows{gap:8px}
   .t-path-side .t-arrows .d-btn{min-width:0;width:30px;height:30px;padding:0;display:grid;place-items:center;font-size:14px;line-height:1}
+  .t-path-side .t-chevron{width:32px;height:32px;display:grid;place-items:center;font-size:16px}
 }
 /* Cover picker (tour settings) */
 .t-cover{display:grid;gap:14px;grid-template-columns:1fr;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}

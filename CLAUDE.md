@@ -239,8 +239,20 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     publishes `--r3d-cuebot` while the cue is sitting there and the pill's `top` reads
     `var(--r3d-cuebot, var(--r3d-framebot))`. Before that the cue floated in the middle of the band and
     the two sat level with each other (client's refine3.jpeg, 2026-10-02). **The `[data-fs]` button is on EVERY landscape drift** (2026-10-07, client), in
-    the footage's own BOTTOM-RIGHT corner where a video player puts it — "the icon and placement they
-    are already familiar with from fb and tik tok standards", in place of the sentence. It used to be
+    the footage's own corner, in place of the sentence — **TOP-right since 2026-10-17** (client:
+    "we had it previously on the top right of the frame, that was a better place"), hung off
+    `--r3d-frametop`. It was BOTTOM-right from 2026-10-07 on the reasoning that a video player puts
+    it there ("the icon and placement they are already familiar with from fb and tik tok standards");
+    in the frame's top corner it reads as the drift's own control and is nowhere near the drag cue or
+    the turn-phone pill, which both hang off the frame's BOTTOM edge. Apple never has the button, so
+    that rule is Android in practice.
+    **Sideways and filling the screen, the EXIT button steps left of Menu**
+    (`.r3d-stage.r3d-corners:not(.r3d-ios) .r3d-tools`, 2026-10-17): Menu owns the top-right corner
+    there and the tools sat straight underneath it, so the way back OUT of fullscreen was behind Menu
+    and unreachable (client, Android). The offset is `clamp(56px, var(--r3d-navw), 140px)` rather than
+    the bare custom property — `--r3d-navw` is derived from the ground beside the footage and can
+    resolve small or negative on a screen with none, and a dropped declaration here would put the
+    button back under Menu, which is the bug. It used to be
     rationed to the first landscape drift of a visit (`r3d-fsfirst` / `fsOfferedFor`, both now gone):
     a visitor met it once and then had no way back OUT of fullscreen, which is what the client
     reported. `r3d-auto-fs` no longer hides it either — that rule existed for the iPhone case, and an
@@ -248,7 +260,12 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     outright, because there is no orientation lock and element fullscreen is `<video>`-only, so turning
     the device IS the answer — and Apple is therefore the only place the "Turn your phone for the full
     view" line still stands (`.r3d-drift.r3d-wide.r3d-ios .r3d-turnhint`), since it is the only thing
-    left to say there. Where the button does show it means "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
+    left to say there. **In Instagram's webview the pill reads "Open Browser to See Fullscreen"**
+    instead (2026-10-17, client: "instagram browser doesn't allow you to rotate"): that webview pins
+    the orientation, so "turn your phone" is advice that cannot be taken. `isInstagramBrowser()` in
+    `inAppBrowser.ts` is deliberately separate from `isFacebookBrowser` / `isInAppBrowser` — it only
+    decides what the pill SAYS, not touch handling or whether a button is offered, and Facebook's
+    webview does turn. Where the button does show it means "fill the screen". That calls `fillLandscape()`, which requests fullscreen and then
     `screen.orientation.lock("landscape")` — real rotation on Android/Chrome. The lock is tried THREE
     times: before any await (while the tap is still the user gesture), straight after fullscreen resolves,
     and once more 350ms later — on X's in-app browser the first open never turned and the second always
@@ -1060,6 +1077,14 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   **Create a Tour** button sits in the row (`CreateTourButton` in tourPageParts, also on the channel PAGE's
   action row): a visitor there is not looking at a property to enquire about, so the invitation is to make
   one. Signed out it opens Try It Free, signed in it goes to their own page.
+- **Builder, third pass** (2026-10-17, client): **"+ New Tour" wears the same pill as the way back** —
+  it was `d-btn ghost sm` sitting beside an accent `.t-back`, which read as disabled ("it's hard to
+  see, use the same blue aesthetic"). It now takes `.t-back` itself plus `.t-fwd`, which only reverses
+  the hover lean, so the pair can never drift apart. And on a phone the step row's **three keys stand
+  apart**: up, down and the settings caret were 4px from each other, one fingertip across all three, so
+  reaching for the caret hit "move down" (`@media(max-width:560px)` — `.t-path-side` gap 4→10px,
+  `.t-arrows` 4→8px, and the caret gets a 32px touch box instead of being a bare 14px glyph). The keys
+  themselves stay compact; only the space between them grew.
 - **Builder, second pass** (2026-10-07, client): the tour's **cover photo is in the builder's head** too, the
   same picture the pathway shows (`flow.coverUrl`, else the first drift with a frame), with a **pencil** on it
   that opens Tour Settings — where the picker lives (ref08). The step strips keep their **reorder arrows on a

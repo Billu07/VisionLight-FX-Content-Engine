@@ -1020,7 +1020,7 @@ export default function TourBuilder({
           ← {page.name} Tours
         </Link>
         {!readOnly && (
-          <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a Separate Tour on This Page">
+          <button className="t-back t-fwd" onClick={() => navigate(`${homePath}?new=1`)} title="Start a Separate Tour on This Page">
             + New Tour
           </button>
         )}

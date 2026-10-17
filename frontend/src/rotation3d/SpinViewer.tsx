@@ -1,6 +1,6 @@
 import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused, REVEAL_RING } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
-import { isInAppBrowser, isApple } from "./inAppBrowser";
+import { isInAppBrowser, isApple, isInstagramBrowser } from "./inAppBrowser";
 import { arrowHabit, noteArrowHabit } from "./cameraAuto";
 import TourTips, { tipsSeen, tipsForced } from "./TourTips";
 import { createAttention, type AttentionTarget } from "./attention";
@@ -2384,8 +2384,15 @@ export default function SpinViewer({
         </div>
       </div>
 
-      {/* Shown for a few seconds when the screen could not be turned for us (iOS). */}
-      {driftMode && <div className="r3d-turnhint" aria-hidden>Turn your phone for the full view</div>}
+      {/* Shown for a few seconds when the screen could not be turned for us (iOS), and standing
+          on an Apple landscape drift where turning IS the answer. Instagram's webview pins the
+          orientation, so there turning does nothing and the only way through is a real browser
+          (client, 2026-10-17). Keyed to Instagram alone — Facebook's webview does turn. */}
+      {driftMode && (
+        <div className="r3d-turnhint" aria-hidden>
+          {isInstagramBrowser() ? "Open Browser to See Fullscreen" : "Turn your phone for the full view"}
+        </div>
+      )}
 
       {driftMode && flowNav && flowNav.stops.length > 1 && (
         <div className="r3d-stops" role="navigation" aria-label="Tour drifts">
@@ -2995,6 +3002,16 @@ const R3D_CSS = `
    client's own sketch, 2026-10-03). Side by side it ran a long way across the top of the room;
    stacked it keeps to the corner. The lines already cut themselves off with an ellipsis. */
 .r3d-corners .r3d-topbar{padding:max(12px,env(safe-area-inset-top)) 12px 0}
+/* Sideways and filling the screen, Menu is the top-right corner (the client's own arrangement)
+   and the tools sat straight underneath it — so the button to get back OUT of fullscreen was
+   behind Menu and unreachable (client, 2026-10-17, Android). Step the tools left by one nav
+   button's width so the two sit side by side. clamp() rather than the bare custom property
+   because --r3d-navw is derived from the ground beside the footage and can resolve small or
+   negative on a screen with none; a dropped declaration here would put the button back under
+   Menu, which is the bug. Apple has no button to place. */
+.r3d-stage.r3d-corners:not(.r3d-ios) .r3d-tools{position:absolute;z-index:7;
+  top:max(14px,env(safe-area-inset-top));
+  right:calc(8px + clamp(56px,var(--r3d-navw,56px),140px) + 10px)}
 .r3d-corners .r3d-brand{flex-direction:column;align-items:flex-start;gap:6px}
 .r3d-corners .r3d-titles{max-width:min(36vw,176px)}
 /* The drag helper hangs off the CTA row's top edge; with the row gone to the corners there is
@@ -3015,12 +3032,16 @@ const R3D_CSS = `
   .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
 }
 @media (pointer: coarse) and (orientation: portrait){
-  /* In the footage's own bottom-right corner, which is where a video player puts it and what the
-     client asked for in place of the sentence ("the icon and placement they are already familiar
-     with from fb and tik tok standards"). --r3d-framebot is the frame's bottom edge, set each
-     frame in draw(). */
+  /* The footage's own TOP-right corner (client, 2026-10-17: "we had it previously on the top
+     right of the frame, that was a better place"). It sat in the BOTTOM-right from 2026-10-07,
+     on the reasoning that a video player puts it there; in the frame's own top corner it reads
+     as the drift's control rather than the page's, and it is nowhere near the drag cue or the
+     turn-phone pill that hang off the frame's bottom edge. --r3d-frametop is the frame's top
+     edge, set each frame in draw() (and tracked separately from --r3d-framebot since
+     2026-10-06, which is what makes this safe to hang off). Apple never has the button at all,
+     so in practice this rule is Android. */
   .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
-    top:calc(var(--r3d-framebot,60%) - clamp(32px,9vmin,40px) - 14px)}
+    top:calc(var(--r3d-frametop,20%) + 14px)}
   /* The sentence stands only where there is no button to offer instead. On an iPhone or iPad
      turning the device IS the answer, so there it still says so; everywhere else the icon says
      it better and in fewer words. */
