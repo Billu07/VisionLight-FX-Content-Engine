@@ -469,6 +469,134 @@ export async function renderDriftCard(input: {
 }
 
 /** The drift.li app icon: "d" and a cyan dot on an ink square (`padding` = maskable safe zone). */
+
+// ───────────────────────── the share kit (a card you post or print) ─────────────────────────
+
+/**
+ * The share sheet used to hand over a bare QR code. A QR on its own says nothing about what is
+ * behind it, so this is a card instead (client, 2026-10-17): the tour's own cover, its name, the
+ * link in plain text, and the QR on a white tile — in the three shapes a tour actually gets
+ * shared in.
+ *
+ * Rendered here rather than on a canvas in the browser for one decisive reason: the cover lives
+ * on R2, and drawing a cross-origin image into a canvas taints it, so `toBlob` — the download —
+ * throws. Server-side there is no origin to cross.
+ */
+export type KitLayout = "landscape" | "square" | "portrait";
+
+export const KIT_SIZES: Record<KitLayout, { w: number; h: number }> = {
+  landscape: { w: 1200, h: 630 }, // a post, a link, a slide
+  square: { w: 1080, h: 1080 }, // Instagram's feed
+  portrait: { w: 1080, h: 1350 }, // a portrait post, or something printed
+};
+
+export const isKitLayout = (v: unknown): v is KitLayout =>
+  v === "landscape" || v === "square" || v === "portrait";
+
+export async function renderShareKitCard(input: {
+  layout: KitLayout;
+  title: string;
+  pageName: string | null;
+  /** Written on the card AND encoded in the QR, so the two can never disagree. */
+  url: string;
+  cover: Buffer | null;
+  /** A square PNG of the QR. Pure: images come in as buffers, as everywhere in this file. */
+  qr: Buffer;
+}): Promise<Buffer> {
+  const { w, h } = KIT_SIZES[input.layout];
+  const accent = ACCENTS.cyan;
+  const pad = Math.round(w * 0.052);
+  // One scale for every type size, taken from the landscape card this grew out of, so the three
+  // layouts are the same design at three sizes rather than three designs.
+  const k = w / 1200;
+
+  // The QR is the point of the card, so it is sized off the SHORT side and floored at something
+  // a phone can still read from across a room.
+  const tile = Math.max(200, Math.round(Math.min(w, h) * 0.26));
+  const quiet = Math.round(tile * 0.08); // the QR's own margin is 0; this is the quiet zone
+  const qrPx = tile - quiet * 2;
+
+  const base = input.cover
+    ? sharp(input.cover).rotate().resize(w, h, { fit: "cover", position: "attention" })
+    : sharp(svg(w, h, `<rect width="${w}" height="${h}" fill="${INK}"/>`));
+
+  const bottom = h - pad;
+  const tileTop = bottom - tile;
+  const tileLeft = w - pad - tile;
+  const colW = w - pad * 2 - tile - Math.round(40 * k);
+
+  const out: string[] = [];
+  out.push(`<defs>
+    <linearGradient id="kt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${INK}" stop-opacity="0.78"/><stop offset="1" stop-color="${INK}" stop-opacity="0"/></linearGradient>
+    <linearGradient id="kb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${INK}" stop-opacity="0"/><stop offset="0.5" stop-color="${INK}" stop-opacity="0.68"/><stop offset="1" stop-color="${INK}" stop-opacity="0.96"/></linearGradient>
+  </defs>
+  <rect width="${w}" height="${Math.round(h * 0.26)}" fill="url(#kt)"/>
+  <rect y="${Math.round(h * 0.42)}" width="${w}" height="${h - Math.round(h * 0.42)}" fill="url(#kb)"/>`);
+
+  // Top row: whose tour it is, and whose platform.
+  const topBase = pad + Math.round(34 * k);
+  const markSize = Math.round(30 * k);
+  const markW = measure("drift.li", "bold", markSize);
+  if (input.pageName) {
+    out.push(
+      text(ellipsize(input.pageName, "semibold", Math.round(28 * k), w - pad * 2 - markW - 40 * k), WHITE, {
+        weight: "semibold",
+        size: Math.round(28 * k),
+        x: pad,
+        y: topBase,
+        opacity: 0.9,
+      }),
+    );
+  }
+  out.push(
+    runs([{ text: "drift", fill: WHITE }, { text: ".li", fill: accent }], {
+      weight: "bold",
+      size: markSize,
+      x: w - pad - markW,
+      y: topBase,
+    }),
+  );
+
+  // Bottom-left, read upwards: the link, the name, the label.
+  const urlSize = Math.round(24 * k);
+  const titleSize = Math.round((input.layout === "landscape" ? 58 : 62) * k);
+  const lh = Math.round(titleSize * 1.1);
+  const urlBase = bottom - Math.round(6 * k);
+  const titleLast = urlBase - urlSize - Math.round(26 * k);
+  const lines = wrap(input.title, "bold", titleSize, colW, input.layout === "landscape" ? 2 : 3);
+  const titleFirst = titleLast - (lines.length - 1) * lh;
+  const pillSize = Math.round(30 * k);
+  const pillH = Math.round(52 * (pillSize / 22));
+  out.push(
+    pill(pad, titleFirst - Math.round(titleSize * 0.78) - Math.round(22 * k) - pillH, "Interactive tour", accent, "hand", pillSize),
+  );
+  lines.forEach((l, i) => out.push(text(l, WHITE, { weight: "bold", size: titleSize, x: pad, y: titleFirst + i * lh })));
+  out.push(
+    text(ellipsize(input.url.replace(/^https?:\/\//, ""), "semibold", urlSize, colW), accent, {
+      weight: "semibold",
+      size: urlSize,
+      x: pad,
+      y: urlBase,
+    }),
+  );
+
+  // Bottom-right: the QR, on white, because a QR on a photograph does not scan.
+  out.push(
+    `<rect x="${tileLeft}" y="${tileTop}" width="${tile}" height="${tile}" rx="${Math.round(tile * 0.11)}" fill="${WHITE}"/>`,
+  );
+
+  // `nearest` on purpose: a QR is a grid of hard squares and any smoothing softens the modules,
+  // which is exactly what makes a camera work for it.
+  const qrImg = await sharp(input.qr).resize(qrPx, qrPx, { kernel: "nearest" }).png().toBuffer();
+  return base
+    .composite([
+      { input: svg(w, h, out.join("")), top: 0, left: 0 },
+      { input: qrImg, top: tileTop + quiet, left: tileLeft + quiet },
+    ])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 export function iconSvg(size: number, opts: { radius?: number; padding?: number } = {}): string {
   const pad = opts.padding ?? 0;
   const inner = size - pad * 2;

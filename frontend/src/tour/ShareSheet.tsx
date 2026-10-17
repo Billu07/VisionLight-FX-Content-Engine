@@ -1,37 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
-import qrcode from "qrcode-generator";
+import { useEffect, useState } from "react";
 import type { Flow, Page } from "./types";
-import { apiEndpoints } from "../lib/api";
+import { API_BASE_URL, apiEndpoints } from "../lib/api";
 import { notify } from "../lib/notifications";
 import { apiError, copyText, publicUrl } from "./tourUi";
 import { PrintKit } from "./PrintKit";
 import { ReelSheet } from "./ReelSheet";
 import { PersonalLinks } from "./PersonalLinks";
 
-/** A QR code as an inline SVG (theme-coloured via currentColor). */
-function QrSvg({ text, size }: { text: string; size: number }) {
-  const { path, n } = useMemo(() => {
-    const qr = qrcode(0, "M");
-    qr.addData(text);
-    qr.make();
-    const count = qr.getModuleCount();
-    let d = "";
-    for (let r = 0; r < count; r++) {
-      for (let c = 0; c < count; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-    }
-    return { path: d, n: count };
-  }, [text]);
-  return (
-    <svg className="t-qr" viewBox={`0 0 ${n} ${n}`} width={size} height={size} shapeRendering="crispEdges" role="img" aria-label="QR code for this tour">
-      <path d={path} fill="currentColor" />
-    </svg>
-  );
-}
+/** The three shapes a tour gets shared in; the server renders each (driftShareCards.ts). */
+type KitLayout = "landscape" | "square" | "portrait";
+const KIT_LAYOUTS: [KitLayout, string][] = [
+  ["landscape", "Landscape"],
+  ["square", "Square"],
+  ["portrait", "Portrait"],
+];
 
 /**
- * The publish moment (and the "Share" button afterwards): the cover in a live
- * ring, the link with copy, a QR code to open the tour on a phone, and the
- * system share sheet where the browser has one.
+ * The publish moment (and the "Share" button afterwards): the cover in a live ring, the link
+ * with copy, the SHARE CARD in three shapes with a PNG download, and the system share sheet
+ * where the browser has one.
+ *
+ * The card is an <img> off a public endpoint rather than anything drawn here, and that is the
+ * whole reason it is not a canvas: the cover lives on R2, and drawing a cross-origin image into
+ * a canvas taints it, so the download — `toBlob` — would throw. Server-side there is no origin
+ * to cross, and the same URL serves the preview and the download (`&download=1`).
  */
 export function ShareSheet({
   flow,
@@ -51,6 +43,9 @@ export function ShareSheet({
   const link = publicUrl(flow.publicPath);
   const short = link.replace(/^https?:\/\//, "");
   const [copied, setCopied] = useState(false);
+  const [layout, setLayout] = useState<KitLayout>("landscape");
+  // One URL for the preview and the download — see the note above the component.
+  const cardSrc = `${API_BASE_URL}/api/drift/public/share-card/${flow.id}?layout=${layout}`;
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const [printOpen, setPrintOpen] = useState(false);
@@ -124,23 +119,37 @@ export function ShareSheet({
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <div className="t-sheet-grid">
-            <div className="t-sheet-qr">
-              <QrSvg text={link} size={148} />
-            </div>
-            <div className="t-sheet-side">
-              <div className="d-label">Open It on a Phone</div>
-              <div className="d-sub" style={{ fontSize: 12.5 }}>
-                Point the camera at the code. Tours feel best held in a hand, dragging through each stop.
-              </div>
-              <div className="t-actions">
-                <a className="d-btn" href={flow.publicPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-                  Open Tour
-                </a>
-                <button type="button" className="d-btn ghost" onClick={share}>
-                  {canShare ? "Share…" : "Copy Link"}
+          <div className="t-kit">
+            <div className="d-label">Share Card</div>
+            <div className="d-tabs">
+              {KIT_LAYOUTS.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`d-tab ${layout === key ? "active" : ""}`}
+                  onClick={() => setLayout(key)}
+                >
+                  {label}
                 </button>
-              </div>
+              ))}
+            </div>
+            <div className={`t-kit-shot t-kit-${layout}`}>
+              {/* keyed by layout so the browser swaps rather than scaling the old one */}
+              <img key={layout} src={cardSrc} alt={`Share card for ${flow.name}`} />
+            </div>
+            <p className="d-sub" style={{ fontSize: 12.5, margin: 0 }}>
+              The Cover, the Name, the Link and a QR on One Card — Post It, Print It, or Hand It Over.
+            </p>
+            <div className="t-actions">
+              <a className="d-btn primary" href={`${cardSrc}&download=1`} download style={{ textDecoration: "none" }}>
+                Download PNG
+              </a>
+              <a className="d-btn" href={flow.publicPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                Open Tour
+              </a>
+              <button type="button" className="d-btn ghost" onClick={share}>
+                {canShare ? "Share…" : "Copy Link"}
+              </button>
             </div>
           </div>
           {canManageLinks && flow.status === "PUBLISHED" && (

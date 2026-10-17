@@ -773,6 +773,29 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   Personal links: `DriftShareLink` per tour (`…?to={token}`, `services/driftEnquiries.ts`); `rotation3d/personalLink.ts`
   notes the token for the visit (open counted once, param dropped from the address) and the player tags VIEW events
   `meta.link`; the share sheet's `PersonalLinks` shows opens / drifts seen / enquiries.
+- **The share card** (2026-10-17, client: "instead of a qr to share, let's make it better… a share card
+  using the thumbnail and qr, well laid out, in different sizes… with png download"): the share sheet's
+  bare QR is gone — a QR alone says nothing about what is behind it. `renderShareKitCard` in
+  `services/driftShareCards.ts` draws the tour's own cover full-bleed with the page name top-left,
+  drift.li top-right, and bottom-left the "Interactive tour" pill, the tour's name (wrapped, 2 lines
+  landscape / 3 otherwise) and the link in the accent, with the QR on a white tile bottom-right.
+  `KIT_SIZES`: landscape 1200x630 (a post or a slide), square 1080x1080 (Instagram's feed), portrait
+  1080x1350 (a portrait post, or print). One scale `k = w/1200` drives every type size, so the three
+  are one design at three sizes rather than three designs.
+  **Rendered on the SERVER, and that is not a preference**: the cover lives on R2, and drawing a
+  cross-origin image into a canvas taints it, so `toBlob` — the download — throws. Server-side there
+  is no origin to cross. The QR comes from the `qrcode` package the backend already had (no new
+  dependency) at `margin: 0`, because the quiet zone is drawn as part of the white tile at whatever
+  size the layout picks; it is resized with `kernel: "nearest"` since smoothing a QR's modules is
+  exactly what stops a camera reading it.
+  `GET /api/drift/public/share-card/:id?layout=&download=1` (`routes/driftShare.ts`) serves both the
+  preview and the download from ONE URL — **public and unauthenticated on purpose**: an `<img>` and a
+  download link cannot carry a bearer token, `lookup.tourById` only returns PUBLISHED tours (which is
+  also when the sheet offers it), and everything on the card is already public via the OG card. It
+  lives under `/api/` rather than beside the `/og/` cards so it does not depend on the drift.li nginx
+  block. The tour lookup sits OUTSIDE the `cardFor` memo so a renamed tour gets the right download
+  filename at once; only the fetch-and-render half is cached. `scratchpad/kit-render.js` renders all
+  three plus a stress case (no cover, a title long enough to wrap to three lines) to be looked at.
 - **Print kit + unbranded link** (2026-09-15, no schema change): share sheet (Editors + Admins, published tours) →
   "Unbranded link" = `/u/{code}` for listing sites (MLS) — `POST /api/drift/my/flows/:id/unbranded` (EDIT) makes a
   10-char code once, kept in `DriftFlow.settings.unbrandedCode` (`serializeFlow` → `unbrandedPath`); public

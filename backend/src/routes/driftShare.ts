@@ -5,13 +5,25 @@ import path from "node:path";
 import { isManagedStorageUrl } from "../utils/managedStorage";
 import {
   createDbShareLookup,
+  DRIFT_ORIGIN,
   renderSharePage,
   resolveShare,
   robotsTxt,
   sitemapXml,
   type ShareMeta,
 } from "../services/driftShare";
-import { renderDriftCard, renderPageCard, renderSiteCard, renderTourCard, SITE_CARDS, type SiteCardKey } from "../services/driftShareCards";
+import QRCode from "qrcode";
+// (DRIFT_ORIGIN is added to the driftShare import below)
+import {
+  isKitLayout,
+  renderDriftCard,
+  renderPageCard,
+  renderShareKitCard,
+  renderSiteCard,
+  renderTourCard,
+  SITE_CARDS,
+  type SiteCardKey,
+} from "../services/driftShareCards";
 
 /**
  * drift.li link previews, served from this app (services/driftShare.ts). nginx sends drift.li
@@ -175,6 +187,62 @@ router.get("/__drift/og/:kind/:file", async (req: Request, res: Response) => {
     }
     res.set("Cache-Control", "public, max-age=300");
     res.type("image/jpeg").send(fallback);
+  }
+});
+
+/**
+ * The share sheet's card: the tour's cover, its name, the link and a QR, in three shapes
+ * (`?layout=landscape|square|portrait`), as a PNG.
+ *
+ * **Public and unauthenticated on purpose.** Everything on it is already public — the OG card at
+ * /og/tour/:id carries the same cover and the same title — and it has to be reachable both by an
+ * `<img>` for the preview and by a download link, neither of which can carry a bearer token.
+ * `lookup.tourById` only returns PUBLISHED tours, which is also exactly when the share sheet
+ * offers this, and the id is a uuid rather than anything guessable.
+ *
+ * Served under /api/ rather than beside the /og/ cards so it does not depend on the drift.li
+ * nginx block: the API is proxied on every domain, the /__drift/og mapping is not.
+ */
+router.get("/api/drift/public/share-card/:id", async (req: Request, res: Response) => {
+  const id = String(req.params.id || "");
+  const raw = String(req.query.layout || "landscape");
+  const layout = isKitLayout(raw) ? raw : "landscape";
+  try {
+    const tour = await lookup.tourById(id);
+    if (!tour) throw new NotFound();
+    const url = `${DRIFT_ORIGIN}${tour.path}`;
+    // Only the expensive half is memoised: one indexed query per request is cheaper than a
+    // stale name on the card, and this endpoint serves the share sheet, not crawlers.
+    const card = await cardFor(`kit:${id}:${layout}`, () =>
+      limited(async () => {
+        const [cover, qr] = await Promise.all([
+          // The tour's own cover, or its first drift's frame when it has none — the same
+          // fallback the pathway and the OG card use.
+          image(tour.cover || tour.thumbs[0]),
+          // margin 0: the quiet zone is drawn as part of the white tile, at the size the card
+          // decides, so it is right at every layout.
+          QRCode.toBuffer(url, {
+            type: "png",
+            margin: 0,
+            width: 900,
+            errorCorrectionLevel: "M",
+            color: { dark: "#0d1119", light: "#ffffff" },
+          }),
+        ]);
+        return renderShareKitCard({ layout, title: tour.title, pageName: tour.pageName, url, cover, qr });
+      }),
+    );
+    if (req.query.download) {
+      const stem = (tour.path.split("/").pop() || "tour").replace(/[^a-z0-9-]/gi, "") || "tour";
+      res.set("Content-Disposition", `attachment; filename="${stem}-${layout}.png"`);
+    }
+    res.set("Cache-Control", "public, max-age=600");
+    res.type("image/png").send(card);
+  } catch (err) {
+    if (!(err instanceof NotFound)) {
+      console.warn(`[${NS}] share card ${id}/${layout} failed:`, err instanceof Error ? err.message : err);
+    }
+    res.status(404).end();
   }
 });
 

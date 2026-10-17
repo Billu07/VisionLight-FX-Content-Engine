@@ -109,6 +109,16 @@ export const TOUR_STYLES = `
    aesthetic"). It takes .t-back itself so the two can never drift apart — only the hover lean
    is reversed, because it goes forward. */
 .t-back.t-fwd:hover{transform:translateX(2px)}
+/* The share card: three shapes of the same card, previewed at whatever width the sheet has.
+   The frame carries the aspect ratio so switching tabs does not jump the sheet's height about
+   while the new PNG loads. */
+.t-kit{display:grid;gap:10px}
+.t-kit-shot{border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--surface-3);
+  display:grid;place-items:center;width:100%;margin:0 auto}
+.t-kit-shot img{display:block;width:100%;height:100%;object-fit:cover}
+.t-kit-landscape{aspect-ratio:1200/630}
+.t-kit-square{aspect-ratio:1/1;max-width:340px}
+.t-kit-portrait{aspect-ratio:1080/1350;max-width:300px}
 .t-name-input{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:8px 10px}
 .t-muted-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
 
@@ -378,13 +388,8 @@ export const TOUR_STYLES = `
 @keyframes t-ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.4);opacity:0}}
 .t-sheet-link{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
 .t-sheet-link code{flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.t-sheet-grid{display:grid;gap:16px;grid-template-columns:auto minmax(0,1fr);align-items:center}
-.t-sheet-qr{padding:10px;border-radius:16px;background:#fff;color:#0b1220;border:1px solid var(--border);display:grid;place-items:center}
-.t-qr{display:block}
-.t-sheet-side{display:grid;gap:8px}
 @keyframes t-fade{from{opacity:0}to{opacity:1}}
 @keyframes t-sheet-up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
-@media(max-width:440px){.t-sheet-grid{grid-template-columns:1fr;justify-items:center;text-align:center}.t-sheet-side .t-actions{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.d-pill.t-live::before,.t-live-ring.pulse::after,.t-sheet,.t-sheet-card{animation:none}}
 /* ── Shell: wrapping account actions + the Tour · Powered by footer ── */
 .t-topactions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
