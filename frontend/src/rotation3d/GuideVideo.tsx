@@ -14,10 +14,10 @@ import { useEffect, useId, useRef, useState } from "react";
  * pausable — the arrangement every browser permits without a gesture, precisely because
  * there is no sound to intrude.
  *
- * **It plays once and rests on its own end card.** Both films close on the drift.li mark over
- * black — they are finished pieces, not loops, and looping one cut from that logo back to the
- * opening sunset every fifteen seconds (the first and last frames share almost nothing: SSIM
- * 0.014). So `loop` is off and the control becomes Replay when it ends.
+ * **It loops, on the client's instruction.** Both films close on the drift.li mark over black,
+ * so each loop cuts from that logo back to the opening sunset — the first and last frames share
+ * almost nothing (SSIM 0.014). That is a known, accepted seam: smoothing it means a crossfade in
+ * the encode, not a change here. `ended` / Replay is kept for a film that does not loop.
  *
  * **It starts with the page.** There is NO viewport gating here, and that
  * is a decision, not an omission: the first version played it on an IntersectionObserver and
@@ -314,11 +314,19 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
         style={ratio ? ({ "--gv-ar": ratio } as React.CSSProperties) : undefined}
       >
         {/*
-          NOT looped. Both films close on the drift.li brand card over black, so they are
-          finished pieces, not loops: looping one cuts from that logo straight back to the
-          opening sunset every fifteen seconds. Measured, the first and last frames share
-          almost nothing (SSIM 0.014 and 0.0006), which is what that cut looks like
-          numerically. It plays once, rests on the brand card, and offers Replay.
+          LOOPED, on the client's instruction (2026-10-17), on phone and desktop alike.
+
+          Worth knowing what that means, because it was briefly off for this reason: both
+          films close on the drift.li brand card over black, so each loop cuts from that logo
+          straight back to the opening sunset. The two frames share almost nothing — SSIM
+          0.014 on the home film, 0.0006 on the tour one — so it is a hard cut, not a match.
+          The client has seen it and wants the loop anyway; a seam that reads as deliberate
+          needs a crossfade built into the ENCODE (xfade the tail over the head, which costs
+          ~0.8s of running time and a regenerated poster, since frame 0 moves). Doing it in
+          the player instead would mean fading the element across the seam.
+
+          `ended` / Replay below is kept for the non-looping case: with `loop` set the event
+          never fires, so that path is dormant rather than dead.
 
           It autoplays. There is deliberately NO viewport gating here: an
           earlier pass played it on an IntersectionObserver and paused it whenever the frame
@@ -336,6 +344,7 @@ export default function GuideVideo({ kicker, title, lead, desktop, mobile, label
           preload={held ? "metadata" : "auto"}
           autoPlay={!held}
           muted
+          loop
           playsInline
           aria-label={label}
           onPlay={() => {
