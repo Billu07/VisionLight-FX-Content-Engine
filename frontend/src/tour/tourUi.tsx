@@ -82,6 +82,15 @@ export const TOUR_STYLES = `
 @media(min-width:1000px){.t-preview{display:grid;gap:12px}}
 .t-frame{aspect-ratio:9/16;width:100%;border-radius:20px;overflow:hidden;background:#000;border:1px solid var(--border);display:grid;place-items:center;color:var(--faint);font-size:12px;text-align:center;padding:0}
 .t-frame iframe{width:100%;height:100%;border:0;display:block}
+/* A phone is 390x844, not 9:16 — 0.46 against 0.56 — which is why a 9:16 preview never showed
+   what a visitor actually sees (client, 2026-10-17: "it's not consistent with what we see in
+   mobile"). Landscape is the same phone turned over, so the player's own orientation media
+   queries resolve correctly inside the iframe: its box really is landscape. */
+.t-frame-port{aspect-ratio:390/844}
+.t-frame-land{aspect-ratio:844/390}
+.t-pvbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.t-pvbar .d-tabs{gap:2px}
+.t-pvbar .d-tab{padding:5px 10px;font-size:11.5px}
 .t-link{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);font-size:12.5px;max-width:100%;min-width:0}
 .t-link code{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;color:var(--text)}
 .t-chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}

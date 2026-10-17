@@ -163,6 +163,15 @@ export type SpinViewerProps = {
   pinTrack?: PinTrack;
   /** Tour Insights: record where this visitor spends their time in the drift (tour drifts only). */
   attention?: AttentionTarget | null;
+  /**
+   * The builder's preview only: dress the player as a platform instead of detecting one
+   * (`/embed/:id?as=android|ios`). A real visitor is always detected — this exists because the
+   * preview runs in a desktop iframe, where `isApple()` is false and, worse, no
+   * `@media (pointer: coarse)` rule applies at all, so the preview showed chrome a phone hides
+   * and hid chrome a phone shows. iOS and iPadOS share it: every browser there is Safari's
+   * engine, which is why there is no separate "Safari".
+   */
+  dressAs?: "android" | "ios" | null;
   /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
    * false = dragging clamps at the first/last frame. Default true (360 spins). */
   loopScrub?: boolean;
@@ -302,6 +311,7 @@ export default function SpinViewer({
   pins,
   pinTrack = null,
   attention = null,
+  dressAs = null,
   loopScrub = true,
   driftDirection = "LTR",
   firstDirection = null,
@@ -542,8 +552,12 @@ export default function SpinViewer({
     // Inside an app's own browser, turning the phone may not hand the screen over by itself, so
     // the button has to stay there — everywhere else the hint does the job (client, 2026-10-02).
     if (isInAppBrowser()) stage.classList.add("r3d-inapp");
-    // No fullscreen to offer on an iPhone or iPad — see isApple().
-    if (isApple()) stage.classList.add("r3d-ios");
+    // No fullscreen to offer on an iPhone or iPad — see isApple(). The builder's preview says
+    // which platform to dress as instead of being detected; everyone else is detected.
+    if (dressAs ? dressAs === "ios" : isApple()) stage.classList.add("r3d-ios");
+    // A desktop iframe has a fine pointer, so every `@media (pointer: coarse)` rule is off. This
+    // class is their twin, and only exists while a platform is being dressed as.
+    if (dressAs) stage.classList.add("r3d-touchsim");
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -3023,6 +3037,19 @@ const R3D_CSS = `
 @media (pointer: coarse){
   /* .r3d-stage scopes it so this beats the base .r3d-stops rule further down the sheet. */
   .r3d-stage .r3d-stops{display:none}
+}
+
+/* ── the builder's preview, dressed as a phone (?as=) ──
+   A desktop iframe never matches pointer:coarse, so the preview showed the stop counter a
+   phone hides and hid the fullscreen button a phone shows — which made an Android/iPhone toggle
+   show no difference at all. These are twins of exactly the coarse rules that change what you
+   SEE, and nothing else; orientation is left to the real media query, because the iframe's own
+   box is genuinely portrait or landscape. */
+.r3d-stage.r3d-touchsim .r3d-stops{display:none}
+.r3d-stage.r3d-touchsim.r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+@media (orientation: portrait){
+  .r3d-stage.r3d-touchsim.r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
+    top:calc(var(--r3d-frametop,20%) + 14px)}
 }
 
 /* A landscape drift on a phone gets the fullscreen button on EVERY stop, not just the first one

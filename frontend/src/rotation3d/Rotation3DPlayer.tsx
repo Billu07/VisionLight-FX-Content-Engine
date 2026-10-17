@@ -170,6 +170,8 @@ export default function Rotation3DPlayer() {
   const placementOverride = (["CENTER", "CENTER_REV", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"] as const).find(
     (v) => v === placementParam,
   );
+  // ?as=android|ios — the builder's device preview. Only it ever sends this.
+  const dressAs = (["android", "ios"] as const).find((v) => v === search.get("as")) || null;
   const previewPrimary = (search.get("previewPrimary") || "").slice(0, 40);
   const previewSecondary = (search.get("previewSecondary") || "").slice(0, 40);
   const showControls = search.get("controls") !== "0";
@@ -409,6 +411,7 @@ export default function Rotation3DPlayer() {
       driftDirection={drift ? p.driftDirection : undefined}
       firstDirection={drift ? p.firstDirection : undefined}
       cameraLock={drift ? !!p.cameraLocked : undefined}
+      dressAs={dressAs}
       driftMode={drift}
       captions={view.captions}
       pins={view.pins}

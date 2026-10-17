@@ -735,6 +735,10 @@ export default function TourBuilder({
   const [pinStep, setPinStep] = useState<FlowStep | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // What the preview pretends to be. The platform goes to the player as ?as= (it cannot be
+  // detected inside a desktop iframe), the orientation is just the frame's shape.
+  const [pvOs, setPvOs] = useState<"android" | "ios">("android");
+  const [pvLand, setPvLand] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [description, setDescription] = useState("");
@@ -1367,10 +1371,39 @@ export default function TourBuilder({
         </div>
 
         <aside className="t-preview">
-          <div className="d-eyebrow">Preview</div>
-          <div className="t-frame">
+          <div className="t-pvbar">
+            <div className="d-eyebrow">Preview</div>
+            <div className="d-tabs">
+              <button type="button" className={`d-tab ${pvLand ? "" : "active"}`} onClick={() => setPvLand(false)}>
+                Portrait
+              </button>
+              <button type="button" className={`d-tab ${pvLand ? "active" : ""}`} onClick={() => setPvLand(true)}>
+                Landscape
+              </button>
+            </div>
+            <div className="d-tabs">
+              <button type="button" className={`d-tab ${pvOs === "android" ? "active" : ""}`} onClick={() => setPvOs("android")}>
+                Android
+              </button>
+              <button
+                type="button"
+                className={`d-tab ${pvOs === "ios" ? "active" : ""}`}
+                onClick={() => setPvOs("ios")}
+                title="iPhone and iPad — every browser there runs Safari's engine, so they behave the same"
+              >
+                iPhone · Safari
+              </button>
+            </div>
+          </div>
+          <div className={`t-frame ${pvLand ? "t-frame-land" : "t-frame-port"}`}>
             {selectedProduct && isReady(selectedProduct.status) ? (
-              <iframe key={selectedProduct.id + selectedProduct.updatedAt} src={`/embed/${selectedProduct.id}`} title={`Preview of ${selectedProduct.name}`} allow="fullscreen" />
+              // Keyed by what it is dressed as too: the player reads ?as= once, on mount.
+              <iframe
+                key={`${selectedProduct.id}${selectedProduct.updatedAt}${pvOs}${pvLand}`}
+                src={`/embed/${selectedProduct.id}?as=${pvOs}`}
+                title={`Preview of ${selectedProduct.name}`}
+                allow="fullscreen"
+              />
             ) : selectedProduct?.status === "AWAITING_PAYMENT" ? (
               <span style={{ padding: 20 }}>{selectedProduct.name} Converts After Checkout</span>
             ) : selectedProduct?.status === "PROCESSING" ? (
