@@ -1106,27 +1106,33 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   **Create a Tour** button sits in the row (`CreateTourButton` in tourPageParts, also on the channel PAGE's
   action row): a visitor there is not looking at a property to enquire about, so the invitation is to make
   one. Signed out it opens Try It Free, signed in it goes to their own page.
-- **The builder's preview is a phone, and says which one** (2026-10-17, client: "the preview of a drift
-  is portrait, but it's not consistent with what we see in mobile… introduce Landscape view option as
-  well, also introduce Android, iOS and safari option"). Three things were wrong with it and each has
-  its own fix:
-  · **The shape.** It was `aspect-ratio: 9/16` = 0.56, where a phone is 390x844 = 0.46. `.t-frame-port`
-    is the phone's own ratio and `.t-frame-land` is it turned over — and because the iframe's BOX is
-    then genuinely landscape, the player's own orientation media queries resolve correctly inside it
-    with no simulation at all.
-  · **The pointer.** A desktop iframe never matches `pointer: coarse`, so every rule keyed on it was
-    off: the preview showed the stop counter a phone hides and hid the fullscreen button a phone shows.
-    `?as=` adds **`r3d-touchsim`**, and the sheet carries twins of exactly the coarse rules that change
-    what you SEE — the stops, the `[data-fs]` button, and the tools' top-right placement. Keep that list
-    short; it is a deliberate duplication, not a pattern to grow.
-  · **The platform.** `/embed/:id?as=android|ios` → `Rotation3DPlayer` reads it beside the other preview
-    params (`ctaPlacement`, `previewPrimary`…) and passes `dressAs` to SpinViewer, which uses it in place
-    of `isApple()` for the `r3d-ios` class. A real visitor is always DETECTED; only the preview is told.
-    The iframe is keyed by `as` too, because the player reads the param once on mount.
-  **There is no separate "Safari" button, on purpose**: every browser on iOS and iPadOS runs Safari's
-  engine — that is what `isApple()` is about — so a third option would have behaved identically to the
-  second and implied a difference that does not exist. The button is labelled "iPhone · Safari" and its
-  tooltip says so.
+- **The builder's preview shows the real device** (2026-10-17, client: "I want the preview to show what
+  I actually see on certain devices"). Two icons, phone and desktop, and the phone picks a platform —
+  that is the whole UI ("one phone icon… a desktop icon… that's it"). An earlier pass had four text tabs
+  including Landscape and was withdrawn: a landscape phone squeezed into the column was unreadable
+  ("even the title text is overlapping with prev button").
+  **The iframe renders at the DEVICE's real viewport size and is scaled down to the column** —
+  390x844 or 1280x800, `transform: scale()` from a ResizeObserver, the box's height set inline from the
+  same scale so it shrink-wraps. That is the part that makes it faithful: sizing the iframe to the
+  column instead gave the player a ~328px viewport, which is no device at all, so every width-based
+  rule resolved to something no visitor ever sees. **Use a CALLBACK ref for the box, not a plain ref
+  plus an effect**: the builder renders a loading shell first, so the box does not exist at mount — an
+  effect ran once against null and never again, leaving `scale(1)`, a 390px screen clipped inside a
+  328px box.
+  **`pointer: coarse` is a CLASS now, not a media query** (`r3d-touch`, set from `coarsePointer()` in
+  SpinViewer and kept in sync by a `change` listener for a measured device). All five coarse blocks in
+  the sheet and all three coarse reads in the JS go through it, so a dressed preview and a real phone
+  take the *identical* path. The pass before this twinned three of those rules under a simulation
+  class and the preview still disagreed with a phone, because a subset of rules is only ever a subset —
+  that is the lesson, and `r3d-touchsim` is gone.
+  `/embed/:id?as=android|ios|desktop` → `Rotation3DPlayer` reads it beside the other preview params and
+  passes `dressAs`, which stands in for both `isApple()` (→ `r3d-ios`) and the pointer question. A real
+  visitor is always DETECTED; only the preview is told. The iframe is keyed by it, as the param is read
+  once at mount. Verified against an emulated touch device: `?as=android` and a real phone agree on
+  `r3d-touch`, the dots (hidden) and the fullscreen button (shown); `?as=ios` hides the button;
+  `?as=desktop` keeps the dots. **No separate "Safari" button, on purpose** — every browser on iOS and
+  iPadOS runs Safari's engine, so it would behave identically to iPhone and imply a difference that is
+  not there.
 - **Builder, third pass** (2026-10-17, client): **"+ New Tour" wears the same pill as the way back** —
   it was `d-btn ghost sm` sitting beside an accent `.t-back`, which read as disabled ("it's hard to
   see, use the same blue aesthetic"). It now takes `.t-back` itself plus `.t-fwd`, which only reverses

@@ -164,14 +164,21 @@ export type SpinViewerProps = {
   /** Tour Insights: record where this visitor spends their time in the drift (tour drifts only). */
   attention?: AttentionTarget | null;
   /**
-   * The builder's preview only: dress the player as a platform instead of detecting one
-   * (`/embed/:id?as=android|ios`). A real visitor is always detected — this exists because the
-   * preview runs in a desktop iframe, where `isApple()` is false and, worse, no
-   * `@media (pointer: coarse)` rule applies at all, so the preview showed chrome a phone hides
-   * and hid chrome a phone shows. iOS and iPadOS share it: every browser there is Safari's
-   * engine, which is why there is no separate "Safari".
+   * The builder's preview only: dress the player as a device instead of detecting one
+   * (`/embed/:id?as=android|ios|desktop`). A real visitor is always detected.
+   *
+   * It answers TWO questions that a desktop iframe otherwise gets wrong — whether this is an
+   * Apple device (`r3d-ios`) and whether the pointer is coarse (`r3d-touch`) — and it answers
+   * them through the same values a real device goes through, not through a parallel set of
+   * rules. That matters: an earlier pass twinned a handful of `pointer: coarse` rules under a
+   * simulation class and the preview still disagreed with a real phone, because the twins were
+   * only ever a subset (client, 2026-10-17: "I want the preview to show what I actually see on
+   * certain devices").
+   *
+   * iOS and iPadOS share one value: every browser there is Safari's engine, which is why there
+   * is no separate "Safari".
    */
-  dressAs?: "android" | "ios" | null;
+  dressAs?: "android" | "ios" | "desktop" | null;
   /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
    * false = dragging clamps at the first/last frame. Default true (360 spins). */
   loopScrub?: boolean;
@@ -203,6 +210,17 @@ const CREATOR_LANDING_URL = "/tour";
 // 1: cover only when the shapes already match, and otherwise fill the axis that fits and
 // let the chrome sit on the ground beside it. Nothing of the room is ever thrown away.
 // Raise it if a little crop is ever worth a little more bleed — it is the only knob.
+/**
+ * Is the pointer coarse? Every `pointer: coarse` question in this file goes through here, so the
+ * builder's preview and a real device cannot answer it differently. Dressed as a device, the
+ * answer is that device's; otherwise it is measured.
+ */
+const coarsePointer = (as: "android" | "ios" | "desktop" | null | undefined): boolean => {
+  if (as) return as !== "desktop";
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
+};
+
 const FILL_MAX_MISMATCH = 1;
 
 /**
@@ -555,9 +573,15 @@ export default function SpinViewer({
     // No fullscreen to offer on an iPhone or iPad — see isApple(). The builder's preview says
     // which platform to dress as instead of being detected; everyone else is detected.
     if (dressAs ? dressAs === "ios" : isApple()) stage.classList.add("r3d-ios");
-    // A desktop iframe has a fine pointer, so every `@media (pointer: coarse)` rule is off. This
-    // class is their twin, and only exists while a platform is being dressed as.
-    if (dressAs) stage.classList.add("r3d-touchsim");
+    // Every `pointer: coarse` RULE in the sheet keys off this class rather than the media
+    // query, so a dressed preview and a real phone go down the same path.
+    const syncTouch = () => stage.classList.toggle("r3d-touch", coarsePointer(dressAs));
+    syncTouch();
+    // A measured device can change its answer — a tablet with a keyboard folded away, a window
+    // moved to a touchscreen — and the class has to follow, or the chrome is wrong until a
+    // reload. A dressed preview is told, so it has nothing to listen for.
+    const pointerMq = dressAs ? null : window.matchMedia?.("(pointer: coarse)") ?? null;
+    pointerMq?.addEventListener?.("change", syncTouch);
     // Immersive, but with the framed geometry: a desktop in fullscreen grows the drift and
     // keeps the dark ground beneath it for the buttons, rather than going edge to edge
     // (client, 2026-09-24). The immersive CHROME — tap to hide, the fade while dragging, the
@@ -1787,7 +1811,7 @@ export default function SpinViewer({
     // A real touch device (phone/tablet) is the only place this applies — a coarse
     // pointer is the reliable signal, so a small laptop window that merely looks
     // phone-sized never triggers it.
-    const isTouchDevice = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
+    const isTouchDevice = coarsePointer(dressAs);
     const isLandscape = () =>
       window.matchMedia?.("(orientation: landscape)")?.matches ??
       window.innerWidth > window.innerHeight;
@@ -2264,6 +2288,7 @@ export default function SpinViewer({
       document.removeEventListener("fullscreenchange", onFsChange);
       window.removeEventListener("resize", onOrient);
       touchLike?.removeEventListener?.("change", onTouchLike);
+      pointerMq?.removeEventListener?.("change", syncTouch);
       stage.classList.remove("r3d-immersive", "r3d-siderail", "r3d-bare");
       window.removeEventListener("orientationchange", onOrient);
       orientMql?.removeEventListener?.("change", onOrient);
@@ -2517,7 +2542,7 @@ export default function SpinViewer({
 
       {tips && (
         <TourTips
-          touch={typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)")?.matches ?? false)}
+          touch={coarsePointer(dressAs)}
           onDone={() => {
             setTips(false);
             // Straight into the demonstration on the drift they have just landed on.
@@ -2971,9 +2996,7 @@ const R3D_CSS = `
 /* Only while a PORTRAIT drift is being dragged on a touch screen (client, 2026-10-02).
    A landscape drift keeps its chrome: it lives in the ground either side, not over the room.
    Tap-to-hide is gone entirely, so the bare class no longer appears here. */
-@media (pointer: coarse){
-  .r3d-immersive:not(.r3d-wide).r3d-grabbing :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
-}
+.r3d-touch.r3d-immersive:not(.r3d-wide).r3d-grabbing :is(.r3d-topbar,.r3d-stops,.r3d-ctas,.r3d-powered-badge,.r3d-legal,.r3d-hint,.r3d-zoomcol,.r3d-pins,.r3d-scrim-top,.r3d-scrim-bot){opacity:0;pointer-events:none}
 
 /* ── A landscape drift on a sideways phone (client's landscape_button.jpeg, 2026-10-02) ──
    The footage is pillarboxed, so the nav moves out into the ground either side of it instead
@@ -3034,32 +3057,14 @@ const R3D_CSS = `
 
 /* A3: the "7/10" panel sits over the top of the frame on a phone — the client asked for it
    gone (2026-10-02). Desktop keeps it: there it has the band above the footage to live in. */
-@media (pointer: coarse){
-  /* .r3d-stage scopes it so this beats the base .r3d-stops rule further down the sheet. */
-  .r3d-stage .r3d-stops{display:none}
-}
-
-/* ── the builder's preview, dressed as a phone (?as=) ──
-   A desktop iframe never matches pointer:coarse, so the preview showed the stop counter a
-   phone hides and hid the fullscreen button a phone shows — which made an Android/iPhone toggle
-   show no difference at all. These are twins of exactly the coarse rules that change what you
-   SEE, and nothing else; orientation is left to the real media query, because the iframe's own
-   box is genuinely portrait or landscape. */
-.r3d-stage.r3d-touchsim .r3d-stops{display:none}
-.r3d-stage.r3d-touchsim.r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
-@media (orientation: portrait){
-  .r3d-stage.r3d-touchsim.r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
-    top:max(max(14px,env(safe-area-inset-top)),
-            calc(var(--r3d-frametop,20%) - clamp(32px,9vmin,40px) - 12px))}
-}
+/* .r3d-stage scopes it so this beats the base .r3d-stops rule further down the sheet. */
+.r3d-stage.r3d-touch .r3d-stops{display:none}
 
 /* A landscape drift on a phone gets the fullscreen button on EVERY stop, not just the first one
    of a visit (client, 2026-10-07) — a visitor who met it once then had no way back OUT of
    fullscreen. An iPhone or iPad is the exception and is handled by the .r3d-ios rule below. */
-@media (pointer: coarse){
-  .r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
-}
-@media (pointer: coarse) and (orientation: portrait){
+.r3d-touch.r3d-drift.r3d-wide [data-fs]{display:inline-grid!important}
+@media (orientation: portrait){
   /* ABOVE the frame's top edge, in the ground over it — not inside it (client, 2026-10-17:
      "I didn't mean inside the frame... it is sitting on the frame, just take it up, out of the
      frame"). The first pass read "top right of the frame" as 14px INSIDE the top edge, which is
@@ -3070,7 +3075,7 @@ const R3D_CSS = `
      are left-aligned while this sits at right:16px. Apple never has the button, so in practice
      this rule is Android. The sideways/fullscreen placement is a different rule and the client
      has confirmed it is right — do not touch it from here. */
-  .r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
+  .r3d-touch.r3d-drift.r3d-wide .r3d-tools{position:absolute;right:16px;z-index:6;
     top:max(max(14px,env(safe-area-inset-top)),
             calc(var(--r3d-frametop,20%) - clamp(32px,9vmin,40px) - 12px))}
   /* The sentence stands only where there is no button to offer instead. On an iPhone or iPad
@@ -3127,7 +3132,10 @@ const R3D_CSS = `
    a width rule stopped matching exactly where it mattered most: the fullscreen landscape
    player, which is the one place the client wanted them gone (2026-09-26). A desktop keeps
    both, and so does every non-tour drift. */
-@media (pointer: coarse), (max-width: 560px) {
+/* Either a touch screen or a narrow one. Two rules rather than one list, because one half is
+   now a class and the other is still a width. */
+.r3d-touch.r3d-tour .r3d-legal,.r3d-touch.r3d-tour .r3d-powered-badge{display:none}
+@media (max-width: 560px){
   .r3d-tour .r3d-legal,.r3d-tour .r3d-powered-badge{display:none}
 }
 /* A desktop in fullscreen keeps its band, so the ground below the drift is visible again —

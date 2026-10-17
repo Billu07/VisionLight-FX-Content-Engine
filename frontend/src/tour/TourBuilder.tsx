@@ -735,10 +735,50 @@ export default function TourBuilder({
   const [pinStep, setPinStep] = useState<FlowStep | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  // What the preview pretends to be. The platform goes to the player as ?as= (it cannot be
-  // detected inside a desktop iframe), the orientation is just the frame's shape.
+  /**
+   * The preview. Two devices, as asked (client, 2026-10-17: "one phone icon… a desktop icon…
+   * that's it"), and the phone picks a platform.
+   *
+   * The iframe is rendered at the device's REAL viewport size and scaled down to the column,
+   * which is the whole trick: every width-based rule in the player then resolves exactly as it
+   * does on that device. Sizing the iframe to the column instead — which is what it used to do
+   * — gave the player a ~300px viewport that is no device at all, and a desktop preview that
+   * was unreadable ("so small on desktop that even the title text is overlapping with prev
+   * button").
+   */
+  const [pvDev, setPvDev] = useState<"phone" | "desktop">("phone");
   const [pvOs, setPvOs] = useState<"android" | "ios">("android");
-  const [pvLand, setPvLand] = useState(false);
+  const [pvScale, setPvScale] = useState(1);
+  const pvSize = pvDev === "phone" ? { w: 390, h: 844 } : { w: 1280, h: 800 };
+  // Read inside the observer so the callback never has to be rebuilt when the device changes.
+  const pvDevRef = useRef(pvDev);
+  pvDevRef.current = pvDev;
+  const pvBoxRef = useRef<HTMLDivElement | null>(null);
+  const pvRo = useRef<ResizeObserver | null>(null);
+  const pvFit = (node: HTMLDivElement) =>
+    setPvScale(Math.min(1, node.clientWidth / (pvDevRef.current === "phone" ? 390 : 1280)));
+  /**
+   * A CALLBACK ref, not a plain one with an effect: the builder renders a loading shell first, so
+   * the preview box does not exist when the component mounts. An effect keyed on the device
+   * therefore ran once against a null ref and never again, and the screen stayed at scale(1) —
+   * measured as a 390px screen inside a 328px box, clipped down the right-hand side. This fires
+   * whenever the node actually attaches.
+   */
+  const attachPvBox = (node: HTMLDivElement | null) => {
+    if (pvBoxRef.current === node) return;
+    pvRo.current?.disconnect();
+    pvBoxRef.current = node;
+    if (!node) return;
+    const ro = new ResizeObserver(() => pvFit(node));
+    ro.observe(node);
+    pvRo.current = ro;
+    pvFit(node);
+  };
+  // Switching device changes the divisor, so refit against the box already on screen.
+  useEffect(() => {
+    if (pvBoxRef.current) pvFit(pvBoxRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvDev]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [description, setDescription] = useState("");
@@ -1373,15 +1413,37 @@ export default function TourBuilder({
         <aside className="t-preview">
           <div className="t-pvbar">
             <div className="d-eyebrow">Preview</div>
-            <div className="d-tabs">
-              <button type="button" className={`d-tab ${pvLand ? "" : "active"}`} onClick={() => setPvLand(false)}>
-                Portrait
+            <div className="t-pvdev" role="group" aria-label="Preview device">
+              <button
+                type="button"
+                className={pvDev === "phone" ? "on" : ""}
+                onClick={() => setPvDev("phone")}
+                title="Phone"
+                aria-label="Phone preview"
+                aria-pressed={pvDev === "phone"}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="7" y="2" width="10" height="20" rx="2.4" />
+                  <path d="M11 18.6h2" />
+                </svg>
               </button>
-              <button type="button" className={`d-tab ${pvLand ? "active" : ""}`} onClick={() => setPvLand(true)}>
-                Landscape
+              <button
+                type="button"
+                className={pvDev === "desktop" ? "on" : ""}
+                onClick={() => setPvDev("desktop")}
+                title="Desktop"
+                aria-label="Desktop preview"
+                aria-pressed={pvDev === "desktop"}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+                  <path d="M9 20.5h6M12 16.5v4" />
+                </svg>
               </button>
             </div>
-            <div className="d-tabs">
+          </div>
+          {pvDev === "phone" && (
+            <div className="d-tabs t-pvos">
               <button type="button" className={`d-tab ${pvOs === "android" ? "active" : ""}`} onClick={() => setPvOs("android")}>
                 Android
               </button>
@@ -1391,19 +1453,24 @@ export default function TourBuilder({
                 onClick={() => setPvOs("ios")}
                 title="iPhone and iPad — every browser there runs Safari's engine, so they behave the same"
               >
-                iPhone · Safari
+                iPhone
               </button>
             </div>
-          </div>
-          <div className={`t-frame ${pvLand ? "t-frame-land" : "t-frame-port"}`}>
+          )}
+          <div ref={attachPvBox} className="t-frame t-pvbox" style={{ height: Math.round(pvSize.h * pvScale) }}>
             {selectedProduct && isReady(selectedProduct.status) ? (
-              // Keyed by what it is dressed as too: the player reads ?as= once, on mount.
-              <iframe
-                key={`${selectedProduct.id}${selectedProduct.updatedAt}${pvOs}${pvLand}`}
-                src={`/embed/${selectedProduct.id}?as=${pvOs}`}
-                title={`Preview of ${selectedProduct.name}`}
-                allow="fullscreen"
-              />
+              // Keyed by what it is dressed as: the player reads ?as= once, on mount.
+              <div
+                className="t-pvscreen"
+                style={{ width: pvSize.w, height: pvSize.h, transform: `scale(${pvScale})` }}
+              >
+                <iframe
+                  key={`${selectedProduct.id}${selectedProduct.updatedAt}${pvDev}${pvOs}`}
+                  src={`/embed/${selectedProduct.id}?as=${pvDev === "desktop" ? "desktop" : pvOs}`}
+                  title={`Preview of ${selectedProduct.name}`}
+                  allow="fullscreen"
+                />
+              </div>
             ) : selectedProduct?.status === "AWAITING_PAYMENT" ? (
               <span style={{ padding: 20 }}>{selectedProduct.name} Converts After Checkout</span>
             ) : selectedProduct?.status === "PROCESSING" ? (
